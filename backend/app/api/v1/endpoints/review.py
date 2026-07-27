@@ -4,12 +4,15 @@ from fastapi import APIRouter, Request, status
 
 from app.core.logging import get_logger
 from app.dependencies.container import (
+    RequirementDeltaReviewServiceDep,
     RequirementReviewServiceDep,
     RequirementSetReviewServiceDep,
     ReviewVersionServiceDep,
 )
 from app.schemas.common import APIResponse
 from app.schemas.review import (
+    DeltaReviewInput,
+    DeltaReviewResponse,
     RequirementReviewInput,
     RequirementReviewResponse,
     RequirementSetReviewInput,
@@ -81,4 +84,29 @@ async def review_requirement_set(
         requirement_count=len(body.requirements),
     )
     response = service.review_requirement_set(body)
+    return APIResponse(data=response, request_id=request.state.request_id)
+
+
+@router.post(
+    "/delta",
+    response_model=APIResponse[DeltaReviewResponse],
+    summary="Run deterministic delta review between requirement revisions",
+    description=(
+        "Detects new, modified, deleted requirements and changed trace links. "
+        "Reviews only changed requirement items during incremental execution."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def review_delta(
+    body: DeltaReviewInput,
+    request: Request,
+    service: RequirementDeltaReviewServiceDep,
+) -> APIResponse[DeltaReviewResponse]:
+    logger.info(
+        "delta_review_requested",
+        specification_id=body.specification_id or "",
+        baseline_count=len(body.baseline_requirements),
+        updated_count=len(body.updated_requirements),
+    )
+    response = service.review_delta(body)
     return APIResponse(data=response, request_id=request.state.request_id)

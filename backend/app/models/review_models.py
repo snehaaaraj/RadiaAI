@@ -154,3 +154,57 @@ class RequirementSetReviewResponse(BaseModel):
     findings: list[ReviewFinding] = Field(default_factory=list)
     requirement_count: int = 0
     determinism: DeterminismContext
+
+
+class TraceLinkChangeType(StrEnum):
+    """Supported trace-link delta operations."""
+
+    ADDED = "added"
+    REMOVED = "removed"
+    MODIFIED = "modified"
+
+
+class TraceLinkChange(BaseModel):
+    """Represents a changed traceability link during delta review."""
+
+    requirement_id: str
+    change_type: TraceLinkChangeType
+    previous_parent_id: str | None = None
+    current_parent_id: str | None = None
+
+
+class DeltaChangeSummary(BaseModel):
+    """Changed item summary for delta review mode."""
+
+    new_requirement_ids: list[str] = Field(default_factory=list)
+    modified_requirement_ids: list[str] = Field(default_factory=list)
+    deleted_requirement_ids: list[str] = Field(default_factory=list)
+    changed_trace_link_requirement_ids: list[str] = Field(default_factory=list)
+
+
+class DeltaRequirementReviewResult(BaseModel):
+    """Per-requirement review result included in delta review response."""
+
+    requirement_id: str
+    overall: ReviewStatus
+    category_results: list[CategoryResult] = Field(default_factory=list)
+    findings: list[ReviewFinding] = Field(default_factory=list)
+
+
+class DeltaReviewInput(BaseModel):
+    """Input payload for deterministic delta review."""
+
+    specification_id: str | None = None
+    baseline_requirements: list[RequirementReviewInput] = Field(default_factory=list)
+    updated_requirements: list[RequirementReviewInput] = Field(default_factory=list)
+    changed_trace_links: list[TraceLinkChange] = Field(default_factory=list)
+
+
+class DeltaReviewResponse(BaseModel):
+    """Deterministic response for delta review mode."""
+
+    overall: ReviewStatus
+    change_summary: DeltaChangeSummary
+    reviewed_requirements: list[DeltaRequirementReviewResult] = Field(default_factory=list)
+    requirement_set_findings: list[ReviewFinding] = Field(default_factory=list)
+    determinism: DeterminismContext
