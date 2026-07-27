@@ -1,8 +1,8 @@
 # Radia AI
 
-Enterprise Retrieval-Augmented Generation (RAG) platform for engineering knowledge.
-Initially designed to review Jama Systems requirements; architected to evolve into a
-full enterprise engineering knowledge assistant.
+Deterministic AI-assisted Requirements Engineering platform for aerospace teams.
+Originally started as a Jama requirements reviewer and now refactored toward
+structured, explainable requirement quality workflows.
 
 ---
 
@@ -21,10 +21,10 @@ full enterprise engineering knowledge assistant.
 │                     port 8000                           │
 │                                                         │
 │  api/v1/       ← routes + request validation only       │
-│  services/     ← business logic (Phase 2+)              │
-│  rag/          ← RAG pipeline stages (Phase 4)          │
-│  ingestion/    ← document ingestion (Phase 2)           │
-│  connectors/   ← source adapters (Phase 2+)             │
+│  reviewers/    ← modular deterministic review engines    │
+│  services/     ← orchestration + business logic          │
+│  ingestion/    ← document ingestion pipeline             │
+│  connectors/   ← source adapters                         │
 └──────────┬──────────┬────────────────┬──────────────────┘
            │          │                │
     ┌──────▼──┐ ┌─────▼──────┐ ┌──────▼──────┐
@@ -153,7 +153,8 @@ pytest --cov=app                # with coverage report
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/v1/health` | Application health check |
-| POST | `/api/v1/chat` | RAG question answering |
+| GET | `/api/v1/review/version` | Reviewer/prompt/standards determinism metadata |
+| POST | `/api/v1/chat` | Legacy RAG question answering (migration in progress) |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
 | POST | `/api/v1/ingest` | Trigger document ingestion |
 | GET | `/api/v1/documents` | List indexed documents |

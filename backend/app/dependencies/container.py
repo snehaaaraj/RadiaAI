@@ -14,10 +14,18 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated
 
-from fastapi import Depends, FastAPI
+from fastapi import Depends, FastAPI, Request
 
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
+from app.reviewers.certification.reviewer import CertificationReviewer
+from app.reviewers.language.reviewer import LanguageReviewer
+from app.reviewers.orchestrator import ReviewOrchestrator
+from app.reviewers.requirement_set.reviewer import RequirementSetReviewer
+from app.reviewers.structure.reviewer import StructureReviewer
+from app.reviewers.traceability.reviewer import TraceabilityReviewer
+from app.reviewers.verifiability.reviewer import VerifiabilityReviewer
+from app.services.review_version_service import ReviewVersionService
 
 logger = get_logger(__name__)
 
@@ -45,6 +53,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         environment=settings.environment,
     )
 
+    app.state.review_orchestrator = _build_review_orchestrator(settings)
+    app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
+
     # Phase 2: initialise Azure clients here, e.g.:
     # app.state.search_service = AzureSearchService(settings.azure_search)
     # app.state.openai_service = AzureOpenAIService(settings.azure_openai)
@@ -60,3 +71,33 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 # ---------------------------------------------------------------------------
 
 SettingsDep = Annotated[AppSettings, Depends(get_settings)]
+
+
+def _build_review_orchestrator(settings: AppSettings) -> ReviewOrchestrator:
+    """Construct the deterministic review orchestrator with registered reviewers."""
+    return ReviewOrchestrator(
+        settings=settings,
+        reviewers=[
+            LanguageReviewer(),
+            StructureReviewer(),
+            VerifiabilityReviewer(),
+            TraceabilityReviewer(),
+            CertificationReviewer(),
+            RequirementSetReviewer(),
+        ],
+        reviewer_bundle_version="1.0.0",
+    )
+
+
+def get_review_version_service(request: Request) -> ReviewVersionService:
+    """Resolve review version service from application state."""
+    service = getattr(request.app.state, "review_version_service", None)
+    if service is None:
+        settings = get_settings()
+        orchestrator = _build_review_orchestrator(settings)
+        service = ReviewVersionService(orchestrator)
+        request.app.state.review_version_service = service
+    return service
+
+
+ReviewVersionServiceDep = Annotated[ReviewVersionService, Depends(get_review_version_service)]
