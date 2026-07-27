@@ -5,9 +5,9 @@ import Typography from '@mui/material/Typography';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Box from '@mui/material/Box';
-import ChatIcon from '@mui/icons-material/Chat';
-import SearchIcon from '@mui/icons-material/Search';
-import FolderIcon from '@mui/icons-material/Folder';
+import RuleIcon from '@mui/icons-material/Rule';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate } from 'react-router-dom';
 import { useHealth } from '@/hooks/useHealth';
@@ -15,25 +15,25 @@ import { ROUTES } from '@/utils/constants';
 
 const QUICK_ACTIONS = [
   {
-    title: 'Ask a Question',
-    description: 'Use the RAG pipeline to ask questions grounded in your indexed documents.',
-    icon: <ChatIcon fontSize="large" color="primary" />,
-    path: ROUTES.CHAT,
-    label: 'Go to Chat',
+    title: 'Requirement Set Review',
+    description: 'Run deterministic production-grade review on an entire specification.',
+    icon: <PlaylistAddCheckIcon fontSize="large" color="primary" />,
+    path: ROUTES.REVIEW_REQUIREMENT_SET,
+    label: 'Open Set Review',
   },
   {
-    title: 'Search Documents',
-    description: 'Run keyword, vector, or hybrid search directly against the index.',
-    icon: <SearchIcon fontSize="large" color="secondary" />,
-    path: ROUTES.SEARCH,
-    label: 'Go to Search',
+    title: 'Individual Requirement Review',
+    description: 'Check language, structure, and verifiability for one requirement.',
+    icon: <RuleIcon fontSize="large" color="secondary" />,
+    path: ROUTES.REVIEW_REQUIREMENT,
+    label: 'Open Single Review',
   },
   {
-    title: 'Manage Documents',
-    description: 'View indexed documents, trigger ingestion, and monitor processing status.',
-    icon: <FolderIcon fontSize="large" sx={{ color: 'warning.main' }} />,
-    path: ROUTES.DOCUMENTS,
-    label: 'View Documents',
+    title: 'Delta Review',
+    description: 'Review only changed requirements and trace-link changes between revisions.',
+    icon: <CompareArrowsIcon fontSize="large" sx={{ color: 'warning.main' }} />,
+    path: ROUTES.REVIEW_DELTA,
+    label: 'Open Delta Review',
   },
 ] as const;
 
@@ -46,11 +46,11 @@ export default function Home() {
       {/* Header */}
       <Box mb={4}>
         <Typography variant="h4" gutterBottom fontWeight={700}>
-          Welcome to Radia AI
+          Requirements Engineering Assistant
         </Typography>
         <Typography variant="body1" color="text.secondary" maxWidth={600}>
-          Enterprise engineering knowledge assistant. Ask questions about your requirements,
-          search indexed documents, and get grounded answers from Azure AI.
+          Deterministic AI-assisted requirements engineering workflows with traceability,
+          explainability, and reproducible outcomes.
         </Typography>
       </Box>
 

@@ -140,6 +140,7 @@ class CategoryResult(BaseModel):
 class RequirementReviewResponse(BaseModel):
     """Aggregated deterministic response for single-requirement review."""
 
+    review_id: str | None = None
     overall: ReviewStatus
     category_results: list[CategoryResult] = Field(default_factory=list)
     findings: list[ReviewFinding] = Field(default_factory=list)
@@ -149,6 +150,7 @@ class RequirementReviewResponse(BaseModel):
 class RequirementSetReviewResponse(BaseModel):
     """Aggregated deterministic response for requirement-set review."""
 
+    review_id: str | None = None
     overall: ReviewStatus
     category_results: list[CategoryResult] = Field(default_factory=list)
     findings: list[ReviewFinding] = Field(default_factory=list)
@@ -203,6 +205,7 @@ class DeltaReviewInput(BaseModel):
 class DeltaReviewResponse(BaseModel):
     """Deterministic response for delta review mode."""
 
+    review_id: str | None = None
     overall: ReviewStatus
     change_summary: DeltaChangeSummary
     reviewed_requirements: list[DeltaRequirementReviewResult] = Field(default_factory=list)

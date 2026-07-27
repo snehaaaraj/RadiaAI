@@ -68,7 +68,10 @@ async def review_requirement(
 ) -> APIResponse[RequirementReviewResponse]:
     logger.info("requirement_review_requested", requirement_id=body.requirement_id or "")
     response = service.review_requirement(body)
-    history_service.record_requirement_review(subject_id=body.requirement_id, response=response)
+    review_id = history_service.record_requirement_review(
+        subject_id=body.requirement_id, response=response
+    )
+    response = response.model_copy(update={"review_id": review_id})
     return APIResponse(data=response, request_id=request.state.request_id)
 
 
@@ -94,10 +97,11 @@ async def review_requirement_set(
         requirement_count=len(body.requirements),
     )
     response = service.review_requirement_set(body)
-    history_service.record_requirement_set_review(
+    review_id = history_service.record_requirement_set_review(
         subject_id=body.specification_id,
         response=response,
     )
+    response = response.model_copy(update={"review_id": review_id})
     return APIResponse(data=response, request_id=request.state.request_id)
 
 
@@ -124,7 +128,10 @@ async def review_delta(
         updated_count=len(body.updated_requirements),
     )
     response = service.review_delta(body)
-    history_service.record_delta_review(subject_id=body.specification_id, response=response)
+    review_id = history_service.record_delta_review(
+        subject_id=body.specification_id, response=response
+    )
+    response = response.model_copy(update={"review_id": review_id})
     return APIResponse(data=response, request_id=request.state.request_id)
 
 

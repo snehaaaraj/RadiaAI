@@ -140,3 +140,158 @@ export interface DocumentSummary {
   metadata: DocumentMetadata;
   ingested_at: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Requirements review
+// ---------------------------------------------------------------------------
+
+export type ReviewStatus = 'Acceptable' | 'Revision Recommended' | 'Unacceptable';
+export type PassFail = 'Pass' | 'Fail';
+export type FindingSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
+export type ReviewWorkflow = 'requirement' | 'requirement-set' | 'delta';
+export type FindingDispositionStatus = 'Accepted' | 'Rejected' | 'Deferred';
+export type TraceLinkChangeType = 'added' | 'removed' | 'modified';
+
+export interface DeterminismConfigSnapshot {
+  temperature: number;
+  max_tokens: number;
+  retrieval_top_k: number;
+}
+
+export interface DeterminismContext {
+  reviewer_bundle_version: string;
+  prompt_versions: Record<string, string>;
+  standards_versions: Record<string, string>;
+  config_hash: string;
+  config_snapshot: DeterminismConfigSnapshot;
+}
+
+export interface CategoryResult {
+  category: string;
+  status: ReviewStatus;
+}
+
+export interface ReviewFinding {
+  category: string;
+  reviewer: string;
+  severity: FindingSeverity;
+  pass_fail: PassFail;
+  status: ReviewStatus;
+  rule: string;
+  explanation: string;
+  evidence: string;
+  recommendation: string;
+  reference: string;
+}
+
+export interface RequirementReviewInput {
+  requirement_id?: string | null;
+  text: string;
+  requirement_level?: string | null;
+  metadata?: Record<string, string>;
+}
+
+export interface RequirementSetReviewInput {
+  specification_id?: string | null;
+  requirements: RequirementReviewInput[];
+  metadata?: Record<string, string>;
+}
+
+export interface TraceLinkChange {
+  requirement_id: string;
+  change_type: TraceLinkChangeType;
+  previous_parent_id?: string | null;
+  current_parent_id?: string | null;
+}
+
+export interface DeltaReviewInput {
+  specification_id?: string | null;
+  baseline_requirements: RequirementReviewInput[];
+  updated_requirements: RequirementReviewInput[];
+  changed_trace_links?: TraceLinkChange[];
+}
+
+export interface RequirementReviewResponse {
+  review_id: string | null;
+  overall: ReviewStatus;
+  category_results: CategoryResult[];
+  findings: ReviewFinding[];
+  determinism: DeterminismContext;
+}
+
+export interface RequirementSetReviewResponse {
+  review_id: string | null;
+  overall: ReviewStatus;
+  category_results: CategoryResult[];
+  findings: ReviewFinding[];
+  requirement_count: number;
+  determinism: DeterminismContext;
+}
+
+export interface DeltaChangeSummary {
+  new_requirement_ids: string[];
+  modified_requirement_ids: string[];
+  deleted_requirement_ids: string[];
+  changed_trace_link_requirement_ids: string[];
+}
+
+export interface DeltaRequirementReviewResult {
+  requirement_id: string;
+  overall: ReviewStatus;
+  category_results: CategoryResult[];
+  findings: ReviewFinding[];
+}
+
+export interface DeltaReviewResponse {
+  review_id: string | null;
+  overall: ReviewStatus;
+  change_summary: DeltaChangeSummary;
+  reviewed_requirements: DeltaRequirementReviewResult[];
+  requirement_set_findings: ReviewFinding[];
+  determinism: DeterminismContext;
+}
+
+export interface StandardReference {
+  key: string;
+  name: string;
+  version: string;
+  source: string;
+  categories: string[];
+  description: string;
+}
+
+export interface StandardsResponse {
+  standards: StandardReference[];
+}
+
+export interface FindingDisposition {
+  finding_index: number;
+  disposition: FindingDispositionStatus;
+  reviewer_comment: string;
+  reviewer_id: string | null;
+  updated_at: string;
+}
+
+export interface ApplyFindingDispositionRequest {
+  finding_index: number;
+  disposition: FindingDispositionStatus;
+  reviewer_comment?: string;
+  reviewer_id?: string | null;
+}
+
+export interface ReviewHistoryEntry {
+  review_id: string;
+  workflow: ReviewWorkflow;
+  subject_id: string | null;
+  created_at: string;
+  overall: ReviewStatus;
+  category_results: CategoryResult[];
+  findings: ReviewFinding[];
+  determinism: DeterminismContext;
+  dispositions: FindingDisposition[];
+}
+
+export interface ReviewHistoryListResponse {
+  total: number;
+  entries: ReviewHistoryEntry[];
+}
