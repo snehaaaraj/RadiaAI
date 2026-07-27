@@ -1,0 +1,62 @@
+"""
+Dependency injection container.
+
+This module is the single place where concrete implementations are wired to
+abstract interfaces. Endpoint handlers declare what they need via type annotations
+and Depends(); this module provides the actual instances.
+
+Phase 1: Only settings and auth are wired.
+Phase 2+: Azure service wrappers will be registered here as singletons
+          using FastAPI's lifespan context manager pattern.
+"""
+
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
+from typing import Annotated
+
+from fastapi import Depends, FastAPI
+
+from app.core.config import AppSettings, get_settings
+from app.core.logging import get_logger
+
+logger = get_logger(__name__)
+
+# ---------------------------------------------------------------------------
+# Lifespan — startup and shutdown hooks
+# ---------------------------------------------------------------------------
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
+    """
+    FastAPI lifespan context manager.
+
+    Startup: initialise shared resources (Azure clients, connection pools).
+    Shutdown: gracefully close connections and flush logs.
+
+    Phase 2 will instantiate Azure service wrappers here and attach them to
+    app.state so they can be injected into request handlers.
+    """
+    settings = get_settings()
+    logger.info(
+        "application_startup",
+        app_name=settings.app_name,
+        version=settings.app_version,
+        environment=settings.environment,
+    )
+
+    # Phase 2: initialise Azure clients here, e.g.:
+    # app.state.search_service = AzureSearchService(settings.azure_search)
+    # app.state.openai_service = AzureOpenAIService(settings.azure_openai)
+    # app.state.blob_service = BlobStorageService(settings.azure_blob)
+
+    yield  # application runs
+
+    logger.info("application_shutdown")
+
+
+# ---------------------------------------------------------------------------
+# Common injectable dependencies
+# ---------------------------------------------------------------------------
+
+SettingsDep = Annotated[AppSettings, Depends(get_settings)]
