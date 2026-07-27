@@ -68,6 +68,7 @@ class ReviewFinding(BaseModel):
     """Single explainable review finding."""
 
     category: str = Field(description="Finding category (language, structure, traceability, etc.).")
+    reviewer: str = Field(description="Reviewer module that produced this finding.")
     severity: FindingSeverity
     pass_fail: PassFail
     status: ReviewStatus
@@ -127,3 +128,19 @@ class ReviewVersionResponse(BaseModel):
     workflow_default: str = Field(description="Default production workflow.")
     determinism: DeterminismContext
     reviewers: list[ReviewVersionEntry] = Field(default_factory=list)
+
+
+class CategoryResult(BaseModel):
+    """Normalized category-level status output for requirement review."""
+
+    category: str
+    status: ReviewStatus
+
+
+class RequirementReviewResponse(BaseModel):
+    """Aggregated deterministic response for single-requirement review."""
+
+    overall: ReviewStatus
+    category_results: list[CategoryResult] = Field(default_factory=list)
+    findings: list[ReviewFinding] = Field(default_factory=list)
+    determinism: DeterminismContext

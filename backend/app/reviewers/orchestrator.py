@@ -7,11 +7,14 @@ import json
 from typing import TYPE_CHECKING
 
 from app.models.review_models import (
+    CategoryResult,
     DeterminismConfigSnapshot,
     DeterminismContext,
     RequirementReviewInput,
+    RequirementReviewResponse,
     RequirementSetReviewInput,
     ReviewerResult,
+    ReviewStatus,
     ReviewVersionEntry,
     ReviewVersionResponse,
 )
@@ -34,13 +37,25 @@ class ReviewOrchestrator:
         self._reviewers = reviewers
         self._reviewer_bundle_version = reviewer_bundle_version
 
-    def review_requirement(self, payload: RequirementReviewInput) -> list[ReviewerResult]:
+    def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
         """Run all reviewers that support individual requirement review."""
-        return [
+        reviewer_results = [
             reviewer.review_requirement(payload)
             for reviewer in self._reviewers
             if reviewer.supports_individual_review
         ]
+        findings = [finding for result in reviewer_results for finding in result.findings]
+        category_results = [
+            CategoryResult(category=result.reviewer, status=result.overall)
+            for result in reviewer_results
+        ]
+        overall = _overall_from_statuses([result.overall for result in reviewer_results])
+        return RequirementReviewResponse(
+            overall=overall,
+            category_results=category_results,
+            findings=findings,
+            determinism=self.build_version_response().determinism,
+        )
 
     def review_requirement_set(self, payload: RequirementSetReviewInput) -> list[ReviewerResult]:
         """Run all reviewers that support requirement set review."""
@@ -105,3 +120,11 @@ class ReviewOrchestrator:
         }
         stable_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(stable_json.encode("utf-8")).hexdigest()
+
+
+def _overall_from_statuses(statuses: list[ReviewStatus]) -> ReviewStatus:
+    if any(status == ReviewStatus.UNACCEPTABLE for status in statuses):
+        return ReviewStatus.UNACCEPTABLE
+    if any(status == ReviewStatus.REVISION_RECOMMENDED for status in statuses):
+        return ReviewStatus.REVISION_RECOMMENDED
+    return ReviewStatus.ACCEPTABLE
