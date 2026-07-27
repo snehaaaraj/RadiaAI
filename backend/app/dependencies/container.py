@@ -18,6 +18,7 @@ from fastapi import Depends, FastAPI, Request
 
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
+from app.repositories.review_history_repository import ReviewHistoryRepository
 from app.reviewers.certification.reviewer import CertificationReviewer
 from app.reviewers.language.reviewer import LanguageReviewer
 from app.reviewers.orchestrator import ReviewOrchestrator
@@ -28,7 +29,10 @@ from app.reviewers.verifiability.reviewer import VerifiabilityReviewer
 from app.services.requirement_delta_review_service import RequirementDeltaReviewService
 from app.services.requirement_review_service import RequirementReviewService
 from app.services.requirement_set_review_service import RequirementSetReviewService
+from app.services.review_history_service import ReviewHistoryService
 from app.services.review_version_service import ReviewVersionService
+from app.services.standards_service import StandardsService
+from app.standards.registry import StandardsRegistry
 
 logger = get_logger(__name__)
 
@@ -58,10 +62,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     app.state.review_orchestrator = _build_review_orchestrator(settings)
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
+    app.state.standards_service = StandardsService(StandardsRegistry())
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
     app.state.requirement_set_review_service = RequirementSetReviewService(
         app.state.review_orchestrator
     )
+    app.state.review_history_repository = ReviewHistoryRepository()
+    app.state.review_history_service = ReviewHistoryService(app.state.review_history_repository)
     app.state.requirement_delta_review_service = RequirementDeltaReviewService(
         app.state.requirement_review_service,
         app.state.requirement_set_review_service,
@@ -173,3 +180,31 @@ def get_requirement_delta_review_service(request: Request) -> RequirementDeltaRe
 RequirementDeltaReviewServiceDep = Annotated[
     RequirementDeltaReviewService, Depends(get_requirement_delta_review_service)
 ]
+
+
+def get_review_history_service(request: Request) -> ReviewHistoryService:
+    """Resolve review history service from application state."""
+    service = getattr(request.app.state, "review_history_service", None)
+    if service is None:
+        repository = getattr(request.app.state, "review_history_repository", None)
+        if repository is None:
+            repository = ReviewHistoryRepository()
+            request.app.state.review_history_repository = repository
+        service = ReviewHistoryService(repository)
+        request.app.state.review_history_service = service
+    return service
+
+
+ReviewHistoryServiceDep = Annotated[ReviewHistoryService, Depends(get_review_history_service)]
+
+
+def get_standards_service(request: Request) -> StandardsService:
+    """Resolve standards service from application state."""
+    service = getattr(request.app.state, "standards_service", None)
+    if service is None:
+        service = StandardsService(StandardsRegistry())
+        request.app.state.standards_service = service
+    return service
+
+
+StandardsServiceDep = Annotated[StandardsService, Depends(get_standards_service)]
