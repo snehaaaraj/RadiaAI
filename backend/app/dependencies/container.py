@@ -25,6 +25,7 @@ from app.reviewers.requirement_set.reviewer import RequirementSetReviewer
 from app.reviewers.structure.reviewer import StructureReviewer
 from app.reviewers.traceability.reviewer import TraceabilityReviewer
 from app.reviewers.verifiability.reviewer import VerifiabilityReviewer
+from app.services.requirement_delta_review_service import RequirementDeltaReviewService
 from app.services.requirement_review_service import RequirementReviewService
 from app.services.requirement_set_review_service import RequirementSetReviewService
 from app.services.review_version_service import ReviewVersionService
@@ -60,6 +61,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
     app.state.requirement_set_review_service = RequirementSetReviewService(
         app.state.review_orchestrator
+    )
+    app.state.requirement_delta_review_service = RequirementDeltaReviewService(
+        app.state.requirement_review_service,
+        app.state.requirement_set_review_service,
+        app.state.review_version_service,
     )
 
     # Phase 2: initialise Azure clients here, e.g.:
@@ -145,4 +151,25 @@ def get_requirement_set_review_service(request: Request) -> RequirementSetReview
 
 RequirementSetReviewServiceDep = Annotated[
     RequirementSetReviewService, Depends(get_requirement_set_review_service)
+]
+
+
+def get_requirement_delta_review_service(request: Request) -> RequirementDeltaReviewService:
+    """Resolve requirement delta review service from application state."""
+    service = getattr(request.app.state, "requirement_delta_review_service", None)
+    if service is None:
+        requirement_service = get_requirement_review_service(request)
+        set_service = get_requirement_set_review_service(request)
+        version_service = get_review_version_service(request)
+        service = RequirementDeltaReviewService(
+            requirement_review_service=requirement_service,
+            requirement_set_review_service=set_service,
+            review_version_service=version_service,
+        )
+        request.app.state.requirement_delta_review_service = service
+    return service
+
+
+RequirementDeltaReviewServiceDep = Annotated[
+    RequirementDeltaReviewService, Depends(get_requirement_delta_review_service)
 ]
