@@ -26,6 +26,7 @@ from app.reviewers.structure.reviewer import StructureReviewer
 from app.reviewers.traceability.reviewer import TraceabilityReviewer
 from app.reviewers.verifiability.reviewer import VerifiabilityReviewer
 from app.services.requirement_review_service import RequirementReviewService
+from app.services.requirement_set_review_service import RequirementSetReviewService
 from app.services.review_version_service import ReviewVersionService
 
 logger = get_logger(__name__)
@@ -57,6 +58,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.review_orchestrator = _build_review_orchestrator(settings)
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
+    app.state.requirement_set_review_service = RequirementSetReviewService(
+        app.state.review_orchestrator
+    )
 
     # Phase 2: initialise Azure clients here, e.g.:
     # app.state.search_service = AzureSearchService(settings.azure_search)
@@ -126,4 +130,19 @@ def get_requirement_review_service(request: Request) -> RequirementReviewService
 
 RequirementReviewServiceDep = Annotated[
     RequirementReviewService, Depends(get_requirement_review_service)
+]
+
+
+def get_requirement_set_review_service(request: Request) -> RequirementSetReviewService:
+    """Resolve requirement-set review service from application state."""
+    service = getattr(request.app.state, "requirement_set_review_service", None)
+    if service is None:
+        orchestrator = get_review_orchestrator(request)
+        service = RequirementSetReviewService(orchestrator)
+        request.app.state.requirement_set_review_service = service
+    return service
+
+
+RequirementSetReviewServiceDep = Annotated[
+    RequirementSetReviewService, Depends(get_requirement_set_review_service)
 ]
