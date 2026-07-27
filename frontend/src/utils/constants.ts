@@ -7,6 +7,11 @@ export const APP_NAME = 'Radia AI';
 
 export const ROUTES = {
   HOME: '/',
+  REVIEW_REQUIREMENT_SET: '/review/requirement-set',
+  REVIEW_REQUIREMENT: '/review/requirement',
+  REVIEW_DELTA: '/review/delta',
+  REVIEW_HISTORY: '/review/history',
+  STANDARDS: '/standards',
   CHAT: '/chat',
   SEARCH: '/search',
   DOCUMENTS: '/documents',

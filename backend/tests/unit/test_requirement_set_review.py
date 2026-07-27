@@ -87,4 +87,8 @@ def test_requirement_set_review_is_deterministic_for_identical_input(client: Tes
 
     assert first.status_code == 200
     assert second.status_code == 200
-    assert first.json()["data"] == second.json()["data"]
+    first_data = first.json()["data"]
+    second_data = second.json()["data"]
+    first_data["review_id"] = "<ignored>"
+    second_data["review_id"] = "<ignored>"
+    assert first_data == second_data

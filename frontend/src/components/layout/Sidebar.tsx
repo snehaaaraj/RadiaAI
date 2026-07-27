@@ -8,9 +8,11 @@ import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import HomeIcon from '@mui/icons-material/Home';
-import ChatIcon from '@mui/icons-material/Chat';
-import SearchIcon from '@mui/icons-material/Search';
-import FolderIcon from '@mui/icons-material/Folder';
+import RuleIcon from '@mui/icons-material/Rule';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
+import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import HistoryIcon from '@mui/icons-material/History';
+import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import BoltIcon from '@mui/icons-material/Bolt';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -21,9 +23,11 @@ const DRAWER_WIDTH = 240;
 
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
-  { label: 'Chat', icon: <ChatIcon />, path: ROUTES.CHAT },
-  { label: 'Search', icon: <SearchIcon />, path: ROUTES.SEARCH },
-  { label: 'Documents', icon: <FolderIcon />, path: ROUTES.DOCUMENTS },
+  { label: 'Set Review', icon: <PlaylistAddCheckIcon />, path: ROUTES.REVIEW_REQUIREMENT_SET },
+  { label: 'Single Review', icon: <RuleIcon />, path: ROUTES.REVIEW_REQUIREMENT },
+  { label: 'Delta Review', icon: <CompareArrowsIcon />, path: ROUTES.REVIEW_DELTA },
+  { label: 'Review History', icon: <HistoryIcon />, path: ROUTES.REVIEW_HISTORY },
+  { label: 'Standards', icon: <MenuBookIcon />, path: ROUTES.STANDARDS },
 ] as const;
 
 const BOTTOM_ITEMS = [

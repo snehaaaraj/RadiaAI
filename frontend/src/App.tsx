@@ -5,6 +5,11 @@ import { ThemeProvider, CssBaseline } from '@mui/material';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppProvider } from '@/context/AppContext';
 import Home from '@/pages/Home';
+import RequirementSetReview from '@/pages/RequirementSetReview';
+import RequirementReview from '@/pages/RequirementReview';
+import DeltaReview from '@/pages/DeltaReview';
+import ReviewHistory from '@/pages/ReviewHistory';
+import Standards from '@/pages/Standards';
 import Chat from '@/pages/Chat';
 import Search from '@/pages/Search';
 import Documents from '@/pages/Documents';
@@ -34,6 +39,11 @@ export default function App() {
             <Routes>
               <Route element={<AppLayout />}>
                 <Route path={ROUTES.HOME} element={<Home />} />
+                <Route path={ROUTES.REVIEW_REQUIREMENT_SET} element={<RequirementSetReview />} />
+                <Route path={ROUTES.REVIEW_REQUIREMENT} element={<RequirementReview />} />
+                <Route path={ROUTES.REVIEW_DELTA} element={<DeltaReview />} />
+                <Route path={ROUTES.REVIEW_HISTORY} element={<ReviewHistory />} />
+                <Route path={ROUTES.STANDARDS} element={<Standards />} />
                 <Route path={ROUTES.CHAT} element={<Chat />} />
                 <Route path={ROUTES.SEARCH} element={<Search />} />
                 <Route path={ROUTES.DOCUMENTS} element={<Documents />} />
