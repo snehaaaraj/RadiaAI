@@ -144,3 +144,13 @@ class RequirementReviewResponse(BaseModel):
     category_results: list[CategoryResult] = Field(default_factory=list)
     findings: list[ReviewFinding] = Field(default_factory=list)
     determinism: DeterminismContext
+
+
+class RequirementSetReviewResponse(BaseModel):
+    """Aggregated deterministic response for requirement-set review."""
+
+    overall: ReviewStatus
+    category_results: list[CategoryResult] = Field(default_factory=list)
+    findings: list[ReviewFinding] = Field(default_factory=list)
+    requirement_count: int = 0
+    determinism: DeterminismContext

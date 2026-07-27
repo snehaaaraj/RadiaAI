@@ -155,6 +155,7 @@ pytest --cov=app                # with coverage report
 | GET | `/api/v1/health` | Application health check |
 | GET | `/api/v1/review/version` | Reviewer/prompt/standards determinism metadata |
 | POST | `/api/v1/review/requirement` | Deterministic individual requirement review |
+| POST | `/api/v1/review/requirement-set` | Deterministic requirement set review |
 | POST | `/api/v1/chat` | Legacy RAG question answering (migration in progress) |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
 | POST | `/api/v1/ingest` | Trigger document ingestion |

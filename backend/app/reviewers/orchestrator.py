@@ -13,7 +13,7 @@ from app.models.review_models import (
     RequirementReviewInput,
     RequirementReviewResponse,
     RequirementSetReviewInput,
-    ReviewerResult,
+    RequirementSetReviewResponse,
     ReviewStatus,
     ReviewVersionEntry,
     ReviewVersionResponse,
@@ -57,13 +57,28 @@ class ReviewOrchestrator:
             determinism=self.build_version_response().determinism,
         )
 
-    def review_requirement_set(self, payload: RequirementSetReviewInput) -> list[ReviewerResult]:
+    def review_requirement_set(
+        self, payload: RequirementSetReviewInput
+    ) -> RequirementSetReviewResponse:
         """Run all reviewers that support requirement set review."""
-        return [
+        reviewer_results = [
             reviewer.review_requirement_set(payload)
             for reviewer in self._reviewers
             if reviewer.supports_requirement_set_review
         ]
+        findings = [finding for result in reviewer_results for finding in result.findings]
+        category_results = [
+            CategoryResult(category=result.reviewer, status=result.overall)
+            for result in reviewer_results
+        ]
+        overall = _overall_from_statuses([result.overall for result in reviewer_results])
+        return RequirementSetReviewResponse(
+            overall=overall,
+            category_results=category_results,
+            findings=findings,
+            requirement_count=len(payload.requirements),
+            determinism=self.build_version_response().determinism,
+        )
 
     def build_version_response(self) -> ReviewVersionResponse:
         """Return deterministic reviewer/prompt/standards version metadata."""
