@@ -11,7 +11,13 @@ export default function Standards() {
   const { data, isLoading, isError, error } = useStandards();
 
   if (isLoading) return <LoadingSpinner message="Loading standards..." />;
-  if (isError) return <Alert severity="error">Failed to load standards: {(error as Error).message}</Alert>;
+  if (isError) {
+    const message =
+      (error as Error)?.message ||
+      (error as { error?: { message?: string } })?.error?.message ||
+      'Unable to reach the backend. Make sure the server is running.';
+    return <Alert severity="error">Failed to load standards: {message}</Alert>;
+  }
 
   return (
     <Stack spacing={3}>
