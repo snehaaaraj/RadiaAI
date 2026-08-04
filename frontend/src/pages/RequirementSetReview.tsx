@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import Alert from '@mui/material/Alert';
@@ -11,7 +11,10 @@ import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
@@ -50,12 +53,58 @@ function createEmptyDraft(): RequirementDraft {
   };
 }
 
+/** Parse a JSON array of requirement objects from an uploaded file. */
+function parseJsonRequirements(content: string): RequirementDraft[] {
+  const parsed = JSON.parse(content) as unknown[];
+  if (!Array.isArray(parsed)) throw new Error('JSON file must contain an array of requirements.');
+  return parsed.map((item) => {
+    const record = item as Record<string, unknown>;
+    const metadata = (record['metadata'] as Record<string, unknown> | undefined) ?? {};
+    return {
+      requirement_id: String(record['requirement_id'] ?? record['id'] ?? ''),
+      requirement_level: String(record['requirement_level'] ?? record['level'] ?? 'system'),
+      text: String(record['text'] ?? record['requirement_text'] ?? record['description'] ?? ''),
+      parent_id: String(metadata['parent_id'] ?? record['parent_id'] ?? ''),
+      verification_method: String(
+        metadata['verification_method'] ?? record['verification_method'] ?? ''
+      ),
+    };
+  });
+}
+
+/** Parse a CSV file with header row into requirement drafts.
+ *  Expected columns (order flexible): requirement_id, requirement_level, text,
+ *  parent_id, verification_method. Extra columns are ignored.
+ */
+function parseCsvRequirements(content: string): RequirementDraft[] {
+  const lines = content.split(/\r?\n/).filter((line) => line.trim());
+  if (lines.length < 2) throw new Error('CSV must have a header row and at least one data row.');
+  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/\s+/g, '_'));
+  const col = (name: string) => headers.indexOf(name);
+  const cell = (row: string[], idx: number) => (idx >= 0 ? (row[idx] ?? '').trim() : '');
+  return lines.slice(1).map((line) => {
+    const row = line.split(',');
+    return {
+      requirement_id: cell(row, col('requirement_id')) || cell(row, col('id')),
+      requirement_level: cell(row, col('requirement_level')) || cell(row, col('level')) || 'system',
+      text: cell(row, col('text')) || cell(row, col('requirement_text')) || cell(row, col('description')),
+      parent_id: cell(row, col('parent_id')),
+      verification_method: cell(row, col('verification_method')),
+    };
+  });
+}
+
+type InputMode = 'manual' | 'upload';
+
 export default function RequirementSetReview() {
   const [specificationId, setSpecificationId] = useState('SPEC-001');
   const [requirements, setRequirements] = useState<RequirementDraft[]>([
     createEmptyDraft(),
     createEmptyDraft(),
   ]);
+  const [inputMode, setInputMode] = useState<InputMode>('manual');
+  const [uploadedFilename, setUploadedFilename] = useState('');
+  const [parseError, setParseError] = useState('');
 
   const {
     mutate: runReview,
@@ -70,6 +119,25 @@ export default function RequirementSetReview() {
     () => requirements.some((item) => item.text.trim().length > 0),
     [requirements]
   );
+
+  const handleFileContent = useCallback((content: string, filename: string) => {
+    setParseError('');
+    try {
+      const isJson = filename.toLowerCase().endsWith('.json');
+      const drafts = isJson ? parseJsonRequirements(content) : parseCsvRequirements(content);
+      if (drafts.length === 0) throw new Error('No requirements found in the uploaded file.');
+      setRequirements(drafts);
+      setUploadedFilename(filename);
+    } catch (parseException) {
+      setParseError((parseException as Error).message);
+    }
+  }, []);
+
+  const handleClearFile = useCallback(() => {
+    setUploadedFilename('');
+    setParseError('');
+    setRequirements([createEmptyDraft(), createEmptyDraft()]);
+  }, []);
 
   return (
     <Stack spacing={3}>
@@ -90,6 +158,54 @@ export default function RequirementSetReview() {
             value={specificationId}
             onChange={(event) => setSpecificationId(event.target.value)}
           />
+
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>
+              Requirements Input
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              value={inputMode}
+              exclusive
+              onChange={(_, value: InputMode | null) => {
+                if (value) {
+                  setInputMode(value);
+                  if (value === 'manual') {
+                    setUploadedFilename('');
+                    setParseError('');
+                  }
+                }
+              }}
+              sx={{ mb: 1.5 }}
+            >
+              <ToggleButton value="manual">Enter manually</ToggleButton>
+              <ToggleButton value="upload">Upload file</ToggleButton>
+            </ToggleButtonGroup>
+
+            {inputMode === 'upload' && (
+              <FileUploadZone
+                accept=".json,.csv"
+                label="Upload a .json or .csv file containing requirements"
+                onFileContent={handleFileContent}
+                filename={uploadedFilename}
+                onClear={handleClearFile}
+              />
+            )}
+
+            {parseError && (
+              <Alert severity="error" sx={{ mt: 1 }}>
+                {parseError}
+              </Alert>
+            )}
+
+            {uploadedFilename && !parseError && (
+              <Alert severity="success" sx={{ mt: 1 }}>
+                Loaded <strong>{requirements.length}</strong> requirement
+                {requirements.length !== 1 ? 's' : ''} from <strong>{uploadedFilename}</strong>.
+                Review or edit below before submitting.
+              </Alert>
+            )}
+          </Box>
 
           {requirements.map((item, index) => (
             <Paper key={`requirement-${index}`} variant="outlined" sx={{ p: 2 }}>

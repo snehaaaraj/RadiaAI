@@ -1,25 +1,32 @@
 import { useMemo, useState } from 'react';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
-import Alert from '@mui/material/Alert';
-import Chip from '@mui/material/Chip';
-import Divider from '@mui/material/Divider';
-import { useRequirementReview } from '@/hooks/useRequirementReview';
-import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
+import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
+import { useRequirementReview } from '@/hooks/useRequirementReview';
+import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 
 const REQUIREMENT_LEVELS = ['aircraft', 'system', 'subsystem', 'component'] as const;
+
+type InputMode = 'paste' | 'upload';
 
 export default function RequirementReview() {
   const [requirementId, setRequirementId] = useState('');
   const [requirementLevel, setRequirementLevel] = useState<string>('system');
   const [text, setText] = useState('');
+  const [inputMode, setInputMode] = useState<InputMode>('paste');
+  const [uploadedFilename, setUploadedFilename] = useState('');
 
   const {
     mutate: runReview,
@@ -31,6 +38,16 @@ export default function RequirementReview() {
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
 
   const canSubmit = useMemo(() => text.trim().length > 0, [text]);
+
+  const handleFileContent = (content: string, filename: string) => {
+    setText(content);
+    setUploadedFilename(filename);
+  };
+
+  const handleClearFile = () => {
+    setText('');
+    setUploadedFilename('');
+  };
 
   return (
     <Stack spacing={3}>
@@ -65,14 +82,53 @@ export default function RequirementReview() {
               </MenuItem>
             ))}
           </TextField>
-          <TextField
-            label="Requirement Text"
-            multiline
-            minRows={5}
-            value={text}
-            onChange={(event) => setText(event.target.value)}
-            placeholder="The subsystem shall ..."
-          />
+
+          <Box>
+            <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>
+              Requirement Text
+            </Typography>
+            <ToggleButtonGroup
+              size="small"
+              value={inputMode}
+              exclusive
+              onChange={(_, value: InputMode | null) => {
+                if (value) {
+                  setInputMode(value);
+                  if (value === 'paste') setUploadedFilename('');
+                }
+              }}
+              sx={{ mb: 1.5 }}
+            >
+              <ToggleButton value="paste">Type / Paste</ToggleButton>
+              <ToggleButton value="upload">Upload file</ToggleButton>
+            </ToggleButtonGroup>
+
+            {inputMode === 'paste' ? (
+              <TextField
+                fullWidth
+                multiline
+                minRows={5}
+                value={text}
+                onChange={(event) => setText(event.target.value)}
+                placeholder="The subsystem shall ..."
+              />
+            ) : (
+              <FileUploadZone
+                accept=".txt,.doc,.docx"
+                label="Upload a .txt or Word document containing the requirement"
+                onFileContent={handleFileContent}
+                filename={uploadedFilename}
+                onClear={handleClearFile}
+              />
+            )}
+          </Box>
+
+          {uploadedFilename && text.trim() && (
+            <Alert severity="info" sx={{ py: 0.5 }}>
+              Loaded from <strong>{uploadedFilename}</strong> — review the text above before submitting.
+            </Alert>
+          )}
+
           <Box>
             <Button
               variant="contained"
