@@ -5,7 +5,11 @@ import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import MenuIcon from '@mui/icons-material/Menu';
 import BoltIcon from '@mui/icons-material/Bolt';
+import LightModeIcon from '@mui/icons-material/LightMode';
+import DarkModeIcon from '@mui/icons-material/DarkMode';
+import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import Box from '@mui/material/Box';
+import Tooltip from '@mui/material/Tooltip';
 import { useAppContext } from '@/context/AppContext';
 import { useHealth } from '@/hooks/useHealth';
 import { APP_NAME } from '@/utils/constants';
@@ -17,10 +21,20 @@ interface TopBarProps {
 }
 
 export function TopBar({ drawerWidth = DRAWER_WIDTH }: TopBarProps) {
-  const { sidebarOpen, setSidebarOpen } = useAppContext();
+  const { sidebarOpen, setSidebarOpen, themePreference, setThemePreference } = useAppContext();
   const { data: health } = useHealth();
 
   const statusColor = health?.status === 'ok' ? 'success' : health?.status === 'degraded' ? 'warning' : 'error';
+  const themeIcon =
+    themePreference === 'dark' ? (
+      <DarkModeIcon fontSize="small" />
+    ) : themePreference === 'light' ? (
+      <LightModeIcon fontSize="small" />
+    ) : (
+      <SettingsBrightnessIcon fontSize="small" />
+    );
+
+  const nextTheme = themePreference === 'system' ? 'light' : themePreference === 'light' ? 'dark' : 'system';
 
   return (
     <AppBar
@@ -54,6 +68,21 @@ export function TopBar({ drawerWidth = DRAWER_WIDTH }: TopBarProps) {
         </Typography>
 
         <Box display="flex" alignItems="center" gap={1}>
+          <Tooltip title={`Theme: ${themePreference}. Click to switch to ${nextTheme}.`}>
+            <IconButton
+              size="small"
+              onClick={() => setThemePreference(nextTheme)}
+              aria-label="change theme preference"
+              sx={{
+                border: '1px solid',
+                borderColor: 'divider',
+                borderRadius: 999,
+              }}
+            >
+              {themeIcon}
+            </IconButton>
+          </Tooltip>
+          <Chip label={themePreference} size="small" variant="outlined" />
           {health && (
             <Chip
               label={`API ${health.status}`}

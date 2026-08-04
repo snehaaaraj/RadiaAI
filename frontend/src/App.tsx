@@ -1,9 +1,10 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import { useMemo, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { AppProvider } from '@/context/AppContext';
+import { AppProvider, useAppContext } from '@/context/AppContext';
 import Home from '@/pages/Home';
 import RequirementSetReview from '@/pages/RequirementSetReview';
 import RequirementReview from '@/pages/RequirementReview';
@@ -14,8 +15,9 @@ import Chat from '@/pages/Chat';
 import Search from '@/pages/Search';
 import Documents from '@/pages/Documents';
 import Settings from '@/pages/Settings';
-import theme from '@/theme';
+import { createAppTheme } from '@/theme';
 import { ROUTES } from '@/utils/constants';
+import useMediaQuery from '@mui/material/useMediaQuery';
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -32,9 +34,8 @@ const queryClient = new QueryClient({
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <AppProvider>
+      <AppProvider>
+        <ThemeShell>
           <BrowserRouter>
             <Routes>
               <Route element={<AppLayout />}>
@@ -53,9 +54,24 @@ export default function App() {
               </Route>
             </Routes>
           </BrowserRouter>
-        </AppProvider>
-      </ThemeProvider>
+        </ThemeShell>
+      </AppProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
+  );
+}
+
+function ThemeShell({ children }: { children: ReactNode }) {
+  const { themePreference } = useAppContext();
+  const prefersDark = useMediaQuery('(prefers-color-scheme: dark)', { noSsr: true });
+  const mode = themePreference === 'system' ? (prefersDark ? 'dark' : 'light') : themePreference;
+
+  const theme = useMemo(() => createAppTheme(mode), [mode]);
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      {children}
+    </ThemeProvider>
   );
 }

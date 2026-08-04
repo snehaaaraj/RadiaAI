@@ -7,6 +7,7 @@ import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Chip from '@mui/material/Chip';
 import HomeIcon from '@mui/icons-material/Home';
 import RuleIcon from '@mui/icons-material/Rule';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
@@ -35,18 +36,34 @@ const BOTTOM_ITEMS = [
 ] as const;
 
 export function Sidebar() {
-  const { sidebarOpen } = useAppContext();
+  const { sidebarOpen, themePreference } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
 
   const drawerContent = (
     <Box display="flex" flexDirection="column" height="100%">
       {/* Logo */}
-      <Box display="flex" alignItems="center" gap={1} px={2} py={2}>
-        <BoltIcon color="primary" />
-        <Typography variant="h6" fontWeight={700} color="primary">
-          {APP_NAME}
-        </Typography>
+      <Box
+        mx={1.5}
+        mt={1.5}
+        mb={1}
+        p={1.5}
+        sx={{
+          borderRadius: 3,
+          background: 'linear-gradient(135deg, rgba(27,79,216,0.10), rgba(107,33,168,0.08))',
+        }}
+      >
+        <Box display="flex" alignItems="center" gap={1}>
+          <BoltIcon color="primary" />
+          <Box>
+            <Typography variant="h6" fontWeight={800} color="primary" lineHeight={1.1}>
+              {APP_NAME}
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              Deterministic reviews
+            </Typography>
+          </Box>
+        </Box>
       </Box>
       <Divider />
 
@@ -59,12 +76,31 @@ export function Sidebar() {
               onClick={() => navigate(path)}
               sx={{
                 mx: 1,
+                my: 0.5,
                 borderRadius: 1,
+                position: 'relative',
+                overflow: 'hidden',
+                transition: 'background-color 120ms ease, transform 120ms ease',
+                '&::before': {
+                  content: '""',
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  bottom: 0,
+                  width: 4,
+                  bgcolor: 'transparent',
+                },
                 '&.Mui-selected': {
                   bgcolor: 'primary.main',
                   color: 'white',
                   '& .MuiListItemIcon-root': { color: 'white' },
                   '&:hover': { bgcolor: 'primary.dark' },
+                  '&::before': {
+                    bgcolor: 'secondary.main',
+                  },
+                },
+                '&:hover': {
+                  transform: 'translateX(2px)',
                 },
               }}
             >
@@ -94,9 +130,12 @@ export function Sidebar() {
       </List>
 
       <Box px={2} pb={2}>
-        <Typography variant="caption" color="text.secondary">
-          v0.1.0 — Phase 1
-        </Typography>
+        <Box display="flex" flexDirection="column" gap={1}>
+          <Chip label={`Theme: ${themePreference}`} size="small" variant="outlined" />
+          <Typography variant="caption" color="text.secondary">
+            v0.1.0 — Phase 1
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );
