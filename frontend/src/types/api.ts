@@ -258,10 +258,15 @@ export interface StandardReference {
   source: string;
   categories: string[];
   description: string;
+  sharepoint_url: string | null;
+  file_type: string | null;
+  last_modified: string | null;
+  file_size_bytes: number | null;
 }
 
 export interface StandardsResponse {
   standards: StandardReference[];
+  source: 'sharepoint' | 'registry' | 'fallback';
 }
 
 export interface FindingDisposition {

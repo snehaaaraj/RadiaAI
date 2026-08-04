@@ -26,12 +26,14 @@ from app.reviewers.requirement_set.reviewer import RequirementSetReviewer
 from app.reviewers.structure.reviewer import StructureReviewer
 from app.reviewers.traceability.reviewer import TraceabilityReviewer
 from app.reviewers.verifiability.reviewer import VerifiabilityReviewer
-from app.services.requirement_delta_review_service import RequirementDeltaReviewService
+from app.connectors.sharepoint_client import SharePointStandardsClient
 from app.services.requirement_review_service import RequirementReviewService
 from app.services.requirement_set_review_service import RequirementSetReviewService
+from app.services.requirement_delta_review_service import RequirementDeltaReviewService
 from app.services.review_history_service import ReviewHistoryService
 from app.services.review_version_service import ReviewVersionService
 from app.services.standards_service import StandardsService
+
 from app.standards.registry import StandardsRegistry
 
 logger = get_logger(__name__)
@@ -62,7 +64,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     app.state.review_orchestrator = _build_review_orchestrator(settings)
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
-    app.state.standards_service = StandardsService(StandardsRegistry())
+
+    sharepoint_client = SharePointStandardsClient(settings.sharepoint)
+    app.state.standards_service = StandardsService(StandardsRegistry(), sharepoint_client)
+    app.state.sharepoint_client = sharepoint_client
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
     app.state.requirement_set_review_service = RequirementSetReviewService(
         app.state.review_orchestrator
@@ -202,7 +207,9 @@ def get_standards_service(request: Request) -> StandardsService:
     """Resolve standards service from application state."""
     service = getattr(request.app.state, "standards_service", None)
     if service is None:
-        service = StandardsService(StandardsRegistry())
+        settings = get_settings()
+        sharepoint_client = SharePointStandardsClient(settings.sharepoint)
+        service = StandardsService(StandardsRegistry(), sharepoint_client)
         request.app.state.standards_service = service
     return service
 
