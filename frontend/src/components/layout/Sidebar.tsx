@@ -7,7 +7,6 @@ import ListItemText from '@mui/material/ListItemText';
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import Chip from '@mui/material/Chip';
 import HomeIcon from '@mui/icons-material/Home';
 import RuleIcon from '@mui/icons-material/Rule';
 import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
@@ -36,7 +35,7 @@ const BOTTOM_ITEMS = [
 ] as const;
 
 export function Sidebar() {
-  const { sidebarOpen, themePreference } = useAppContext();
+  const { sidebarOpen } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -130,12 +129,9 @@ export function Sidebar() {
       </List>
 
       <Box px={2} pb={2}>
-        <Box display="flex" flexDirection="column" gap={1}>
-          <Chip label={`Theme: ${themePreference}`} size="small" variant="outlined" />
-          <Typography variant="caption" color="text.secondary">
-            v0.1.0 — Phase 1
-          </Typography>
-        </Box>
+        <Typography variant="caption" color="text.secondary">
+          v0.1.0 — Phase 1
+        </Typography>
       </Box>
     </Box>
   );
