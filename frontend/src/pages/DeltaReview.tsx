@@ -12,10 +12,12 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
+import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { useDeltaReview } from '@/hooks/useDeltaReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import type { DeltaReviewInput } from '@/types/api';
+import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 const BASELINE_SAMPLE = JSON.stringify(
   [
@@ -268,6 +270,9 @@ export default function DeltaReview() {
               </Typography>
               <ReviewStatusChip status={result.overall} size="medium" />
             </Box>
+            <ReviewQualityBand
+              score={getReviewQualityScore(result.overall, result.requirement_set_findings)}
+            />
             {result.review_id && (
               <Typography variant="caption" color="text.secondary">
                 Review ID: {result.review_id}
@@ -299,6 +304,13 @@ export default function DeltaReview() {
                       <Typography variant="subtitle2">{reviewedRequirement.requirement_id}</Typography>
                       <ReviewStatusChip status={reviewedRequirement.overall} />
                     </Box>
+                    <ReviewQualityBand
+                      label="Requirement quality"
+                      score={getReviewQualityScore(
+                        reviewedRequirement.overall,
+                        reviewedRequirement.findings
+                      )}
+                    />
                     {reviewedRequirement.findings.map((finding, index) => (
                       <FindingCard
                         key={`${reviewedRequirement.requirement_id}-${index}`}
