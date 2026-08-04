@@ -36,6 +36,8 @@ from app.services.standards_service import StandardsService
 
 from app.standards.registry import StandardsRegistry
 
+logger = get_logger(__name__)
+
 # ---------------------------------------------------------------------------
 # Lifespan — startup and shutdown hooks
 # ---------------------------------------------------------------------------
