@@ -59,6 +59,37 @@ class AzureBlobSettings(BaseSettings):
     )
 
 
+class SharePointSettings(BaseSettings):
+    """SharePoint / Microsoft Graph API settings for standards document library."""
+
+    model_config = SettingsConfigDict(env_prefix="SHAREPOINT_", env_file=_ENV_FILE, extra="ignore")
+
+    tenant_id: str = Field(default="", description="Azure AD tenant ID (can share with ENTRA_TENANT_ID)")
+    client_id: str = Field(default="", description="App registration client ID with Sites.Read.All")
+    client_secret: str = Field(default="", description="App registration client secret")
+    site_url: str = Field(
+        default="https://radia99.sharepoint.com/sites/sysengint",
+        description="SharePoint site root URL",
+    )
+    drive_name: str = Field(
+        default="Requirements Management",
+        description="SharePoint document library (drive) name",
+    )
+    standards_folder: str = Field(
+        default="0. Reference Material/AI Reference Material",
+        description="Folder path within the drive containing standard documents",
+    )
+    cache_ttl_seconds: int = Field(
+        default=300,
+        description="How long to cache the file listing before re-fetching (seconds)",
+    )
+
+    @property
+    def is_configured(self) -> bool:
+        """True only when all credentials and site URL are set."""
+        return bool(self.tenant_id and self.client_id and self.client_secret and self.site_url)
+
+
 class EntraIDSettings(BaseSettings):
     """Microsoft Entra ID (Azure AD) configuration for authentication."""
 
@@ -115,6 +146,7 @@ class AppSettings(BaseSettings):
     azure_search: AzureSearchSettings = Field(default_factory=AzureSearchSettings)
     azure_blob: AzureBlobSettings = Field(default_factory=AzureBlobSettings)
     entra: EntraIDSettings = Field(default_factory=EntraIDSettings)
+    sharepoint: SharePointSettings = Field(default_factory=SharePointSettings)
 
     @field_validator("debug")
     @classmethod
