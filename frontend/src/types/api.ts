@@ -182,6 +182,8 @@ export interface ReviewFinding {
   evidence: string;
   recommendation: string;
   reference: string;
+  reference_title: string | null;
+  reference_url: string | null;
 }
 
 export interface RequirementReviewInput {
