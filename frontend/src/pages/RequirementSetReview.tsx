@@ -16,10 +16,12 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
+import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import { useRequirementSetReview } from '@/hooks/useRequirementSetReview';
 import type { RequirementReviewInput } from '@/types/api';
+import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 interface RequirementDraft {
   requirement_id: string;
@@ -337,6 +339,9 @@ export default function RequirementSetReview() {
               </Typography>
               <ReviewStatusChip status={result.overall} size="medium" />
             </Box>
+            <ReviewQualityBand
+              score={getReviewQualityScore(result.overall, result.findings)}
+            />
             <Typography variant="body2" color="text.secondary">
               Reviewed requirements: {result.requirement_count}
             </Typography>

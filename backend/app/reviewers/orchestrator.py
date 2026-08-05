@@ -22,6 +22,7 @@ from app.models.review_models import (
 if TYPE_CHECKING:
     from app.core.config import AppSettings
     from app.reviewers.base import RequirementReviewer
+    from app.services.standards_service import StandardsService
 
 
 class ReviewOrchestrator:
@@ -31,10 +32,12 @@ class ReviewOrchestrator:
         self,
         settings: AppSettings,
         reviewers: list[RequirementReviewer],
+        standards_service: StandardsService | None = None,
         reviewer_bundle_version: str = "1.0.0",
     ) -> None:
         self._settings = settings
         self._reviewers = reviewers
+        self._standards_service = standards_service
         self._reviewer_bundle_version = reviewer_bundle_version
 
     def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
@@ -44,7 +47,7 @@ class ReviewOrchestrator:
             for reviewer in self._reviewers
             if reviewer.supports_individual_review
         ]
-        findings = [finding for result in reviewer_results for finding in result.findings]
+        findings = self._enrich_findings([finding for result in reviewer_results for finding in result.findings])
         category_results = [
             CategoryResult(category=result.reviewer, status=result.overall)
             for result in reviewer_results
@@ -66,7 +69,7 @@ class ReviewOrchestrator:
             for reviewer in self._reviewers
             if reviewer.supports_requirement_set_review
         ]
-        findings = [finding for result in reviewer_results for finding in result.findings]
+        findings = self._enrich_findings([finding for result in reviewer_results for finding in result.findings])
         category_results = [
             CategoryResult(category=result.reviewer, status=result.overall)
             for result in reviewer_results
@@ -135,6 +138,32 @@ class ReviewOrchestrator:
         }
         stable_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(stable_json.encode("utf-8")).hexdigest()
+
+    def _enrich_findings(self, findings: list) -> list:
+        if self._standards_service is None:
+            return findings
+
+        enriched = []
+        for finding in findings:
+            resolved = self._standards_service.resolve_reference(
+                finding.reference,
+                category=finding.category,
+                reviewer=finding.reviewer,
+            )
+            if resolved is None or not resolved.sharepoint_url:
+                enriched.append(finding)
+                continue
+
+            enriched.append(
+                finding.model_copy(
+                    update={
+                        "reference": resolved.name,
+                        "reference_title": resolved.name,
+                        "reference_url": resolved.sharepoint_url,
+                    }
+                )
+            )
+        return enriched
 
 
 def _overall_from_statuses(statuses: list[ReviewStatus]) -> ReviewStatus:

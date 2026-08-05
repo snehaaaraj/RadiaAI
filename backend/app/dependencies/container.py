@@ -62,11 +62,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         environment=settings.environment,
     )
 
-    app.state.review_orchestrator = _build_review_orchestrator(settings)
-    app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
-
     sharepoint_client = SharePointStandardsClient(settings.sharepoint)
     app.state.standards_service = StandardsService(StandardsRegistry(), sharepoint_client)
+    app.state.review_orchestrator = _build_review_orchestrator(
+        settings,
+        app.state.standards_service,
+    )
+    app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
     app.state.sharepoint_client = sharepoint_client
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
     app.state.requirement_set_review_service = RequirementSetReviewService(
@@ -97,7 +99,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 SettingsDep = Annotated[AppSettings, Depends(get_settings)]
 
 
-def _build_review_orchestrator(settings: AppSettings) -> ReviewOrchestrator:
+def _build_review_orchestrator(
+    settings: AppSettings, standards_service: StandardsService | None = None
+) -> ReviewOrchestrator:
     """Construct the deterministic review orchestrator with registered reviewers."""
     return ReviewOrchestrator(
         settings=settings,
@@ -109,6 +113,7 @@ def _build_review_orchestrator(settings: AppSettings) -> ReviewOrchestrator:
             CertificationReviewer(),
             RequirementSetReviewer(),
         ],
+        standards_service=standards_service,
         reviewer_bundle_version="1.0.0",
     )
 
@@ -131,7 +136,8 @@ def get_review_orchestrator(request: Request) -> ReviewOrchestrator:
     orchestrator = getattr(request.app.state, "review_orchestrator", None)
     if orchestrator is None:
         settings = get_settings()
-        orchestrator = _build_review_orchestrator(settings)
+        standards_service = get_standards_service(request)
+        orchestrator = _build_review_orchestrator(settings, standards_service)
         request.app.state.review_orchestrator = orchestrator
     return orchestrator
 

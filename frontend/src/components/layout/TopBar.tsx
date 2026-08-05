@@ -5,7 +5,6 @@ import Typography from '@mui/material/Typography';
 import Chip from '@mui/material/Chip';
 import MenuIcon from '@mui/icons-material/Menu';
 import BoltIcon from '@mui/icons-material/Bolt';
-import Box from '@mui/material/Box';
 import { useAppContext } from '@/context/AppContext';
 import { useHealth } from '@/hooks/useHealth';
 import { APP_NAME } from '@/utils/constants';
@@ -53,16 +52,9 @@ export function TopBar({ drawerWidth = DRAWER_WIDTH }: TopBarProps) {
           {APP_NAME}
         </Typography>
 
-        <Box display="flex" alignItems="center" gap={1}>
-          {health && (
-            <Chip
-              label={`API ${health.status}`}
-              color={statusColor}
-              size="small"
-              variant="outlined"
-            />
-          )}
-        </Box>
+        {health && (
+          <Chip label={`API ${health.status}`} color={statusColor} size="small" variant="outlined" />
+        )}
       </Toolbar>
     </AppBar>
   );

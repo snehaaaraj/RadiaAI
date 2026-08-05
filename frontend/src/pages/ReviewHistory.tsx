@@ -8,10 +8,12 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { FindingCard } from '@/components/review/FindingCard';
+import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useApplyFindingDisposition, useReviewHistory } from '@/hooks/useReviewHistory';
 import type { ReviewWorkflow } from '@/types/api';
+import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 const WORKFLOW_OPTIONS: Array<{ label: string; value: ReviewWorkflow | 'all' }> = [
   { label: 'All workflows', value: 'all' },
@@ -74,6 +76,9 @@ export default function ReviewHistory() {
                   Workflow: {entry.workflow} • Subject: {entry.subject_id ?? 'N/A'} •{' '}
                   {new Date(entry.created_at).toLocaleString()}
                 </Typography>
+                <ReviewQualityBand
+                  score={getReviewQualityScore(entry.overall, entry.findings)}
+                />
                 <Box display="flex" gap={1} flexWrap="wrap">
                   {entry.category_results.map((category, index) => (
                     <Chip

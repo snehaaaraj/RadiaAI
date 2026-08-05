@@ -77,6 +77,14 @@ class ReviewFinding(BaseModel):
     evidence: str = Field(description="Specific text/evidence from the reviewed requirement(s).")
     recommendation: str = Field(description="Actionable remediation guidance.")
     reference: str = Field(description="Standard or guide reference identifier.")
+    reference_title: str | None = Field(
+        default=None,
+        description="Human-readable source document title for the reference.",
+    )
+    reference_url: str | None = Field(
+        default=None,
+        description="SharePoint or document URL for the reference source.",
+    )
 
 
 class ReviewerResult(BaseModel):

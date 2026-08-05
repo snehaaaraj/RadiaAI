@@ -12,6 +12,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
+import Link from '@mui/material/Link';
 import type {
   ApplyFindingDispositionRequest,
   FindingDisposition,
@@ -80,7 +81,14 @@ export function FindingCard({
             <strong>Recommendation:</strong> {finding.recommendation}
           </Typography>
           <Typography variant="body2">
-            <strong>Reference:</strong> {finding.reference}
+            <strong>Reference:</strong>{' '}
+            {finding.reference_url ? (
+              <Link href={finding.reference_url} target="_blank" rel="noopener noreferrer" underline="hover">
+                {finding.reference_title ?? finding.reference}
+              </Link>
+            ) : (
+              finding.reference_title ?? finding.reference
+            )}
           </Typography>
 
           {onApplyDisposition && (
@@ -131,4 +139,3 @@ export function FindingCard({
     </Accordion>
   );
 }
-

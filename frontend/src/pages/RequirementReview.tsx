@@ -13,9 +13,11 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
+import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { useRequirementReview } from '@/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
+import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 const REQUIREMENT_LEVELS = ['aircraft', 'system', 'subsystem', 'component'] as const;
 
@@ -158,6 +160,9 @@ export default function RequirementReview() {
               </Typography>
               <ReviewStatusChip status={result.overall} size="medium" />
             </Box>
+            <ReviewQualityBand
+              score={getReviewQualityScore(result.overall, result.findings)}
+            />
             {result.review_id && (
               <Typography variant="caption" color="text.secondary">
                 Review ID: {result.review_id}
