@@ -18,6 +18,7 @@ from app.models.review_models import (
     ReviewVersionEntry,
     ReviewVersionResponse,
 )
+from app.utils.review_utils import overall_from_statuses
 
 if TYPE_CHECKING:
     from app.core.config import AppSettings
@@ -52,7 +53,7 @@ class ReviewOrchestrator:
             CategoryResult(category=result.reviewer, status=result.overall)
             for result in reviewer_results
         ]
-        overall = _overall_from_statuses([result.overall for result in reviewer_results])
+        overall = overall_from_statuses([result.overall for result in reviewer_results])
         return RequirementReviewResponse(
             overall=overall,
             category_results=category_results,
@@ -74,7 +75,7 @@ class ReviewOrchestrator:
             CategoryResult(category=result.reviewer, status=result.overall)
             for result in reviewer_results
         ]
-        overall = _overall_from_statuses([result.overall for result in reviewer_results])
+        overall = overall_from_statuses([result.overall for result in reviewer_results])
         return RequirementSetReviewResponse(
             overall=overall,
             category_results=category_results,
@@ -164,11 +165,3 @@ class ReviewOrchestrator:
                 )
             )
         return enriched
-
-
-def _overall_from_statuses(statuses: list[ReviewStatus]) -> ReviewStatus:
-    if any(status == ReviewStatus.UNACCEPTABLE for status in statuses):
-        return ReviewStatus.UNACCEPTABLE
-    if any(status == ReviewStatus.REVISION_RECOMMENDED for status in statuses):
-        return ReviewStatus.REVISION_RECOMMENDED
-    return ReviewStatus.ACCEPTABLE

@@ -20,11 +20,6 @@ def set_request_id(request_id: str) -> None:
     _request_id_ctx.set(request_id)
 
 
-def get_request_id() -> str:
-    """Return the current request ID, or a new UUID if none is set."""
-    return _request_id_ctx.get() or str(uuid.uuid4())
-
-
 def generate_request_id() -> str:
     """Generate a new UUID4 request ID."""
     return str(uuid.uuid4())

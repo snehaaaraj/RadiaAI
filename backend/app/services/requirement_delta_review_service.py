@@ -11,6 +11,7 @@ from app.models.review_models import (
 from app.services.requirement_review_service import RequirementReviewService
 from app.services.requirement_set_review_service import RequirementSetReviewService
 from app.services.review_version_service import ReviewVersionService
+from app.utils.review_utils import overall_from_statuses
 
 
 class RequirementDeltaReviewService:
@@ -52,7 +53,7 @@ class RequirementDeltaReviewService:
                 metadata={"mode": "delta"},
             )
         )
-        overall = _overall_from_statuses(
+        overall = overall_from_statuses(
             [result.overall for result in reviewed_requirements] + [set_result.overall]
         )
         determinism = self._review_version_service.get_review_version().determinism
@@ -63,12 +64,4 @@ class RequirementDeltaReviewService:
             requirement_set_findings=set_result.findings,
             determinism=determinism,
         )
-
-
-def _overall_from_statuses(statuses: list[ReviewStatus]) -> ReviewStatus:
-    if any(status == ReviewStatus.UNACCEPTABLE for status in statuses):
-        return ReviewStatus.UNACCEPTABLE
-    if any(status == ReviewStatus.REVISION_RECOMMENDED for status in statuses):
-        return ReviewStatus.REVISION_RECOMMENDED
-    return ReviewStatus.ACCEPTABLE
 

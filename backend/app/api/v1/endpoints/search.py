@@ -7,7 +7,7 @@ Phase 1: Returns a stub response to validate the API contract.
 Phase 3: Will wire in the real Azure AI Search service.
 """
 
-from fastapi import APIRouter, Depends, Request, status
+from fastapi import APIRouter, Request, status
 
 from app.core.logging import get_logger
 from app.schemas.common import APIResponse

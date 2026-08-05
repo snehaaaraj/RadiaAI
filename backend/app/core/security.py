@@ -85,35 +85,3 @@ async def _entra_auth(
     raise NotImplementedError("Entra ID token validation not yet implemented")
 
 
-def get_current_user_dependency(settings: AppSettings) -> Callable:
-    """
-    Factory that returns the appropriate auth dependency based on configuration.
-
-    Returns the stub when Entra is not configured (local dev),
-    and the real validator when Entra is fully configured.
-    """
-    if settings.entra.is_configured:
-        return _entra_auth
-    logger.warning(
-        "Entra ID not configured — using stub authentication. "
-        "Do NOT use this in production."
-    )
-    return _stub_auth
-
-
-def require_role(role: str) -> Callable:
-    """
-    Dependency factory that enforces a specific role on an endpoint.
-
-    Usage:
-        @router.post("/admin/...", dependencies=[Depends(require_role("admin"))])
-    """
-
-    async def _check_role(user: AuthenticatedUser = Depends(_stub_auth)) -> None:
-        if not user.has_role(role):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Role '{role}' is required for this resource",
-            )
-
-    return _check_role
