@@ -1,11 +1,11 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
+import Grid from '@mui/material/Grid2';
 import IconButton from '@mui/material/IconButton';
 import MenuItem from '@mui/material/MenuItem';
 import Paper from '@mui/material/Paper';
@@ -14,14 +14,15 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
-import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
-import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
+import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useRequirementSetReview } from '@/hooks/useRequirementSetReview';
 import type { RequirementReviewInput, RequirementSetReviewResponse } from '@/types/api';
+import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 interface RequirementDraft {
@@ -31,8 +32,6 @@ interface RequirementDraft {
   parent_id: string;
   verification_method: string;
 }
-
-const REQUIREMENT_LEVELS = ['aircraft', 'system', 'subsystem', 'component'] as const;
 
 function toApiRequirement(draft: RequirementDraft): RequirementReviewInput {
   return {
@@ -49,7 +48,7 @@ function toApiRequirement(draft: RequirementDraft): RequirementReviewInput {
 function createEmptyDraft(): RequirementDraft {
   return {
     requirement_id: '',
-    requirement_level: 'system',
+    requirement_level: 'System',
     text: '',
     parent_id: '',
     verification_method: '',
@@ -65,7 +64,9 @@ function parseJsonRequirements(content: string): RequirementDraft[] {
     const metadata = (record['metadata'] as Record<string, unknown> | undefined) ?? {};
     return {
       requirement_id: String(record['requirement_id'] ?? record['id'] ?? ''),
-      requirement_level: String(record['requirement_level'] ?? record['level'] ?? 'system'),
+      requirement_level: normalizeRequirementLevel(
+        String(record['requirement_level'] ?? record['level'] ?? 'System')
+      ),
       text: String(record['text'] ?? record['requirement_text'] ?? record['description'] ?? ''),
       parent_id: String(metadata['parent_id'] ?? record['parent_id'] ?? ''),
       verification_method: String(
@@ -89,7 +90,9 @@ function parseCsvRequirements(content: string): RequirementDraft[] {
     const row = line.split(',');
     return {
       requirement_id: cell(row, col('requirement_id')) || cell(row, col('id')),
-      requirement_level: cell(row, col('requirement_level')) || cell(row, col('level')) || 'system',
+      requirement_level: normalizeRequirementLevel(
+        cell(row, col('requirement_level')) || cell(row, col('level')) || 'System'
+      ),
       text: cell(row, col('text')) || cell(row, col('requirement_text')) || cell(row, col('description')),
       parent_id: cell(row, col('parent_id')),
       verification_method: cell(row, col('verification_method')),
@@ -124,7 +127,12 @@ export default function RequirementSetReview() {
     initialValue: null,
   });
   const [specificationId, setSpecificationId] = useState(formState.specificationId);
-  const [requirements, setRequirements] = useState<RequirementDraft[]>(formState.requirements);
+  const [requirements, setRequirements] = useState<RequirementDraft[]>(
+    formState.requirements.map((item) => ({
+      ...item,
+      requirement_level: normalizeRequirementLevel(item.requirement_level),
+    }))
+  );
   const [inputMode, setInputMode] = useState<InputMode>(formState.inputMode);
   const [uploadedFilename, setUploadedFilename] = useState(formState.uploadedFilename);
   const [parseError, setParseError] = useState(formState.parseError);
@@ -144,10 +152,16 @@ export default function RequirementSetReview() {
     [requirements]
   );
   const activeResult = result ?? persistedResult;
+  const resultRef = useRef<HTMLDivElement | null>(null);
 
   const updateFormState = useCallback((next: Partial<RequirementSetFormState>) => {
     setFormState((current) => ({ ...current, ...next }));
   }, [setFormState]);
+
+  useEffect(() => {
+    if (!activeResult) return;
+    resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [activeResult]);
 
   const handleFileContent = useCallback((content: string, filename: string) => {
     setParseError('');
@@ -216,26 +230,37 @@ export default function RequirementSetReview() {
             <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>
               Requirements Input
             </Typography>
-            <ToggleButtonGroup
-              size="small"
-              value={inputMode}
-              exclusive
-              onChange={(_, value: InputMode | null) => {
-                if (value) {
-                  setInputMode(value);
-                  updateFormState({ inputMode: value });
-                  if (value === 'manual') {
-                    setUploadedFilename('');
-                    setParseError('');
-                    updateFormState({ uploadedFilename: '', parseError: '' });
-                  }
-                }
-              }}
-              sx={{ mb: 1.5 }}
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="space-between"
+              gap={1}
+              flexWrap="wrap"
+              mb={1.5}
             >
-              <ToggleButton value="manual">Enter manually</ToggleButton>
-              <ToggleButton value="upload">Upload file</ToggleButton>
-            </ToggleButtonGroup>
+              <ToggleButtonGroup
+                size="small"
+                value={inputMode}
+                exclusive
+                onChange={(_, value: InputMode | null) => {
+                  if (value) {
+                    setInputMode(value);
+                    updateFormState({ inputMode: value });
+                    if (value === 'manual') {
+                      setUploadedFilename('');
+                      setParseError('');
+                      updateFormState({ uploadedFilename: '', parseError: '' });
+                    }
+                  }
+                }}
+              >
+                <ToggleButton value="manual">Enter manually</ToggleButton>
+                <ToggleButton value="upload">Upload file</ToggleButton>
+              </ToggleButtonGroup>
+              <Button variant="outlined" color="inherit" onClick={handleClearAll}>
+                Clear Review
+              </Button>
+            </Box>
 
             {inputMode === 'upload' && (
               <FileUploadZone
@@ -284,41 +309,51 @@ export default function RequirementSetReview() {
                     <DeleteOutlineIcon fontSize="small" />
                   </IconButton>
                 </Box>
-                <TextField
-                  size="small"
-                  label="Requirement ID"
-                  value={item.requirement_id}
-                  onChange={(event) =>
-                    setRequirements((current) => {
-                      const nextRequirements = current.map((entry, entryIndex) =>
-                        entryIndex === index ? { ...entry, requirement_id: event.target.value } : entry
-                      );
-                      updateFormState({ requirements: nextRequirements });
-                      return nextRequirements;
-                    })
-                  }
-                />
-                <TextField
-                  select
-                  size="small"
-                  label="Requirement Level"
-                  value={item.requirement_level}
-                  onChange={(event) =>
-                    setRequirements((current) => {
-                      const nextRequirements = current.map((entry, entryIndex) =>
-                        entryIndex === index ? { ...entry, requirement_level: event.target.value } : entry
-                      );
-                      updateFormState({ requirements: nextRequirements });
-                      return nextRequirements;
-                    })
-                  }
-                >
-                  {REQUIREMENT_LEVELS.map((level) => (
-                    <MenuItem key={level} value={level}>
-                      {level}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <Grid container spacing={1.5}>
+                  <Grid size={{ xs: 12, md: 4 }}>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      label="Requirement ID"
+                      value={item.requirement_id}
+                      onChange={(event) =>
+                        setRequirements((current) => {
+                          const nextRequirements = current.map((entry, entryIndex) =>
+                            entryIndex === index ? { ...entry, requirement_id: event.target.value } : entry
+                          );
+                          updateFormState({ requirements: nextRequirements });
+                          return nextRequirements;
+                        })
+                      }
+                    />
+                  </Grid>
+                  <Grid size={{ xs: 12, md: 3 }}>
+                    <TextField
+                      select
+                      size="small"
+                      fullWidth
+                      label="Requirement Level"
+                      value={item.requirement_level}
+                      onChange={(event) =>
+                        setRequirements((current) => {
+                          const nextRequirements = current.map((entry, entryIndex) =>
+                            entryIndex === index
+                              ? { ...entry, requirement_level: normalizeRequirementLevel(event.target.value) }
+                              : entry
+                          );
+                          updateFormState({ requirements: nextRequirements });
+                          return nextRequirements;
+                        })
+                      }
+                    >
+                      {REQUIREMENT_LEVELS.map((level) => (
+                        <MenuItem key={level} value={level}>
+                          {level}
+                        </MenuItem>
+                      ))}
+                    </TextField>
+                  </Grid>
+                </Grid>
                 <TextField
                   multiline
                   minRows={3}
@@ -404,9 +439,6 @@ export default function RequirementSetReview() {
             >
               Run requirement-set review
             </Button>
-            <Button variant="outlined" color="inherit" onClick={handleClearAll}>
-              Clear
-            </Button>
           </Box>
         </Stack>
       </Paper>
@@ -414,56 +446,59 @@ export default function RequirementSetReview() {
       {isError && <Alert severity="error">Review failed: {(error as Error).message}</Alert>}
 
       {activeResult && (
-        <Paper variant="outlined" sx={{ p: 2.5 }}>
-          <Stack spacing={2}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
-              <Typography variant="h6" fontWeight={700}>
-                Requirement Set Result
-              </Typography>
-              <ReviewStatusChip status={activeResult.overall} size="medium" />
-            </Box>
-            <ReviewQualityBand
-              score={getReviewQualityScore(activeResult.overall, activeResult.findings)}
-            />
-            <Typography variant="body2" color="text.secondary">
-              Reviewed requirements: {activeResult.requirement_count}
-            </Typography>
-            {activeResult.review_id && (
-              <Typography variant="caption" color="text.secondary">
-                Review ID: {activeResult.review_id}
-              </Typography>
-            )}
-            <Box display="flex" gap={1} flexWrap="wrap">
-              {activeResult.category_results.map((category) => (
-                <Chip
-                  key={`${category.category}-${category.status}`}
-                  label={`${category.category}: ${category.status}`}
-                  variant="outlined"
-                  size="small"
-                />
-              ))}
-            </Box>
-            <Divider />
-            <Stack spacing={1.5}>
-              {activeResult.findings.length === 0 ? (
-                <Alert severity="success">No findings detected for this requirement set.</Alert>
-              ) : (
-                activeResult.findings.map((finding, index) => (
-                  <FindingCard
-                    key={`${finding.category}-${index}`}
-                    finding={finding}
-                    index={index}
-                    reviewId={activeResult.review_id}
-                    onApplyDisposition={(reviewId, payload) =>
-                      applyDisposition({ reviewId, payload })
-                    }
-                    isApplyingDisposition={isApplyingDisposition}
-                  />
-                ))
-              )}
+        <Stack spacing={2} ref={resultRef}>
+          <ReviewResultHero
+            title="Requirement set score"
+            score={getReviewQualityScore(activeResult.overall, activeResult.findings)}
+            status={activeResult.overall}
+            findings={activeResult.findings}
+            reviewId={activeResult.review_id}
+            metadata={[
+              { label: 'Specification', value: specificationId || 'Not provided' },
+              { label: 'Reviewed', value: activeResult.requirement_count },
+            ]}
+          />
+          <Paper variant="outlined" sx={{ p: 2.5 }}>
+            <Stack spacing={2}>
+              <Box>
+                <Typography variant="h6" fontWeight={800} gutterBottom>
+                  Category scoring
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Compare sub-category quality across the full uploaded or manually entered requirement set.
+                </Typography>
+              </Box>
+              <CategoryScoreGrid categories={activeResult.category_results} />
+              <Divider />
+              <Box>
+                <Typography variant="h6" fontWeight={800} gutterBottom>
+                  Suggested changes
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Each recommendation is grouped with the source text and standards reference that informed it.
+                </Typography>
+              </Box>
+              <Stack spacing={1.5}>
+                {activeResult.findings.length === 0 ? (
+                  <Alert severity="success">No findings detected for this requirement set.</Alert>
+                ) : (
+                  activeResult.findings.map((finding, index) => (
+                    <FindingCard
+                      key={`${finding.category}-${index}`}
+                      finding={finding}
+                      index={index}
+                      reviewId={activeResult.review_id}
+                      onApplyDisposition={(reviewId, payload) =>
+                        applyDisposition({ reviewId, payload })
+                      }
+                      isApplyingDisposition={isApplyingDisposition}
+                    />
+                  ))
+                )}
+              </Stack>
             </Stack>
-          </Stack>
-        </Paper>
+          </Paper>
+        </Stack>
       )}
     </Stack>
   );

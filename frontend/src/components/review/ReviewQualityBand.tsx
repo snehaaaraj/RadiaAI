@@ -6,17 +6,29 @@ import { getReviewQualityColor } from '@/utils/reviewQuality';
 interface ReviewQualityBandProps {
   score: number;
   label?: string;
+  showValue?: boolean;
 }
 
-export function ReviewQualityBand({ score, label = 'Review quality' }: ReviewQualityBandProps) {
+export function ReviewQualityBand({
+  score,
+  label = 'Review quality',
+  showValue = true,
+}: ReviewQualityBandProps) {
   const color = getReviewQualityColor(score);
   const position = `${Math.max(0, Math.min(100, (score / 10) * 100))}%`;
 
   return (
     <Stack spacing={0.5}>
-      <Typography variant="caption" color="text.secondary">
-        {label}
-      </Typography>
+      <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1}>
+        <Typography variant="caption" color="text.secondary">
+          {label}
+        </Typography>
+        {showValue && (
+          <Typography variant="caption" fontWeight={700} color="text.secondary">
+            {score.toFixed(1)} / 10
+          </Typography>
+        )}
+      </Stack>
       <Box
         sx={{
           position: 'relative',

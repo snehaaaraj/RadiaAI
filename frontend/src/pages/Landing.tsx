@@ -2,7 +2,6 @@ import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
 import InsightsIcon from '@mui/icons-material/Insights';
 import SecurityIcon from '@mui/icons-material/Security';
-import BoltIcon from '@mui/icons-material/Bolt';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -13,6 +12,7 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { RadiaMark } from '@/components/layout/RadiaMark';
 import { useAppContext } from '@/context/AppContext';
 import { APP_NAME, ROUTES } from '@/utils/constants';
 
@@ -57,7 +57,7 @@ export default function Landing() {
             <CardContent>
               <Stack spacing={3}>
                 <Box display="flex" alignItems="center" gap={1}>
-                  <BoltIcon color="primary" />
+                  <RadiaMark size={26} />
                   <Typography variant="subtitle2" color="text.secondary">
                     Welcome to {APP_NAME}
                   </Typography>

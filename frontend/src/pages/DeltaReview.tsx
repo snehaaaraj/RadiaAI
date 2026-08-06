@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -10,10 +10,12 @@ import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
+import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
+import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useDeltaReview } from '@/hooks/useDeltaReview';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
@@ -25,13 +27,13 @@ const BASELINE_SAMPLE = JSON.stringify(
     {
       requirement_id: 'REQ-001',
       text: 'The subsystem shall enable diagnostics within 2 seconds.',
-      requirement_level: 'system',
+      requirement_level: 'System',
       metadata: { parent_id: 'P-100', verification_method: 'test' },
     },
     {
       requirement_id: 'REQ-002',
       text: 'The subsystem shall provide telemetry every 1 second.',
-      requirement_level: 'system',
+      requirement_level: 'System',
       metadata: { parent_id: 'P-100', verification_method: 'analysis' },
     },
   ],
@@ -44,13 +46,13 @@ const UPDATED_SAMPLE = JSON.stringify(
     {
       requirement_id: 'REQ-001',
       text: 'The subsystem shall enable diagnostics within 1 second.',
-      requirement_level: 'system',
+      requirement_level: 'System',
       metadata: { parent_id: 'P-100', verification_method: 'test' },
     },
     {
       requirement_id: 'REQ-003',
       text: 'The subsystem shall provide built-in test under nominal conditions.',
-      requirement_level: 'system',
+      requirement_level: 'System',
       metadata: { parent_id: 'P-110', verification_method: 'inspection' },
     },
   ],
@@ -133,10 +135,16 @@ export default function DeltaReview() {
 
   const canSubmit = useMemo(() => baselineJson.trim() && updatedJson.trim(), [baselineJson, updatedJson]);
   const activeResult = result ?? persistedResult;
+  const resultRef = useRef<HTMLDivElement | null>(null);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
     setFormState((current) => ({ ...current, ...next }));
   };
+
+  useEffect(() => {
+    if (!activeResult) return;
+    resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }, [activeResult]);
 
   const handleClearAll = () => {
     clearFormState();
@@ -184,26 +192,37 @@ export default function DeltaReview() {
             <Typography variant="subtitle2" fontWeight={600} mb={0.75}>
               Baseline requirements
             </Typography>
-            <ToggleButtonGroup
-              size="small"
-              value={baselineMode}
-              exclusive
-              onChange={(_, value: JsonInputMode | null) => {
-                if (value) {
-                  setBaselineMode(value);
-                  updateFormState({ baselineMode: value });
-                  if (value === 'paste') {
-                    setBaselineFilename('');
-                    setBaselineJson(BASELINE_SAMPLE);
-                    updateFormState({ baselineFilename: '', baselineJson: BASELINE_SAMPLE });
-                  }
-                }
-              }}
-              sx={{ mb: 1 }}
+            <Box
+              display="flex"
+              alignItems="center"
+              justifyContent="space-between"
+              gap={1}
+              flexWrap="wrap"
+              mb={1}
             >
-              <ToggleButton value="paste">Paste JSON</ToggleButton>
-              <ToggleButton value="upload">Upload .json</ToggleButton>
-            </ToggleButtonGroup>
+              <ToggleButtonGroup
+                size="small"
+                value={baselineMode}
+                exclusive
+                onChange={(_, value: JsonInputMode | null) => {
+                  if (value) {
+                    setBaselineMode(value);
+                    updateFormState({ baselineMode: value });
+                    if (value === 'paste') {
+                      setBaselineFilename('');
+                      setBaselineJson(BASELINE_SAMPLE);
+                      updateFormState({ baselineFilename: '', baselineJson: BASELINE_SAMPLE });
+                    }
+                  }
+                }}
+              >
+                <ToggleButton value="paste">Paste JSON</ToggleButton>
+                <ToggleButton value="upload">Upload .json</ToggleButton>
+              </ToggleButtonGroup>
+              <Button variant="outlined" color="inherit" onClick={handleClearAll}>
+                Clear Review
+              </Button>
+            </Box>
             {baselineMode === 'paste' ? (
               <TextField
                 fullWidth
@@ -374,9 +393,6 @@ export default function DeltaReview() {
             >
               Run delta review
             </Button>
-            <Button variant="outlined" color="inherit" onClick={handleClearAll} sx={{ ml: 1 }}>
-              Clear
-            </Button>
           </Box>
           {parseError && <Alert severity="error">Invalid JSON input: {parseError}</Alert>}
         </Stack>
@@ -385,58 +401,91 @@ export default function DeltaReview() {
       {isError && <Alert severity="error">Delta review failed: {(error as Error).message}</Alert>}
 
       {activeResult && (
-        <Paper variant="outlined" sx={{ p: 2.5 }}>
-          <Stack spacing={2}>
-            <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
-              <Typography variant="h6" fontWeight={700}>
-                Delta Review Result
+        <Stack spacing={2} ref={resultRef}>
+          <ReviewResultHero
+            title="Delta review score"
+            score={getReviewQualityScore(activeResult.overall, activeResult.requirement_set_findings)}
+            status={activeResult.overall}
+            findings={activeResult.requirement_set_findings}
+            reviewId={activeResult.review_id}
+            metadata={[
+              { label: 'Specification', value: specificationId || 'Not provided' },
+              { label: 'Changed items', value: activeResult.reviewed_requirements.length },
+            ]}
+          />
+          <Paper variant="outlined" sx={{ p: 2.5 }}>
+            <Stack spacing={2}>
+              <Box display="flex" gap={1} flexWrap="wrap">
+                <Chip label={`New: ${activeResult.change_summary.new_requirement_ids.length}`} size="small" />
+                <Chip
+                  label={`Modified: ${activeResult.change_summary.modified_requirement_ids.length}`}
+                  size="small"
+                />
+                <Chip label={`Deleted: ${activeResult.change_summary.deleted_requirement_ids.length}`} size="small" />
+                <Chip
+                  label={`Trace changes: ${activeResult.change_summary.changed_trace_link_requirement_ids.length}`}
+                  size="small"
+                />
+              </Box>
+              <Divider />
+              <Typography variant="h6" fontWeight={800}>
+                Changed requirement results
               </Typography>
-              <ReviewStatusChip status={activeResult.overall} size="medium" />
-            </Box>
-            <ReviewQualityBand
-              score={getReviewQualityScore(activeResult.overall, activeResult.requirement_set_findings)}
-            />
-            {activeResult.review_id && (
-              <Typography variant="caption" color="text.secondary">
-                Review ID: {activeResult.review_id}
-              </Typography>
-            )}
-            <Box display="flex" gap={1} flexWrap="wrap">
-              <Chip label={`New: ${activeResult.change_summary.new_requirement_ids.length}`} size="small" />
-              <Chip
-                label={`Modified: ${activeResult.change_summary.modified_requirement_ids.length}`}
-                size="small"
-              />
-              <Chip label={`Deleted: ${activeResult.change_summary.deleted_requirement_ids.length}`} size="small" />
-              <Chip
-                label={`Trace changes: ${activeResult.change_summary.changed_trace_link_requirement_ids.length}`}
-                size="small"
-              />
-            </Box>
-            <Divider />
-            <Typography variant="subtitle1" fontWeight={700}>
-              Changed Requirement Findings
-            </Typography>
-            {activeResult.reviewed_requirements.length === 0 ? (
-              <Alert severity="success">No changed requirements to review.</Alert>
-            ) : (
-              activeResult.reviewed_requirements.map((reviewedRequirement) => (
-                <Paper key={reviewedRequirement.requirement_id} variant="outlined" sx={{ p: 1.5 }}>
-                  <Stack spacing={1.5}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center" gap={1}>
-                      <Typography variant="subtitle2">{reviewedRequirement.requirement_id}</Typography>
-                      <ReviewStatusChip status={reviewedRequirement.overall} />
-                    </Box>
-                    <ReviewQualityBand
-                      label="Requirement quality"
-                      score={getReviewQualityScore(
-                        reviewedRequirement.overall,
-                        reviewedRequirement.findings
+              {activeResult.reviewed_requirements.length === 0 ? (
+                <Alert severity="success">No changed requirements to review.</Alert>
+              ) : (
+                activeResult.reviewed_requirements.map((reviewedRequirement) => (
+                  <Paper key={reviewedRequirement.requirement_id} variant="outlined" sx={{ p: 1.75, borderRadius: 3 }}>
+                    <Stack spacing={1.5}>
+                      <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
+                        <Typography variant="h6" fontWeight={800}>
+                          {reviewedRequirement.requirement_id}
+                        </Typography>
+                        <ReviewStatusChip status={reviewedRequirement.overall} />
+                      </Box>
+                      <ReviewQualityBand
+                        label="Requirement score"
+                        score={getReviewQualityScore(
+                          reviewedRequirement.overall,
+                          reviewedRequirement.findings
+                        )}
+                      />
+                      <CategoryScoreGrid categories={reviewedRequirement.category_results} />
+                      {reviewedRequirement.findings.length === 0 ? (
+                        <Alert severity="success">No changes recommended for this requirement.</Alert>
+                      ) : (
+                        reviewedRequirement.findings.map((finding, index) => (
+                          <FindingCard
+                            key={`${reviewedRequirement.requirement_id}-${index}`}
+                            finding={finding}
+                            index={index}
+                            reviewId={activeResult.review_id}
+                            onApplyDisposition={(reviewId, payload) =>
+                              applyDisposition({ reviewId, payload })
+                            }
+                            isApplyingDisposition={isApplyingDisposition}
+                          />
+                        ))
                       )}
-                    />
-                    {reviewedRequirement.findings.map((finding, index) => (
+                    </Stack>
+                  </Paper>
+                ))
+              )}
+              {activeResult.requirement_set_findings.length > 0 && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Typography variant="h6" fontWeight={800} gutterBottom>
+                      Cross-requirement findings
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      These findings span the changed set as a whole rather than one individual requirement.
+                    </Typography>
+                  </Box>
+                  <Stack spacing={1.5}>
+                    {activeResult.requirement_set_findings.map((finding, index) => (
                       <FindingCard
-                        key={`${reviewedRequirement.requirement_id}-${index}`}
+                        key={`set-finding-${index}`}
                         finding={finding}
                         index={index}
                         reviewId={activeResult.review_id}
@@ -447,33 +496,11 @@ export default function DeltaReview() {
                       />
                     ))}
                   </Stack>
-                </Paper>
-              ))
-            )}
-            {activeResult.requirement_set_findings.length > 0 && (
-              <>
-                <Divider />
-                <Typography variant="subtitle1" fontWeight={700}>
-                  Requirement Set Findings (Changed Items Scope)
-                </Typography>
-                <Stack spacing={1.5}>
-                  {activeResult.requirement_set_findings.map((finding, index) => (
-                    <FindingCard
-                      key={`set-finding-${index}`}
-                      finding={finding}
-                      index={index}
-                      reviewId={activeResult.review_id}
-                      onApplyDisposition={(reviewId, payload) =>
-                        applyDisposition({ reviewId, payload })
-                      }
-                      isApplyingDisposition={isApplyingDisposition}
-                    />
-                  ))}
-                </Stack>
-              </>
-            )}
-          </Stack>
-        </Paper>
+                </>
+              )}
+            </Stack>
+          </Paper>
+        </Stack>
       )}
     </Stack>
   );
