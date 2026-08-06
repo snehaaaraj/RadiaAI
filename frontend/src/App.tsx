@@ -5,6 +5,7 @@ import { CssBaseline, ThemeProvider } from '@mui/material';
 import { useMemo, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppProvider, useAppContext } from '@/context/AppContext';
+import Landing from '@/pages/Landing';
 import Home from '@/pages/Home';
 import RequirementSetReview from '@/pages/RequirementSetReview';
 import RequirementReview from '@/pages/RequirementReview';
@@ -38,6 +39,7 @@ export default function App() {
         <ThemeShell>
           <BrowserRouter>
             <Routes>
+              <Route path={ROUTES.LANDING} element={<Landing />} />
               <Route element={<AppLayout />}>
                 <Route path={ROUTES.HOME} element={<Home />} />
                 <Route path={ROUTES.REVIEW_REQUIREMENT_SET} element={<RequirementSetReview />} />
@@ -49,9 +51,8 @@ export default function App() {
                 <Route path={ROUTES.SEARCH} element={<Search />} />
                 <Route path={ROUTES.DOCUMENTS} element={<Documents />} />
                 <Route path={ROUTES.SETTINGS} element={<Settings />} />
-                {/* Catch-all redirect to home */}
-                <Route path="*" element={<Navigate to={ROUTES.HOME} replace />} />
               </Route>
+              <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
             </Routes>
           </BrowserRouter>
         </ThemeShell>
@@ -62,11 +63,11 @@ export default function App() {
 }
 
 function ThemeShell({ children }: { children: ReactNode }) {
-  const { themePreference } = useAppContext();
+  const { themePreference, accentColor, uiDensity } = useAppContext();
   const prefersDark = useMediaQuery('(prefers-color-scheme: dark)', { noSsr: true });
   const mode = themePreference === 'system' ? (prefersDark ? 'dark' : 'light') : themePreference;
 
-  const theme = useMemo(() => createAppTheme(mode), [mode]);
+  const theme = useMemo(() => createAppTheme(mode, accentColor, uiDensity), [mode, accentColor, uiDensity]);
 
   return (
     <ThemeProvider theme={theme}>

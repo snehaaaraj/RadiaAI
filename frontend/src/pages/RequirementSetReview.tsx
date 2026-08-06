@@ -19,8 +19,9 @@ import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { useRequirementSetReview } from '@/hooks/useRequirementSetReview';
-import type { RequirementReviewInput } from '@/types/api';
+import type { RequirementReviewInput, RequirementSetReviewResponse } from '@/types/api';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 interface RequirementDraft {
@@ -97,20 +98,41 @@ function parseCsvRequirements(content: string): RequirementDraft[] {
 }
 
 type InputMode = 'manual' | 'upload';
+type RequirementSetFormState = {
+  specificationId: string;
+  requirements: RequirementDraft[];
+  inputMode: InputMode;
+  uploadedFilename: string;
+  parseError: string;
+};
+
+const DEFAULT_SET_FORM_STATE: RequirementSetFormState = {
+  specificationId: 'SPEC-001',
+  requirements: [createEmptyDraft(), createEmptyDraft()],
+  inputMode: 'manual',
+  uploadedFilename: '',
+  parseError: '',
+};
 
 export default function RequirementSetReview() {
-  const [specificationId, setSpecificationId] = useState('SPEC-001');
-  const [requirements, setRequirements] = useState<RequirementDraft[]>([
-    createEmptyDraft(),
-    createEmptyDraft(),
-  ]);
-  const [inputMode, setInputMode] = useState<InputMode>('manual');
-  const [uploadedFilename, setUploadedFilename] = useState('');
-  const [parseError, setParseError] = useState('');
+  const { state: formState, setState: setFormState, clear: clearFormState } = usePersistentState<RequirementSetFormState>({
+    key: 'requirement-set-review-form-state',
+    initialValue: DEFAULT_SET_FORM_STATE,
+  });
+  const { state: persistedResult, setState: setPersistedResult, clear: clearPersistedResult } = usePersistentState<RequirementSetReviewResponse | null>({
+    key: 'requirement-set-review-result',
+    initialValue: null,
+  });
+  const [specificationId, setSpecificationId] = useState(formState.specificationId);
+  const [requirements, setRequirements] = useState<RequirementDraft[]>(formState.requirements);
+  const [inputMode, setInputMode] = useState<InputMode>(formState.inputMode);
+  const [uploadedFilename, setUploadedFilename] = useState(formState.uploadedFilename);
+  const [parseError, setParseError] = useState(formState.parseError);
 
   const {
     mutate: runReview,
     data: result,
+    reset: resetResult,
     isPending,
     isError,
     error,
@@ -121,25 +143,50 @@ export default function RequirementSetReview() {
     () => requirements.some((item) => item.text.trim().length > 0),
     [requirements]
   );
+  const activeResult = result ?? persistedResult;
+
+  const updateFormState = useCallback((next: Partial<RequirementSetFormState>) => {
+    setFormState((current) => ({ ...current, ...next }));
+  }, [setFormState]);
 
   const handleFileContent = useCallback((content: string, filename: string) => {
     setParseError('');
+    updateFormState({ parseError: '' });
     try {
       const isJson = filename.toLowerCase().endsWith('.json');
       const drafts = isJson ? parseJsonRequirements(content) : parseCsvRequirements(content);
       if (drafts.length === 0) throw new Error('No requirements found in the uploaded file.');
       setRequirements(drafts);
       setUploadedFilename(filename);
+      updateFormState({ requirements: drafts, uploadedFilename: filename });
     } catch (parseException) {
-      setParseError((parseException as Error).message);
+      const message = (parseException as Error).message;
+      setParseError(message);
+      updateFormState({ parseError: message });
     }
-  }, []);
+  }, [updateFormState]);
 
   const handleClearFile = useCallback(() => {
     setUploadedFilename('');
     setParseError('');
     setRequirements([createEmptyDraft(), createEmptyDraft()]);
-  }, []);
+    updateFormState({
+      uploadedFilename: '',
+      parseError: '',
+      requirements: [createEmptyDraft(), createEmptyDraft()],
+    });
+  }, [updateFormState]);
+
+  const handleClearAll = useCallback(() => {
+    clearFormState();
+    clearPersistedResult();
+    setSpecificationId(DEFAULT_SET_FORM_STATE.specificationId);
+    setRequirements(DEFAULT_SET_FORM_STATE.requirements);
+    setInputMode(DEFAULT_SET_FORM_STATE.inputMode);
+    setUploadedFilename(DEFAULT_SET_FORM_STATE.uploadedFilename);
+    setParseError(DEFAULT_SET_FORM_STATE.parseError);
+    resetResult();
+  }, [clearFormState, clearPersistedResult, resetResult]);
 
   return (
     <Stack spacing={3}>
@@ -158,7 +205,11 @@ export default function RequirementSetReview() {
             size="small"
             label="Specification ID"
             value={specificationId}
-            onChange={(event) => setSpecificationId(event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setSpecificationId(nextValue);
+              updateFormState({ specificationId: nextValue });
+            }}
           />
 
           <Box>
@@ -172,9 +223,11 @@ export default function RequirementSetReview() {
               onChange={(_, value: InputMode | null) => {
                 if (value) {
                   setInputMode(value);
+                  updateFormState({ inputMode: value });
                   if (value === 'manual') {
                     setUploadedFilename('');
                     setParseError('');
+                    updateFormState({ uploadedFilename: '', parseError: '' });
                   }
                 }
               }}
@@ -220,7 +273,11 @@ export default function RequirementSetReview() {
                     size="small"
                     aria-label="remove requirement"
                     onClick={() =>
-                      setRequirements((current) => current.filter((_, currentIndex) => currentIndex !== index))
+                      setRequirements((current) => {
+                        const nextRequirements = current.filter((_, currentIndex) => currentIndex !== index);
+                        updateFormState({ requirements: nextRequirements });
+                        return nextRequirements;
+                      })
                     }
                     disabled={requirements.length <= 1}
                   >
@@ -232,11 +289,13 @@ export default function RequirementSetReview() {
                   label="Requirement ID"
                   value={item.requirement_id}
                   onChange={(event) =>
-                    setRequirements((current) =>
-                      current.map((entry, entryIndex) =>
+                    setRequirements((current) => {
+                      const nextRequirements = current.map((entry, entryIndex) =>
                         entryIndex === index ? { ...entry, requirement_id: event.target.value } : entry
-                      )
-                    )
+                      );
+                      updateFormState({ requirements: nextRequirements });
+                      return nextRequirements;
+                    })
                   }
                 />
                 <TextField
@@ -245,11 +304,13 @@ export default function RequirementSetReview() {
                   label="Requirement Level"
                   value={item.requirement_level}
                   onChange={(event) =>
-                    setRequirements((current) =>
-                      current.map((entry, entryIndex) =>
+                    setRequirements((current) => {
+                      const nextRequirements = current.map((entry, entryIndex) =>
                         entryIndex === index ? { ...entry, requirement_level: event.target.value } : entry
-                      )
-                    )
+                      );
+                      updateFormState({ requirements: nextRequirements });
+                      return nextRequirements;
+                    })
                   }
                 >
                   {REQUIREMENT_LEVELS.map((level) => (
@@ -264,11 +325,13 @@ export default function RequirementSetReview() {
                   label="Requirement Text"
                   value={item.text}
                   onChange={(event) =>
-                    setRequirements((current) =>
-                      current.map((entry, entryIndex) =>
+                    setRequirements((current) => {
+                      const nextRequirements = current.map((entry, entryIndex) =>
                         entryIndex === index ? { ...entry, text: event.target.value } : entry
-                      )
-                    )
+                      );
+                      updateFormState({ requirements: nextRequirements });
+                      return nextRequirements;
+                    })
                   }
                 />
                 <TextField
@@ -276,11 +339,13 @@ export default function RequirementSetReview() {
                   label="Parent Requirement ID"
                   value={item.parent_id}
                   onChange={(event) =>
-                    setRequirements((current) =>
-                      current.map((entry, entryIndex) =>
+                    setRequirements((current) => {
+                      const nextRequirements = current.map((entry, entryIndex) =>
                         entryIndex === index ? { ...entry, parent_id: event.target.value } : entry
-                      )
-                    )
+                      );
+                      updateFormState({ requirements: nextRequirements });
+                      return nextRequirements;
+                    })
                   }
                 />
                 <TextField
@@ -288,13 +353,15 @@ export default function RequirementSetReview() {
                   label="Verification Method"
                   value={item.verification_method}
                   onChange={(event) =>
-                    setRequirements((current) =>
-                      current.map((entry, entryIndex) =>
+                    setRequirements((current) => {
+                      const nextRequirements = current.map((entry, entryIndex) =>
                         entryIndex === index
                           ? { ...entry, verification_method: event.target.value }
                           : entry
-                      )
-                    )
+                      );
+                      updateFormState({ requirements: nextRequirements });
+                      return nextRequirements;
+                    })
                   }
                   placeholder="test / analysis / inspection / demonstration"
                 />
@@ -306,7 +373,13 @@ export default function RequirementSetReview() {
             <Button
               variant="outlined"
               startIcon={<AddIcon />}
-              onClick={() => setRequirements((current) => [...current, createEmptyDraft()])}
+              onClick={() =>
+                setRequirements((current) => {
+                  const nextRequirements = [...current, createEmptyDraft()];
+                  updateFormState({ requirements: nextRequirements });
+                  return nextRequirements;
+                })
+              }
             >
               Add requirement
             </Button>
@@ -314,15 +387,25 @@ export default function RequirementSetReview() {
               variant="contained"
               disabled={!canSubmit || isPending}
               onClick={() =>
-                runReview({
-                  specification_id: specificationId || undefined,
-                  requirements: requirements
-                    .filter((item) => item.text.trim().length > 0)
-                    .map(toApiRequirement),
-                })
+                runReview(
+                  {
+                    specification_id: specificationId || undefined,
+                    requirements: requirements
+                      .filter((item) => item.text.trim().length > 0)
+                      .map(toApiRequirement),
+                  },
+                  {
+                    onSuccess: (response) => {
+                      setPersistedResult(response);
+                    },
+                  }
+                )
               }
             >
               Run requirement-set review
+            </Button>
+            <Button variant="outlined" color="inherit" onClick={handleClearAll}>
+              Clear
             </Button>
           </Box>
         </Stack>
@@ -330,28 +413,28 @@ export default function RequirementSetReview() {
 
       {isError && <Alert severity="error">Review failed: {(error as Error).message}</Alert>}
 
-      {result && (
+      {activeResult && (
         <Paper variant="outlined" sx={{ p: 2.5 }}>
           <Stack spacing={2}>
             <Box display="flex" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
               <Typography variant="h6" fontWeight={700}>
                 Requirement Set Result
               </Typography>
-              <ReviewStatusChip status={result.overall} size="medium" />
+              <ReviewStatusChip status={activeResult.overall} size="medium" />
             </Box>
             <ReviewQualityBand
-              score={getReviewQualityScore(result.overall, result.findings)}
+              score={getReviewQualityScore(activeResult.overall, activeResult.findings)}
             />
             <Typography variant="body2" color="text.secondary">
-              Reviewed requirements: {result.requirement_count}
+              Reviewed requirements: {activeResult.requirement_count}
             </Typography>
-            {result.review_id && (
+            {activeResult.review_id && (
               <Typography variant="caption" color="text.secondary">
-                Review ID: {result.review_id}
+                Review ID: {activeResult.review_id}
               </Typography>
             )}
             <Box display="flex" gap={1} flexWrap="wrap">
-              {result.category_results.map((category) => (
+              {activeResult.category_results.map((category) => (
                 <Chip
                   key={`${category.category}-${category.status}`}
                   label={`${category.category}: ${category.status}`}
@@ -362,15 +445,15 @@ export default function RequirementSetReview() {
             </Box>
             <Divider />
             <Stack spacing={1.5}>
-              {result.findings.length === 0 ? (
+              {activeResult.findings.length === 0 ? (
                 <Alert severity="success">No findings detected for this requirement set.</Alert>
               ) : (
-                result.findings.map((finding, index) => (
+                activeResult.findings.map((finding, index) => (
                   <FindingCard
                     key={`${finding.category}-${index}`}
                     finding={finding}
                     index={index}
-                    reviewId={result.review_id}
+                    reviewId={activeResult.review_id}
                     onApplyDisposition={(reviewId, payload) =>
                       applyDisposition({ reviewId, payload })
                     }

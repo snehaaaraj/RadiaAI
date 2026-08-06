@@ -15,8 +15,9 @@ import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { useDeltaReview } from '@/hooks/useDeltaReview';
+import { usePersistentState } from '@/hooks/usePersistentState';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
-import type { DeltaReviewInput } from '@/types/api';
+import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 const BASELINE_SAMPLE = JSON.stringify(
@@ -71,24 +72,59 @@ const TRACE_SAMPLE = JSON.stringify(
 );
 
 type JsonInputMode = 'paste' | 'upload';
+type DeltaReviewFormState = {
+  specificationId: string;
+  baselineJson: string;
+  updatedJson: string;
+  traceJson: string;
+  parseError: string;
+  baselineMode: JsonInputMode;
+  updatedMode: JsonInputMode;
+  traceMode: JsonInputMode;
+  baselineFilename: string;
+  updatedFilename: string;
+  traceFilename: string;
+};
+
+const DEFAULT_DELTA_FORM_STATE: DeltaReviewFormState = {
+  specificationId: 'SPEC-DELTA-1',
+  baselineJson: BASELINE_SAMPLE,
+  updatedJson: UPDATED_SAMPLE,
+  traceJson: TRACE_SAMPLE,
+  parseError: '',
+  baselineMode: 'paste',
+  updatedMode: 'paste',
+  traceMode: 'paste',
+  baselineFilename: '',
+  updatedFilename: '',
+  traceFilename: '',
+};
 
 export default function DeltaReview() {
-  const [specificationId, setSpecificationId] = useState('SPEC-DELTA-1');
-  const [baselineJson, setBaselineJson] = useState(BASELINE_SAMPLE);
-  const [updatedJson, setUpdatedJson] = useState(UPDATED_SAMPLE);
-  const [traceJson, setTraceJson] = useState(TRACE_SAMPLE);
-  const [parseError, setParseError] = useState('');
-
-  const [baselineMode, setBaselineMode] = useState<JsonInputMode>('paste');
-  const [updatedMode, setUpdatedMode] = useState<JsonInputMode>('paste');
-  const [traceMode, setTraceMode] = useState<JsonInputMode>('paste');
-  const [baselineFilename, setBaselineFilename] = useState('');
-  const [updatedFilename, setUpdatedFilename] = useState('');
-  const [traceFilename, setTraceFilename] = useState('');
+  const { state: formState, setState: setFormState, clear: clearFormState } = usePersistentState<DeltaReviewFormState>({
+    key: 'delta-review-form-state',
+    initialValue: DEFAULT_DELTA_FORM_STATE,
+  });
+  const { state: persistedResult, setState: setPersistedResult, clear: clearPersistedResult } = usePersistentState<DeltaReviewResponse | null>({
+    key: 'delta-review-result',
+    initialValue: null,
+  });
+  const [specificationId, setSpecificationId] = useState(formState.specificationId);
+  const [baselineJson, setBaselineJson] = useState(formState.baselineJson);
+  const [updatedJson, setUpdatedJson] = useState(formState.updatedJson);
+  const [traceJson, setTraceJson] = useState(formState.traceJson);
+  const [parseError, setParseError] = useState(formState.parseError);
+  const [baselineMode, setBaselineMode] = useState<JsonInputMode>(formState.baselineMode);
+  const [updatedMode, setUpdatedMode] = useState<JsonInputMode>(formState.updatedMode);
+  const [traceMode, setTraceMode] = useState<JsonInputMode>(formState.traceMode);
+  const [baselineFilename, setBaselineFilename] = useState(formState.baselineFilename);
+  const [updatedFilename, setUpdatedFilename] = useState(formState.updatedFilename);
+  const [traceFilename, setTraceFilename] = useState(formState.traceFilename);
 
   const {
     mutate: runDeltaReview,
     data: result,
+    reset: resetResult,
     isPending,
     isError,
     error,
@@ -96,6 +132,28 @@ export default function DeltaReview() {
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
 
   const canSubmit = useMemo(() => baselineJson.trim() && updatedJson.trim(), [baselineJson, updatedJson]);
+  const activeResult = result ?? persistedResult;
+
+  const updateFormState = (next: Partial<DeltaReviewFormState>) => {
+    setFormState((current) => ({ ...current, ...next }));
+  };
+
+  const handleClearAll = () => {
+    clearFormState();
+    clearPersistedResult();
+    setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
+    setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
+    setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
+    setTraceJson(DEFAULT_DELTA_FORM_STATE.traceJson);
+    setParseError(DEFAULT_DELTA_FORM_STATE.parseError);
+    setBaselineMode(DEFAULT_DELTA_FORM_STATE.baselineMode);
+    setUpdatedMode(DEFAULT_DELTA_FORM_STATE.updatedMode);
+    setTraceMode(DEFAULT_DELTA_FORM_STATE.traceMode);
+    setBaselineFilename(DEFAULT_DELTA_FORM_STATE.baselineFilename);
+    setUpdatedFilename(DEFAULT_DELTA_FORM_STATE.updatedFilename);
+    setTraceFilename(DEFAULT_DELTA_FORM_STATE.traceFilename);
+    resetResult();
+  };
 
   return (
     <Stack spacing={3}>
@@ -114,7 +172,11 @@ export default function DeltaReview() {
             size="small"
             label="Specification ID"
             value={specificationId}
-            onChange={(event) => setSpecificationId(event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setSpecificationId(nextValue);
+              updateFormState({ specificationId: nextValue });
+            }}
           />
 
           {/* Baseline */}
@@ -129,7 +191,12 @@ export default function DeltaReview() {
               onChange={(_, value: JsonInputMode | null) => {
                 if (value) {
                   setBaselineMode(value);
-                  if (value === 'paste') { setBaselineFilename(''); setBaselineJson(BASELINE_SAMPLE); }
+                  updateFormState({ baselineMode: value });
+                  if (value === 'paste') {
+                    setBaselineFilename('');
+                    setBaselineJson(BASELINE_SAMPLE);
+                    updateFormState({ baselineFilename: '', baselineJson: BASELINE_SAMPLE });
+                  }
                 }
               }}
               sx={{ mb: 1 }}
@@ -143,15 +210,27 @@ export default function DeltaReview() {
                 multiline
                 minRows={7}
                 value={baselineJson}
-                onChange={(event) => setBaselineJson(event.target.value)}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setBaselineJson(nextValue);
+                  updateFormState({ baselineJson: nextValue });
+                }}
               />
             ) : (
               <FileUploadZone
                 accept=".json"
                 label="Upload baseline requirements as a .json file"
-                onFileContent={(content, filename) => { setBaselineJson(content); setBaselineFilename(filename); }}
+                onFileContent={(content, filename) => {
+                  setBaselineJson(content);
+                  setBaselineFilename(filename);
+                  updateFormState({ baselineJson: content, baselineFilename: filename });
+                }}
                 filename={baselineFilename}
-                onClear={() => { setBaselineJson(''); setBaselineFilename(''); }}
+                onClear={() => {
+                  setBaselineJson('');
+                  setBaselineFilename('');
+                  updateFormState({ baselineJson: '', baselineFilename: '' });
+                }}
               />
             )}
           </Box>
@@ -168,7 +247,12 @@ export default function DeltaReview() {
               onChange={(_, value: JsonInputMode | null) => {
                 if (value) {
                   setUpdatedMode(value);
-                  if (value === 'paste') { setUpdatedFilename(''); setUpdatedJson(UPDATED_SAMPLE); }
+                  updateFormState({ updatedMode: value });
+                  if (value === 'paste') {
+                    setUpdatedFilename('');
+                    setUpdatedJson(UPDATED_SAMPLE);
+                    updateFormState({ updatedFilename: '', updatedJson: UPDATED_SAMPLE });
+                  }
                 }
               }}
               sx={{ mb: 1 }}
@@ -182,15 +266,27 @@ export default function DeltaReview() {
                 multiline
                 minRows={7}
                 value={updatedJson}
-                onChange={(event) => setUpdatedJson(event.target.value)}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setUpdatedJson(nextValue);
+                  updateFormState({ updatedJson: nextValue });
+                }}
               />
             ) : (
               <FileUploadZone
                 accept=".json"
                 label="Upload updated requirements as a .json file"
-                onFileContent={(content, filename) => { setUpdatedJson(content); setUpdatedFilename(filename); }}
+                onFileContent={(content, filename) => {
+                  setUpdatedJson(content);
+                  setUpdatedFilename(filename);
+                  updateFormState({ updatedJson: content, updatedFilename: filename });
+                }}
                 filename={updatedFilename}
-                onClear={() => { setUpdatedJson(''); setUpdatedFilename(''); }}
+                onClear={() => {
+                  setUpdatedJson('');
+                  setUpdatedFilename('');
+                  updateFormState({ updatedJson: '', updatedFilename: '' });
+                }}
               />
             )}
           </Box>
@@ -207,7 +303,12 @@ export default function DeltaReview() {
               onChange={(_, value: JsonInputMode | null) => {
                 if (value) {
                   setTraceMode(value);
-                  if (value === 'paste') { setTraceFilename(''); setTraceJson(TRACE_SAMPLE); }
+                  updateFormState({ traceMode: value });
+                  if (value === 'paste') {
+                    setTraceFilename('');
+                    setTraceJson(TRACE_SAMPLE);
+                    updateFormState({ traceFilename: '', traceJson: TRACE_SAMPLE });
+                  }
                 }
               }}
               sx={{ mb: 1 }}
@@ -221,15 +322,27 @@ export default function DeltaReview() {
                 multiline
                 minRows={5}
                 value={traceJson}
-                onChange={(event) => setTraceJson(event.target.value)}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setTraceJson(nextValue);
+                  updateFormState({ traceJson: nextValue });
+                }}
               />
             ) : (
               <FileUploadZone
                 accept=".json"
                 label="Upload changed trace links as a .json file"
-                onFileContent={(content, filename) => { setTraceJson(content); setTraceFilename(filename); }}
+                onFileContent={(content, filename) => {
+                  setTraceJson(content);
+                  setTraceFilename(filename);
+                  updateFormState({ traceJson: content, traceFilename: filename });
+                }}
                 filename={traceFilename}
-                onClear={() => { setTraceJson(''); setTraceFilename(''); }}
+                onClear={() => {
+                  setTraceJson('');
+                  setTraceFilename('');
+                  updateFormState({ traceJson: '', traceFilename: '' });
+                }}
               />
             )}
           </Box>
@@ -246,13 +359,23 @@ export default function DeltaReview() {
                     changed_trace_links: traceJson.trim() ? JSON.parse(traceJson) : [],
                   };
                   setParseError('');
-                  runDeltaReview(payload);
+                  updateFormState({ parseError: '' });
+                  runDeltaReview(payload, {
+                    onSuccess: (response) => {
+                      setPersistedResult(response);
+                    },
+                  });
                 } catch (parseException) {
-                  setParseError((parseException as Error).message);
+                  const message = (parseException as Error).message;
+                  setParseError(message);
+                  updateFormState({ parseError: message });
                 }
               }}
             >
               Run delta review
+            </Button>
+            <Button variant="outlined" color="inherit" onClick={handleClearAll} sx={{ ml: 1 }}>
+              Clear
             </Button>
           </Box>
           {parseError && <Alert severity="error">Invalid JSON input: {parseError}</Alert>}
@@ -261,32 +384,32 @@ export default function DeltaReview() {
 
       {isError && <Alert severity="error">Delta review failed: {(error as Error).message}</Alert>}
 
-      {result && (
+      {activeResult && (
         <Paper variant="outlined" sx={{ p: 2.5 }}>
           <Stack spacing={2}>
             <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
               <Typography variant="h6" fontWeight={700}>
                 Delta Review Result
               </Typography>
-              <ReviewStatusChip status={result.overall} size="medium" />
+              <ReviewStatusChip status={activeResult.overall} size="medium" />
             </Box>
             <ReviewQualityBand
-              score={getReviewQualityScore(result.overall, result.requirement_set_findings)}
+              score={getReviewQualityScore(activeResult.overall, activeResult.requirement_set_findings)}
             />
-            {result.review_id && (
+            {activeResult.review_id && (
               <Typography variant="caption" color="text.secondary">
-                Review ID: {result.review_id}
+                Review ID: {activeResult.review_id}
               </Typography>
             )}
             <Box display="flex" gap={1} flexWrap="wrap">
-              <Chip label={`New: ${result.change_summary.new_requirement_ids.length}`} size="small" />
+              <Chip label={`New: ${activeResult.change_summary.new_requirement_ids.length}`} size="small" />
               <Chip
-                label={`Modified: ${result.change_summary.modified_requirement_ids.length}`}
+                label={`Modified: ${activeResult.change_summary.modified_requirement_ids.length}`}
                 size="small"
               />
-              <Chip label={`Deleted: ${result.change_summary.deleted_requirement_ids.length}`} size="small" />
+              <Chip label={`Deleted: ${activeResult.change_summary.deleted_requirement_ids.length}`} size="small" />
               <Chip
-                label={`Trace changes: ${result.change_summary.changed_trace_link_requirement_ids.length}`}
+                label={`Trace changes: ${activeResult.change_summary.changed_trace_link_requirement_ids.length}`}
                 size="small"
               />
             </Box>
@@ -294,10 +417,10 @@ export default function DeltaReview() {
             <Typography variant="subtitle1" fontWeight={700}>
               Changed Requirement Findings
             </Typography>
-            {result.reviewed_requirements.length === 0 ? (
+            {activeResult.reviewed_requirements.length === 0 ? (
               <Alert severity="success">No changed requirements to review.</Alert>
             ) : (
-              result.reviewed_requirements.map((reviewedRequirement) => (
+              activeResult.reviewed_requirements.map((reviewedRequirement) => (
                 <Paper key={reviewedRequirement.requirement_id} variant="outlined" sx={{ p: 1.5 }}>
                   <Stack spacing={1.5}>
                     <Box display="flex" justifyContent="space-between" alignItems="center" gap={1}>
@@ -316,7 +439,7 @@ export default function DeltaReview() {
                         key={`${reviewedRequirement.requirement_id}-${index}`}
                         finding={finding}
                         index={index}
-                        reviewId={result.review_id}
+                        reviewId={activeResult.review_id}
                         onApplyDisposition={(reviewId, payload) =>
                           applyDisposition({ reviewId, payload })
                         }
@@ -327,19 +450,19 @@ export default function DeltaReview() {
                 </Paper>
               ))
             )}
-            {result.requirement_set_findings.length > 0 && (
+            {activeResult.requirement_set_findings.length > 0 && (
               <>
                 <Divider />
                 <Typography variant="subtitle1" fontWeight={700}>
                   Requirement Set Findings (Changed Items Scope)
                 </Typography>
                 <Stack spacing={1.5}>
-                  {result.requirement_set_findings.map((finding, index) => (
+                  {activeResult.requirement_set_findings.map((finding, index) => (
                     <FindingCard
                       key={`set-finding-${index}`}
                       finding={finding}
                       index={index}
-                      reviewId={result.review_id}
+                      reviewId={activeResult.review_id}
                       onApplyDisposition={(reviewId, payload) =>
                         applyDisposition({ reviewId, payload })
                       }

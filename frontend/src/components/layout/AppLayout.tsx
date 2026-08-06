@@ -1,6 +1,7 @@
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
-import { Outlet } from 'react-router-dom';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Outlet, useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { useAppContext } from '@/context/AppContext';
@@ -12,7 +13,8 @@ const DRAWER_WIDTH = 240;
  * All authenticated pages are rendered inside this layout.
  */
 export function AppLayout() {
-  const { sidebarOpen } = useAppContext();
+  const { sidebarOpen, motionPreference, uiDensity } = useAppContext();
+  const location = useLocation();
 
   return (
     <Box display="flex">
@@ -23,7 +25,6 @@ export function AppLayout() {
         component="main"
         sx={{
           flexGrow: 1,
-          p: 3,
           transition: (t) =>
             t.transitions.create('margin', {
               easing: t.transitions.easing.sharp,
@@ -32,11 +33,22 @@ export function AppLayout() {
           marginLeft: sidebarOpen ? 0 : `-${DRAWER_WIDTH}px`,
           minHeight: '100vh',
           bgcolor: 'background.default',
+          p: uiDensity === 'compact' ? 2 : 3,
         }}
       >
         {/* Push content below the AppBar */}
         <Toolbar />
-        <Outlet />
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={motionPreference === 'reduced' ? false : { opacity: 0, y: 10 }}
+            animate={motionPreference === 'reduced' ? {} : { opacity: 1, y: 0 }}
+            exit={motionPreference === 'reduced' ? {} : { opacity: 0, y: -8 }}
+            transition={{ duration: 0.2, ease: 'easeOut' }}
+          >
+            <Outlet />
+          </motion.div>
+        </AnimatePresence>
       </Box>
     </Box>
   );

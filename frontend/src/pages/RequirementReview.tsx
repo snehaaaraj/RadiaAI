@@ -17,22 +17,48 @@ import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { useRequirementReview } from '@/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
+import { usePersistentState } from '@/hooks/usePersistentState';
+import type { RequirementReviewResponse } from '@/types/api';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 const REQUIREMENT_LEVELS = ['aircraft', 'system', 'subsystem', 'component'] as const;
 
 type InputMode = 'paste' | 'upload';
+type RequirementReviewFormState = {
+  requirementId: string;
+  requirementLevel: string;
+  text: string;
+  inputMode: InputMode;
+  uploadedFilename: string;
+};
+
+const DEFAULT_FORM_STATE: RequirementReviewFormState = {
+  requirementId: '',
+  requirementLevel: 'system',
+  text: '',
+  inputMode: 'paste',
+  uploadedFilename: '',
+};
 
 export default function RequirementReview() {
-  const [requirementId, setRequirementId] = useState('');
-  const [requirementLevel, setRequirementLevel] = useState<string>('system');
-  const [text, setText] = useState('');
-  const [inputMode, setInputMode] = useState<InputMode>('paste');
-  const [uploadedFilename, setUploadedFilename] = useState('');
+  const { state: formState, setState: setFormState, clear: clearFormState } = usePersistentState<RequirementReviewFormState>({
+    key: 'requirement-review-form-state',
+    initialValue: DEFAULT_FORM_STATE,
+  });
+  const { state: persistedResult, setState: setPersistedResult, clear: clearPersistedResult } = usePersistentState<RequirementReviewResponse | null>({
+    key: 'requirement-review-result',
+    initialValue: null,
+  });
+  const [requirementId, setRequirementId] = useState(formState.requirementId);
+  const [requirementLevel, setRequirementLevel] = useState<string>(formState.requirementLevel);
+  const [text, setText] = useState(formState.text);
+  const [inputMode, setInputMode] = useState<InputMode>(formState.inputMode);
+  const [uploadedFilename, setUploadedFilename] = useState(formState.uploadedFilename);
 
   const {
     mutate: runReview,
     data: result,
+    reset: resetResult,
     isPending,
     isError,
     error,
@@ -40,15 +66,33 @@ export default function RequirementReview() {
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
 
   const canSubmit = useMemo(() => text.trim().length > 0, [text]);
+  const activeResult = result ?? persistedResult;
+
+  const updateFormState = (next: Partial<RequirementReviewFormState>) => {
+    setFormState((current) => ({ ...current, ...next }));
+  };
 
   const handleFileContent = (content: string, filename: string) => {
     setText(content);
     setUploadedFilename(filename);
+    updateFormState({ text: content, uploadedFilename: filename });
   };
 
   const handleClearFile = () => {
     setText('');
     setUploadedFilename('');
+    updateFormState({ text: '', uploadedFilename: '' });
+  };
+
+  const handleClearAll = () => {
+    clearFormState();
+    clearPersistedResult();
+    setRequirementId(DEFAULT_FORM_STATE.requirementId);
+    setRequirementLevel(DEFAULT_FORM_STATE.requirementLevel);
+    setText(DEFAULT_FORM_STATE.text);
+    setInputMode(DEFAULT_FORM_STATE.inputMode);
+    setUploadedFilename(DEFAULT_FORM_STATE.uploadedFilename);
+    resetResult();
   };
 
   return (
@@ -68,7 +112,11 @@ export default function RequirementReview() {
             size="small"
             label="Requirement ID"
             value={requirementId}
-            onChange={(event) => setRequirementId(event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setRequirementId(nextValue);
+              updateFormState({ requirementId: nextValue });
+            }}
             placeholder="REQ-1234"
           />
           <TextField
@@ -76,7 +124,11 @@ export default function RequirementReview() {
             size="small"
             label="Requirement Level"
             value={requirementLevel}
-            onChange={(event) => setRequirementLevel(event.target.value)}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setRequirementLevel(nextValue);
+              updateFormState({ requirementLevel: nextValue });
+            }}
           >
             {REQUIREMENT_LEVELS.map((level) => (
               <MenuItem key={level} value={level}>
@@ -96,7 +148,11 @@ export default function RequirementReview() {
               onChange={(_, value: InputMode | null) => {
                 if (value) {
                   setInputMode(value);
-                  if (value === 'paste') setUploadedFilename('');
+                  updateFormState({ inputMode: value });
+                  if (value === 'paste') {
+                    setUploadedFilename('');
+                    updateFormState({ uploadedFilename: '' });
+                  }
                 }
               }}
               sx={{ mb: 1.5 }}
@@ -111,7 +167,11 @@ export default function RequirementReview() {
                 multiline
                 minRows={5}
                 value={text}
-                onChange={(event) => setText(event.target.value)}
+                onChange={(event) => {
+                  const nextValue = event.target.value;
+                  setText(nextValue);
+                  updateFormState({ text: nextValue });
+                }}
                 placeholder="The subsystem shall ..."
               />
             ) : (
@@ -140,10 +200,17 @@ export default function RequirementReview() {
                   requirement_id: requirementId || undefined,
                   requirement_level: requirementLevel,
                   text: text.trim(),
+                }, {
+                  onSuccess: (response) => {
+                    setPersistedResult(response);
+                  },
                 })
               }
             >
               Run deterministic review
+            </Button>
+            <Button variant="outlined" color="inherit" onClick={handleClearAll} sx={{ ml: 1 }}>
+              Clear
             </Button>
           </Box>
         </Stack>
@@ -151,25 +218,25 @@ export default function RequirementReview() {
 
       {isError && <Alert severity="error">Review failed: {(error as Error).message}</Alert>}
 
-      {result && (
+      {activeResult && (
         <Paper variant="outlined" sx={{ p: 2.5 }}>
           <Stack spacing={2}>
             <Box display="flex" alignItems="center" justifyContent="space-between" flexWrap="wrap" gap={1}>
               <Typography variant="h6" fontWeight={700}>
                 Review Result
               </Typography>
-              <ReviewStatusChip status={result.overall} size="medium" />
+              <ReviewStatusChip status={activeResult.overall} size="medium" />
             </Box>
             <ReviewQualityBand
-              score={getReviewQualityScore(result.overall, result.findings)}
+              score={getReviewQualityScore(activeResult.overall, activeResult.findings)}
             />
-            {result.review_id && (
+            {activeResult.review_id && (
               <Typography variant="caption" color="text.secondary">
-                Review ID: {result.review_id}
+                Review ID: {activeResult.review_id}
               </Typography>
             )}
             <Box display="flex" gap={1} flexWrap="wrap">
-              {result.category_results.map((category) => (
+              {activeResult.category_results.map((category) => (
                 <Chip
                   key={`${category.category}-${category.status}`}
                   label={`${category.category}: ${category.status}`}
@@ -180,15 +247,15 @@ export default function RequirementReview() {
             </Box>
             <Divider />
             <Stack spacing={1.5}>
-              {result.findings.length === 0 ? (
+              {activeResult.findings.length === 0 ? (
                 <Alert severity="success">No findings. Requirement is acceptable.</Alert>
               ) : (
-                result.findings.map((finding, index) => (
+                activeResult.findings.map((finding, index) => (
                   <FindingCard
                     key={`${finding.category}-${index}`}
                     finding={finding}
                     index={index}
-                    reviewId={result.review_id}
+                    reviewId={activeResult.review_id}
                     onApplyDisposition={(reviewId, payload) =>
                       applyDisposition({ reviewId, payload })
                     }
