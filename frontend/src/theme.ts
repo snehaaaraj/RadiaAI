@@ -3,22 +3,32 @@
  */
 
 import { createTheme, type PaletteMode } from '@mui/material/styles';
+import type { AccentColor, UiDensity } from '@/context/AppContext';
 
-export function createAppTheme(mode: PaletteMode) {
+const ACCENT_COLORS: Record<AccentColor, { light: string; dark: string }> = {
+  indigo: { light: '#1B4FD8', dark: '#7C9CFF' },
+  violet: { light: '#6B21A8', dark: '#C084FC' },
+  teal: { light: '#0F766E', dark: '#2DD4BF' },
+  rose: { light: '#BE185D', dark: '#FB7185' },
+};
+
+export function createAppTheme(mode: PaletteMode, accentColor: AccentColor, density: UiDensity) {
   const isDark = mode === 'dark';
+  const primaryBase = ACCENT_COLORS[accentColor];
+  const compact = density === 'compact';
 
   return createTheme({
     palette: {
       mode,
       primary: {
-        main: isDark ? '#7C9CFF' : '#1B4FD8',
-        light: isDark ? '#A9BCFF' : '#4F78E3',
-        dark: isDark ? '#4E6EE8' : '#1239A5',
+        main: isDark ? primaryBase.dark : primaryBase.light,
+        light: isDark ? '#D2DFFF' : '#5B82F0',
+        dark: isDark ? '#5C7EF5' : '#0F3BAE',
       },
       secondary: {
-        main: isDark ? '#C084FC' : '#6B21A8',
-        light: isDark ? '#E9D5FF' : '#9B4DD1',
-        dark: isDark ? '#A855F7' : '#4A1577',
+        main: isDark ? '#C084FC' : '#7E22CE',
+        light: isDark ? '#E9D5FF' : '#A855F7',
+        dark: isDark ? '#A855F7' : '#581C87',
       },
       background: {
         default: isDark ? '#0B1220' : '#F8FAFC',
@@ -45,7 +55,7 @@ export function createAppTheme(mode: PaletteMode) {
       button: { fontWeight: 700 },
     },
     shape: {
-      borderRadius: 14,
+      borderRadius: compact ? 12 : 14,
     },
     components: {
       MuiCssBaseline: {
@@ -59,18 +69,28 @@ export function createAppTheme(mode: PaletteMode) {
         },
       },
       MuiButton: {
+        defaultProps: {
+          size: compact ? 'small' : 'medium',
+        },
         styleOverrides: {
           root: {
             textTransform: 'none',
             borderRadius: 999,
-            paddingInline: 18,
+            paddingInline: compact ? 14 : 18,
+          },
+        },
+      },
+      MuiListItemButton: {
+        styleOverrides: {
+          root: {
+            minHeight: compact ? 40 : 46,
           },
         },
       },
       MuiCard: {
         styleOverrides: {
           root: {
-            borderRadius: 20,
+            borderRadius: compact ? 16 : 20,
             transition: 'transform 160ms ease, box-shadow 160ms ease',
             '&:hover': {
               transform: 'translateY(-2px)',

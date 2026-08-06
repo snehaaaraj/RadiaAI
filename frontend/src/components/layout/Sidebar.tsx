@@ -15,6 +15,7 @@ import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import BoltIcon from '@mui/icons-material/Bolt';
+import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
 import { ROUTES, APP_NAME } from '@/utils/constants';
@@ -31,6 +32,7 @@ const NAV_ITEMS = [
 ] as const;
 
 const BOTTOM_ITEMS = [
+  { label: 'Launchpad', icon: <RocketLaunchIcon />, path: ROUTES.LANDING },
   { label: 'Settings', icon: <SettingsIcon />, path: ROUTES.SETTINGS },
 ] as const;
 
