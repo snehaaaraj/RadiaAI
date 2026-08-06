@@ -19,9 +19,8 @@ import { useRequirementReview } from '@/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
+import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
-
-const REQUIREMENT_LEVELS = ['aircraft', 'system', 'subsystem', 'component'] as const;
 
 type InputMode = 'paste' | 'upload';
 type RequirementReviewFormState = {
@@ -34,7 +33,7 @@ type RequirementReviewFormState = {
 
 const DEFAULT_FORM_STATE: RequirementReviewFormState = {
   requirementId: '',
-  requirementLevel: 'system',
+  requirementLevel: 'System',
   text: '',
   inputMode: 'paste',
   uploadedFilename: '',
@@ -50,7 +49,9 @@ export default function RequirementReview() {
     initialValue: null,
   });
   const [requirementId, setRequirementId] = useState(formState.requirementId);
-  const [requirementLevel, setRequirementLevel] = useState<string>(formState.requirementLevel);
+  const [requirementLevel, setRequirementLevel] = useState<string>(
+    normalizeRequirementLevel(formState.requirementLevel)
+  );
   const [text, setText] = useState(formState.text);
   const [inputMode, setInputMode] = useState<InputMode>(formState.inputMode);
   const [uploadedFilename, setUploadedFilename] = useState(formState.uploadedFilename);
@@ -137,7 +138,7 @@ export default function RequirementReview() {
                 label="Requirement Level"
                 value={requirementLevel}
                 onChange={(event) => {
-                  const nextValue = event.target.value;
+                  const nextValue = normalizeRequirementLevel(event.target.value);
                   setRequirementLevel(nextValue);
                   updateFormState({ requirementLevel: nextValue });
                 }}

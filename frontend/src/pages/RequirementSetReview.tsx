@@ -22,6 +22,7 @@ import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useRequirementSetReview } from '@/hooks/useRequirementSetReview';
 import type { RequirementReviewInput, RequirementSetReviewResponse } from '@/types/api';
+import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 interface RequirementDraft {
@@ -31,8 +32,6 @@ interface RequirementDraft {
   parent_id: string;
   verification_method: string;
 }
-
-const REQUIREMENT_LEVELS = ['aircraft', 'system', 'subsystem', 'component'] as const;
 
 function toApiRequirement(draft: RequirementDraft): RequirementReviewInput {
   return {
@@ -49,7 +48,7 @@ function toApiRequirement(draft: RequirementDraft): RequirementReviewInput {
 function createEmptyDraft(): RequirementDraft {
   return {
     requirement_id: '',
-    requirement_level: 'system',
+    requirement_level: 'System',
     text: '',
     parent_id: '',
     verification_method: '',
@@ -65,7 +64,9 @@ function parseJsonRequirements(content: string): RequirementDraft[] {
     const metadata = (record['metadata'] as Record<string, unknown> | undefined) ?? {};
     return {
       requirement_id: String(record['requirement_id'] ?? record['id'] ?? ''),
-      requirement_level: String(record['requirement_level'] ?? record['level'] ?? 'system'),
+      requirement_level: normalizeRequirementLevel(
+        String(record['requirement_level'] ?? record['level'] ?? 'System')
+      ),
       text: String(record['text'] ?? record['requirement_text'] ?? record['description'] ?? ''),
       parent_id: String(metadata['parent_id'] ?? record['parent_id'] ?? ''),
       verification_method: String(
@@ -89,7 +90,9 @@ function parseCsvRequirements(content: string): RequirementDraft[] {
     const row = line.split(',');
     return {
       requirement_id: cell(row, col('requirement_id')) || cell(row, col('id')),
-      requirement_level: cell(row, col('requirement_level')) || cell(row, col('level')) || 'system',
+      requirement_level: normalizeRequirementLevel(
+        cell(row, col('requirement_level')) || cell(row, col('level')) || 'System'
+      ),
       text: cell(row, col('text')) || cell(row, col('requirement_text')) || cell(row, col('description')),
       parent_id: cell(row, col('parent_id')),
       verification_method: cell(row, col('verification_method')),
@@ -124,7 +127,12 @@ export default function RequirementSetReview() {
     initialValue: null,
   });
   const [specificationId, setSpecificationId] = useState(formState.specificationId);
-  const [requirements, setRequirements] = useState<RequirementDraft[]>(formState.requirements);
+  const [requirements, setRequirements] = useState<RequirementDraft[]>(
+    formState.requirements.map((item) => ({
+      ...item,
+      requirement_level: normalizeRequirementLevel(item.requirement_level),
+    }))
+  );
   const [inputMode, setInputMode] = useState<InputMode>(formState.inputMode);
   const [uploadedFilename, setUploadedFilename] = useState(formState.uploadedFilename);
   const [parseError, setParseError] = useState(formState.parseError);
@@ -329,7 +337,9 @@ export default function RequirementSetReview() {
                       onChange={(event) =>
                         setRequirements((current) => {
                           const nextRequirements = current.map((entry, entryIndex) =>
-                            entryIndex === index ? { ...entry, requirement_level: event.target.value } : entry
+                            entryIndex === index
+                              ? { ...entry, requirement_level: normalizeRequirementLevel(event.target.value) }
+                              : entry
                           );
                           updateFormState({ requirements: nextRequirements });
                           return nextRequirements;

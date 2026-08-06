@@ -27,13 +27,13 @@ const BASELINE_SAMPLE = JSON.stringify(
     {
       requirement_id: 'REQ-001',
       text: 'The subsystem shall enable diagnostics within 2 seconds.',
-      requirement_level: 'system',
+      requirement_level: 'System',
       metadata: { parent_id: 'P-100', verification_method: 'test' },
     },
     {
       requirement_id: 'REQ-002',
       text: 'The subsystem shall provide telemetry every 1 second.',
-      requirement_level: 'system',
+      requirement_level: 'System',
       metadata: { parent_id: 'P-100', verification_method: 'analysis' },
     },
   ],
@@ -46,13 +46,13 @@ const UPDATED_SAMPLE = JSON.stringify(
     {
       requirement_id: 'REQ-001',
       text: 'The subsystem shall enable diagnostics within 1 second.',
-      requirement_level: 'system',
+      requirement_level: 'System',
       metadata: { parent_id: 'P-100', verification_method: 'test' },
     },
     {
       requirement_id: 'REQ-003',
       text: 'The subsystem shall provide built-in test under nominal conditions.',
-      requirement_level: 'system',
+      requirement_level: 'System',
       metadata: { parent_id: 'P-110', verification_method: 'inspection' },
     },
   ],
