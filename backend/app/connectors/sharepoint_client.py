@@ -91,14 +91,12 @@ class SharePointStandardsClient:
                 client_secret=settings.client_secret,
             )
 
-    def _get_token(self) -> str:
-        assert self._credential is not None
-        token = self._credential.get_token("https://graph.microsoft.com/.default")
-        return token.token
-
     def _headers(self) -> dict[str, str]:
+        if self._credential is None:
+            return {"Accept": "application/json"}
+        token = self._credential.get_token("https://graph.microsoft.com/.default")
         return {
-            "Authorization": f"Bearer {self._get_token()}",
+            "Authorization": f"Bearer {token.token}",
             "Accept": "application/json",
         }
 

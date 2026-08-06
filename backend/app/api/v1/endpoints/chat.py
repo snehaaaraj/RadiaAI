@@ -7,7 +7,7 @@ Phase 1: Returns a stub response to validate the API contract.
 Phase 4: Will wire in the full RAG pipeline (retrieval → prompt → LLM).
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Request, status
 
 from app.core.logging import get_logger
 from app.schemas.chat import ChatRequest, ChatResponse
