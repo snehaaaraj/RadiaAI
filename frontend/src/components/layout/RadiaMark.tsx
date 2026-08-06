@@ -1,8 +1,8 @@
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 
-const lightLogoUrl = new URL('../../assets/radia-circle-white background.svg', import.meta.url).href;
-const darkLogoUrl = new URL('../../assets/radia-circle-white lines', import.meta.url).href;
+const lightLogoUrl = new URL('../../assets/radia-circle-white background.png', import.meta.url).href;
+const darkLogoUrl = new URL('../../assets/radia-circle-white lines.jpg', import.meta.url).href;
 
 interface RadiaMarkProps {
   size?: number;
