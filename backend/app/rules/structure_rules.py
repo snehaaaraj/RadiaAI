@@ -1,6 +1,6 @@
 """Rule constants for deterministic requirement structure review."""
 
-REQUIREMENT_LEVELS = {"Aircraft", "System", "Subsystem", "Component"}
+REQUIREMENT_LEVELS = {"aircraft", "system", "subsystem", "component"}
 
 CONJUNCTION_MARKERS = {" and ", " or ", ";"}
 
