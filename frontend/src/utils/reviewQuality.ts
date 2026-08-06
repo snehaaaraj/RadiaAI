@@ -6,6 +6,11 @@ const SEVERITY_PENALTY: Record<FindingSeverity, number> = {
   High: 2,
   Critical: 3,
 };
+const STATUS_BASE_SCORE: Record<ReviewStatus, number> = {
+  Acceptable: 9.5,
+  'Revision Recommended': 6.5,
+  Unacceptable: 3,
+};
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -37,4 +42,8 @@ export function getReviewQualityColor(score: number): string {
   const pct = clamp(score, 0, 10) / 10;
   const hue = Math.round(120 * pct);
   return `hsl(${hue} 80% 46%)`;
+}
+
+export function getCategoryStatusScore(status: ReviewStatus): number {
+  return STATUS_BASE_SCORE[status];
 }

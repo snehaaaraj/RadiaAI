@@ -5,8 +5,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { useAppContext } from '@/context/AppContext';
-
-const DRAWER_WIDTH = 240;
+import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 
 /**
  * Root layout wrapper — renders TopBar + Sidebar + page content (via Outlet).
@@ -15,10 +14,11 @@ const DRAWER_WIDTH = 240;
 export function AppLayout() {
   const { sidebarOpen, motionPreference, uiDensity } = useAppContext();
   const location = useLocation();
+  const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
   return (
     <Box display="flex">
-      <TopBar drawerWidth={DRAWER_WIDTH} />
+      <TopBar drawerWidth={SIDEBAR_WIDTH} />
       <Sidebar />
 
       <Box
@@ -30,7 +30,8 @@ export function AppLayout() {
               easing: t.transitions.easing.sharp,
               duration: t.transitions.duration.leavingScreen,
             }),
-          marginLeft: sidebarOpen ? 0 : `-${DRAWER_WIDTH}px`,
+          marginLeft: 0,
+          width: `calc(100% - ${sidebarWidth}px)`,
           minHeight: '100vh',
           bgcolor: 'background.default',
           p: uiDensity === 'compact' ? 2 : 3,

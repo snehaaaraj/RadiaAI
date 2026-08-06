@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Accordion from '@mui/material/Accordion';
 import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
+import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
 import Stack from '@mui/material/Stack';
@@ -15,11 +16,19 @@ import Divider from '@mui/material/Divider';
 import Link from '@mui/material/Link';
 import type {
   ApplyFindingDispositionRequest,
+  FindingSeverity,
   FindingDisposition,
   FindingDispositionStatus,
   ReviewFinding,
 } from '@/types/api';
 import { ReviewStatusChip } from './ReviewStatusChip';
+
+const SEVERITY_COLOR: Record<FindingSeverity, 'error' | 'warning' | 'info'> = {
+  Critical: 'error',
+  High: 'error',
+  Medium: 'warning',
+  Low: 'info',
+};
 
 interface FindingCardProps {
   finding: ReviewFinding;
@@ -49,15 +58,36 @@ export function FindingCard({
   );
 
   return (
-    <Accordion disableGutters>
+    <Accordion
+      disableGutters
+      sx={{
+        borderLeft: '5px solid',
+        borderLeftColor:
+          finding.severity === 'Critical' || finding.severity === 'High'
+            ? 'error.main'
+            : finding.severity === 'Medium'
+              ? 'warning.main'
+              : 'info.main',
+        borderRadius: '18px !important',
+        overflow: 'hidden',
+      }}
+    >
       <AccordionSummary expandIcon={<ExpandMoreIcon />}>
         <Box display="flex" width="100%" alignItems="center" justifyContent="space-between" pr={1}>
-          <Box>
-            <Typography variant="subtitle2" fontWeight={700}>
+          <Box minWidth={0}>
+            <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center" mb={0.5}>
+              <Chip label={finding.category} size="small" color="primary" variant="outlined" />
+              <Chip
+                label={finding.severity}
+                size="small"
+                color={SEVERITY_COLOR[finding.severity]}
+              />
+            </Stack>
+            <Typography variant="subtitle1" fontWeight={800}>
               {finding.category}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {finding.reviewer} • {finding.severity}
+            <Typography variant="body2" color="text.secondary" noWrap>
+              {finding.reviewer} • {finding.rule}
             </Typography>
           </Box>
           <Stack direction="row" spacing={1} alignItems="center">
@@ -67,29 +97,82 @@ export function FindingCard({
         </Box>
       </AccordionSummary>
       <AccordionDetails>
-        <Stack spacing={1.5}>
-          <Typography variant="body2">
-            <strong>Rule:</strong> {finding.rule}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Explanation:</strong> {finding.explanation}
-          </Typography>
-          <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-            <strong>Evidence:</strong> {finding.evidence}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Recommendation:</strong> {finding.recommendation}
-          </Typography>
-          <Typography variant="body2">
-            <strong>Reference:</strong>{' '}
-            {finding.reference_url ? (
-              <Link href={finding.reference_url} target="_blank" rel="noopener noreferrer" underline="hover">
+        <Stack spacing={2}>
+          <Alert
+            severity={SEVERITY_COLOR[finding.severity]}
+            variant="outlined"
+            sx={{ alignItems: 'center' }}
+          >
+            <Typography variant="body2" fontWeight={700}>
+              Suggested change
+            </Typography>
+            <Typography variant="body2">{finding.recommendation}</Typography>
+          </Alert>
+
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 3,
+              bgcolor: 'action.hover',
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Typography variant="overline" color="text.secondary">
+              Why this was flagged
+            </Typography>
+            <Typography variant="body2" mt={0.5}>
+              {finding.explanation}
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 3,
+              border: '1px dashed',
+              borderColor: 'divider',
+              background:
+                'linear-gradient(180deg, rgba(27,79,216,0.04), rgba(27,79,216,0.00))',
+            }}
+          >
+            <Typography variant="overline" color="text.secondary">
+              Observed source text
+            </Typography>
+            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.75 }}>
+              {finding.evidence}
+            </Typography>
+          </Box>
+
+          <Box
+            sx={{
+              p: 1.5,
+              borderRadius: 3,
+              border: '1px solid',
+              borderColor: 'divider',
+            }}
+          >
+            <Stack spacing={0.75}>
+              <Typography variant="overline" color="text.secondary">
+                Standards source
+              </Typography>
+              <Typography variant="body2" fontWeight={700}>
                 {finding.reference_title ?? finding.reference}
-              </Link>
-            ) : (
-              finding.reference_title ?? finding.reference
-            )}
-          </Typography>
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {finding.reference}
+              </Typography>
+              <Typography variant="body2">
+                {finding.reference_url ? (
+                  <Link href={finding.reference_url} target="_blank" rel="noopener noreferrer" underline="hover">
+                    Open source document
+                  </Link>
+                ) : (
+                  'No direct source URL provided.'
+                )}
+              </Typography>
+            </Stack>
+          </Box>
 
           {onApplyDisposition && (
             <>
