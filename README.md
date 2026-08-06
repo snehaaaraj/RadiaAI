@@ -11,7 +11,7 @@ structured, explainable requirement quality workflows.
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                       Frontend                          │
-│          React + TypeScript + Vite + MUI                │
+│     React + TypeScript + Vite + MUI + Framer Motion     │
 │                  port 3000 (nginx)                      │
 └─────────────────────┬───────────────────────────────────┘
                       │  /api/v1/*
@@ -58,6 +58,7 @@ RadiaAi-2.0/
 ├── frontend/
 │   ├── src/
 │   │   ├── api/        # typed Axios functions
+│   │   ├── assets/     # logos and static UI assets
 │   │   ├── components/ # reusable UI components
 │   │   ├── hooks/      # React Query hooks
 │   │   ├── pages/      # route-level page components
@@ -85,6 +86,33 @@ RadiaAi-2.0/
 | 4 | RAG pipeline (retrieval → prompt → LLM) | Planned |
 | 5 | React chat interface (full UI) | Planned |
 | 6 | Testing, logging, monitoring | Planned |
+
+---
+
+## Current Frontend Experience
+
+- Dedicated **Launchpad** landing page at `/`
+- Main app workspace now starts at `/workspace`
+- Theme-aware branding with separate light and dark logo assets
+- Personalization controls for:
+  - theme mode (system / light / dark)
+  - accent color
+  - UI density
+  - motion preference
+  - default workspace start page
+  - sidebar open/collapsed state
+- Animated page transitions and cards using **Framer Motion**
+- Persistent review form/results state across navigation for:
+  - individual requirement review
+  - requirement set review
+  - delta review
+- Explicit **Clear Review** actions to reset persisted review state
+- Auto-scroll to score/result area after a review completes
+- Improved review result presentation with:
+  - overall score hero
+  - per-category scoring cards
+  - severity color-coding
+  - clearer suggested changes, evidence, and standards references
 
 ---
 
@@ -116,6 +144,9 @@ docker compose up --build
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/api/docs
 
+The Dockerized frontend serves the Launchpad on `/` and the main workspace on
+`/workspace`.
+
 ### 3. Local backend development (without Docker)
 
 ```bash
@@ -134,6 +165,11 @@ npm install
 npm run dev
       # starts Vite dev server on :5173, proxies /api to :8000
 ```
+
+Local frontend URLs:
+
+- Launchpad: http://localhost:5173/
+- Workspace: http://localhost:5173/workspace
 
 ---
 
@@ -203,6 +239,6 @@ Key settings:
 
 **Backend:** Python 3.12, FastAPI, Pydantic v2, Azure SDK, structlog, pytest
 
-**Frontend:** React 18, TypeScript, Vite, MUI v6, React Query v5, Axios
+**Frontend:** React 18, TypeScript, Vite, MUI v6, React Query v5, Axios, Framer Motion
 
 **Infrastructure:** Docker, nginx, Azure App Service / Container Apps
