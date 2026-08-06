@@ -1,4 +1,6 @@
-import Box from '@mui/material/Box';
+const OUTER_SPOKES = Array.from({ length: 24 }, (_, index) => index * 15);
+const INNER_SPOKES = Array.from({ length: 24 }, (_, index) => index * 15 + 7.5);
+const LOGO_COLOR = '#2F4352';
 
 interface RadiaMarkProps {
   size?: number;
@@ -6,54 +8,42 @@ interface RadiaMarkProps {
 
 export function RadiaMark({ size = 36 }: RadiaMarkProps) {
   return (
-    <Box
-      sx={{
-        position: 'relative',
-        width: size,
-        height: size,
-        borderRadius: '28% 50% 38% 50%',
-        background: 'linear-gradient(150deg, #ff6b6b 0%, #e11d48 52%, #7f1d1d 100%)',
-        boxShadow: '0 14px 30px rgba(225, 29, 72, 0.28)',
-        overflow: 'hidden',
-        flexShrink: 0,
-      }}
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 128 128"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
+      style={{ display: 'block', flexShrink: 0 }}
     >
-      <Box
-        sx={{
-          position: 'absolute',
-          inset: '18% 20% auto auto',
-          width: '54%',
-          height: '54%',
-          borderTop: '3px solid rgba(255,255,255,0.94)',
-          borderRight: '3px solid rgba(255,255,255,0.94)',
-          borderRadius: '0 80% 0 0',
-          transform: 'rotate(18deg)',
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          left: '28%',
-          top: '22%',
-          width: '14%',
-          height: '58%',
-          borderRadius: 999,
-          bgcolor: 'rgba(255,255,255,0.96)',
-          transform: 'rotate(18deg)',
-        }}
-      />
-      <Box
-        sx={{
-          position: 'absolute',
-          right: '-14%',
-          bottom: '-14%',
-          width: '60%',
-          height: '60%',
-          borderRadius: '50%',
-          background: 'rgba(255,255,255,0.16)',
-        }}
-      />
-    </Box>
+      <circle cx="64" cy="64" r="21" fill="white" />
+
+      {OUTER_SPOKES.map((angle) => (
+        <rect
+          key={`outer-${angle}`}
+          x="60"
+          y="6"
+          width="8"
+          height="18"
+          rx="1.5"
+          fill={LOGO_COLOR}
+          transform={`rotate(${angle} 64 64)`}
+        />
+      ))}
+
+      {INNER_SPOKES.map((angle) => (
+        <rect
+          key={`inner-${angle}`}
+          x="59.5"
+          y="30"
+          width="9"
+          height="15"
+          rx="1.5"
+          fill={LOGO_COLOR}
+          transform={`rotate(${angle} 64 64)`}
+        />
+      ))}
+    </svg>
   );
 }
