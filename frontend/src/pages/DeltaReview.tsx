@@ -12,7 +12,6 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
-import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
@@ -454,28 +453,12 @@ export default function DeltaReview() {
                       <CategoryScoreGrid categories={reviewedRequirement.category_results} />
                       <ReviewChangeSet
                         findings={reviewedRequirement.findings}
-                        title="Proposed changes"
-                        description="AI-assisted edits for this changed requirement with their standards source."
+                        reviewId={activeResult.review_id}
+                        onApplyDisposition={(reviewId, payload) =>
+                          applyDisposition({ reviewId, payload })
+                        }
+                        isApplyingDisposition={isApplyingDisposition}
                       />
-                      <Typography variant="subtitle2" fontWeight={700}>
-                        Detailed findings
-                      </Typography>
-                      {reviewedRequirement.findings.length === 0 ? (
-                        <Alert severity="success">No changes recommended for this requirement.</Alert>
-                      ) : (
-                        reviewedRequirement.findings.map((finding, index) => (
-                          <FindingCard
-                            key={`${reviewedRequirement.requirement_id}-${index}`}
-                            finding={finding}
-                            index={index}
-                            reviewId={activeResult.review_id}
-                            onApplyDisposition={(reviewId, payload) =>
-                              applyDisposition({ reviewId, payload })
-                            }
-                            isApplyingDisposition={isApplyingDisposition}
-                          />
-                        ))
-                      )}
                     </Stack>
                   </Paper>
                 ))
@@ -485,32 +468,12 @@ export default function DeltaReview() {
                   <Divider />
                   <ReviewChangeSet
                     findings={activeResult.requirement_set_findings}
-                    title="Cross-requirement change set"
-                    description="Set-level changes derived from consistency and traceability checks."
+                    reviewId={activeResult.review_id}
+                    onApplyDisposition={(reviewId, payload) =>
+                      applyDisposition({ reviewId, payload })
+                    }
+                    isApplyingDisposition={isApplyingDisposition}
                   />
-                  <Divider />
-                  <Box>
-                    <Typography variant="h6" fontWeight={800} gutterBottom>
-                      Cross-requirement findings
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      These findings span the changed set as a whole rather than one individual requirement.
-                    </Typography>
-                  </Box>
-                  <Stack spacing={1.5}>
-                    {activeResult.requirement_set_findings.map((finding, index) => (
-                      <FindingCard
-                        key={`set-finding-${index}`}
-                        finding={finding}
-                        index={index}
-                        reviewId={activeResult.review_id}
-                        onApplyDisposition={(reviewId, payload) =>
-                          applyDisposition({ reviewId, payload })
-                        }
-                        isApplyingDisposition={isApplyingDisposition}
-                      />
-                    ))}
-                  </Stack>
                 </>
               )}
             </Stack>

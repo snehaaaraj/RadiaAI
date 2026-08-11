@@ -16,7 +16,6 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
-import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
@@ -471,34 +470,12 @@ export default function RequirementSetReview() {
               </Box>
               <CategoryScoreGrid categories={activeResult.category_results} />
               <Divider />
-              <ReviewChangeSet findings={activeResult.findings} />
-              <Divider />
-              <Box>
-                <Typography variant="h6" fontWeight={800} gutterBottom>
-                  Detailed findings
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Expand each item for full context, evidence, and reviewer actions.
-                </Typography>
-              </Box>
-              <Stack spacing={1.5}>
-                {activeResult.findings.length === 0 ? (
-                  <Alert severity="success">No findings detected for this requirement set.</Alert>
-                ) : (
-                  activeResult.findings.map((finding, index) => (
-                    <FindingCard
-                      key={`${finding.category}-${index}`}
-                      finding={finding}
-                      index={index}
-                      reviewId={activeResult.review_id}
-                      onApplyDisposition={(reviewId, payload) =>
-                        applyDisposition({ reviewId, payload })
-                      }
-                      isApplyingDisposition={isApplyingDisposition}
-                    />
-                  ))
-                )}
-              </Stack>
+              <ReviewChangeSet
+                findings={activeResult.findings}
+                reviewId={activeResult.review_id}
+                onApplyDisposition={(reviewId, payload) => applyDisposition({ reviewId, payload })}
+                isApplyingDisposition={isApplyingDisposition}
+              />
             </Stack>
           </Paper>
         </Stack>
