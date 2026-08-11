@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
+import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
@@ -451,6 +452,14 @@ export default function DeltaReview() {
                         )}
                       />
                       <CategoryScoreGrid categories={reviewedRequirement.category_results} />
+                      <ReviewChangeSet
+                        findings={reviewedRequirement.findings}
+                        title="Proposed changes"
+                        description="AI-assisted edits for this changed requirement with their standards source."
+                      />
+                      <Typography variant="subtitle2" fontWeight={700}>
+                        Detailed findings
+                      </Typography>
                       {reviewedRequirement.findings.length === 0 ? (
                         <Alert severity="success">No changes recommended for this requirement.</Alert>
                       ) : (
@@ -473,6 +482,12 @@ export default function DeltaReview() {
               )}
               {activeResult.requirement_set_findings.length > 0 && (
                 <>
+                  <Divider />
+                  <ReviewChangeSet
+                    findings={activeResult.requirement_set_findings}
+                    title="Cross-requirement change set"
+                    description="Set-level changes derived from consistency and traceability checks."
+                  />
                   <Divider />
                   <Box>
                     <Typography variant="h6" fontWeight={800} gutterBottom>

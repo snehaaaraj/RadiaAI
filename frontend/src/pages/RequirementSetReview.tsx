@@ -17,6 +17,7 @@ import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { FindingCard } from '@/components/review/FindingCard';
+import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -470,12 +471,14 @@ export default function RequirementSetReview() {
               </Box>
               <CategoryScoreGrid categories={activeResult.category_results} />
               <Divider />
+              <ReviewChangeSet findings={activeResult.findings} />
+              <Divider />
               <Box>
                 <Typography variant="h6" fontWeight={800} gutterBottom>
-                  Suggested changes
+                  Detailed findings
                 </Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Each recommendation is grouped with the source text and standards reference that informed it.
+                  Expand each item for full context, evidence, and reviewer actions.
                 </Typography>
               </Box>
               <Stack spacing={1.5}>
