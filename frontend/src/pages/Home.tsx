@@ -107,31 +107,6 @@ export default function Home() {
           </Grid>
         ))}
       </Grid>
-
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-        animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-        transition={{ duration: 0.24, ease: 'easeOut', delay: 0.2 }}
-      >
-        <Card>
-          <CardContent>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              What this app does
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              It supports single requirement review, delta review, review history, and standards
-              references for aerospace requirements engineering.
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-              <Chip label="Single Review" size="small" />
-              <Chip label="Delta Review" size="small" />
-              <Chip label="Standards" size="small" />
-              <Chip icon={<RocketLaunchIcon />} label="Launch-ready workflow" size="small" />
-            </Box>
-          </CardContent>
-        </Card>
-      </motion.div>
     </Stack>
   );
 }
