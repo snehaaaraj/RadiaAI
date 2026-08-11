@@ -1,0 +1,31 @@
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.32.1
+python-multipart==0.0.20
+
+# Validation & settings
+pydantic==2.10.3
+pydantic-settings==2.7.0
+
+# Azure SDKs
+azure-identity==1.19.0
+azure-search-documents==11.6.0b8
+azure-storage-blob==12.24.0
+openai==1.58.1          # Azure OpenAI uses the openai SDK
+
+# HTTP client
+httpx==0.28.1
+
+# Utilities
+python-jose[cryptography]==3.3.0   # JWT for Entra ID tokens
+tenacity==9.0.0                    # retries with backoff
+structlog==24.4.0                  # structured logging
+
+# Dev / test (pinned separately for reproducibility)
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+httpx==0.28.1                      # AsyncClient for FastAPI testing
+ruff==0.8.4
+black==24.10.0
+mypy==1.13.0
