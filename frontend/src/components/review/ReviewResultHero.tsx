@@ -51,7 +51,7 @@ export function ReviewResultHero({
               Review outcome is highlighted below with category-level scoring and evidence-backed
               recommendations.
             </Typography>
-            <ReviewQualityBand score={score} label="Overall score" />
+            <ReviewQualityBand score={score} label="Overall score" showValue={false} />
             <Stack direction="row" gap={1} flexWrap="wrap">
               {metadata.map((item) => (
                 <Chip key={item.label} label={`${item.label}: ${item.value}`} variant="outlined" size="small" />

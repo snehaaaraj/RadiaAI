@@ -159,22 +159,6 @@ export function FindingCard({
                 sx={{
                   p: 1.25,
                   borderRadius: 2,
-                  border: '1px dashed',
-                  borderColor: 'divider',
-                }}
-              >
-                <Typography variant="overline" color="text.secondary">
-                  Observed source text
-                </Typography>
-                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}>
-                  {finding.evidence}
-                </Typography>
-              </Box>
-
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 2,
                   bgcolor: 'action.hover',
                 }}
               >
