@@ -62,28 +62,19 @@ export default function Home() {
         animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
         transition={{ duration: 0.24, ease: 'easeOut', delay: 0.06 }}
       >
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
-              <Typography variant="subtitle2" color="text.secondary">
-                System status
-              </Typography>
-              <Box>
-                {isLoading ? (
-                  <Chip label="Checking..." size="small" />
-                ) : (
-                  <Chip
-                    icon={<CheckCircleIcon />}
-                    label={`API ${health?.status ?? 'unknown'} — v${health?.version ?? '—'}`}
-                    color={health?.status === 'ok' ? 'success' : 'warning'}
-                    size="small"
-                    variant="outlined"
-                  />
-                )}
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+        <Box display="flex" justifyContent="flex-end">
+          {isLoading ? (
+            <Chip label="Checking..." size="small" />
+          ) : (
+            <Chip
+              icon={<CheckCircleIcon />}
+              label={`API ${health?.status ?? 'unknown'} — v${health?.version ?? '—'}`}
+              color={health?.status === 'ok' ? 'success' : 'warning'}
+              size="small"
+              variant="outlined"
+            />
+          )}
+        </Box>
       </motion.div>
 
       <Grid container spacing={2}>
