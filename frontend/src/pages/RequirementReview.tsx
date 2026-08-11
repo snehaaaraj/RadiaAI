@@ -213,7 +213,7 @@ export default function RequirementReview() {
 
           {uploadedFilename && text.trim() && (
             <Alert severity="info" sx={{ py: 0.5 }}>
-              Loaded from <strong>{uploadedFilename}</strong> — review the text above before submitting.
+              Loaded from <strong>{uploadedFilename}</strong> - review the text tab before submitting.
             </Alert>
           )}
 
