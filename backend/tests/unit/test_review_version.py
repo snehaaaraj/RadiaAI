@@ -19,7 +19,7 @@ def test_review_version_response_structure(client: TestClient) -> None:
     assert "data" in body
     data = body["data"]
     assert data["product"] == "Radia AI Requirements Engineering Assistant"
-    assert data["workflow_default"] == "requirement-set-review"
+    assert data["workflow_default"] == "requirement"
     assert "determinism" in data
     assert "reviewers" in data
     assert len(data["reviewers"]) >= 1

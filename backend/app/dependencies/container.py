@@ -22,13 +22,11 @@ from app.repositories.review_history_repository import ReviewHistoryRepository
 from app.reviewers.certification.reviewer import CertificationReviewer
 from app.reviewers.language.reviewer import LanguageReviewer
 from app.reviewers.orchestrator import ReviewOrchestrator
-from app.reviewers.requirement_set.reviewer import RequirementSetReviewer
 from app.reviewers.structure.reviewer import StructureReviewer
 from app.reviewers.traceability.reviewer import TraceabilityReviewer
 from app.reviewers.verifiability.reviewer import VerifiabilityReviewer
 from app.connectors.sharepoint_client import SharePointStandardsClient
 from app.services.requirement_review_service import RequirementReviewService
-from app.services.requirement_set_review_service import RequirementSetReviewService
 from app.services.requirement_delta_review_service import RequirementDeltaReviewService
 from app.services.review_history_service import ReviewHistoryService
 from app.services.review_version_service import ReviewVersionService
@@ -71,14 +69,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
     app.state.sharepoint_client = sharepoint_client
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
-    app.state.requirement_set_review_service = RequirementSetReviewService(
-        app.state.review_orchestrator
-    )
     app.state.review_history_repository = ReviewHistoryRepository()
     app.state.review_history_service = ReviewHistoryService(app.state.review_history_repository)
     app.state.requirement_delta_review_service = RequirementDeltaReviewService(
         app.state.requirement_review_service,
-        app.state.requirement_set_review_service,
         app.state.review_version_service,
     )
 
@@ -111,7 +105,6 @@ def _build_review_orchestrator(
             VerifiabilityReviewer(),
             TraceabilityReviewer(),
             CertificationReviewer(),
-            RequirementSetReviewer(),
         ],
         standards_service=standards_service,
         reviewer_bundle_version="1.0.0",
@@ -157,31 +150,14 @@ RequirementReviewServiceDep = Annotated[
 ]
 
 
-def get_requirement_set_review_service(request: Request) -> RequirementSetReviewService:
-    """Resolve requirement-set review service from application state."""
-    service = getattr(request.app.state, "requirement_set_review_service", None)
-    if service is None:
-        orchestrator = get_review_orchestrator(request)
-        service = RequirementSetReviewService(orchestrator)
-        request.app.state.requirement_set_review_service = service
-    return service
-
-
-RequirementSetReviewServiceDep = Annotated[
-    RequirementSetReviewService, Depends(get_requirement_set_review_service)
-]
-
-
 def get_requirement_delta_review_service(request: Request) -> RequirementDeltaReviewService:
     """Resolve requirement delta review service from application state."""
     service = getattr(request.app.state, "requirement_delta_review_service", None)
     if service is None:
         requirement_service = get_requirement_review_service(request)
-        set_service = get_requirement_set_review_service(request)
         version_service = get_review_version_service(request)
         service = RequirementDeltaReviewService(
             requirement_review_service=requirement_service,
-            requirement_set_review_service=set_service,
             review_version_service=version_service,
         )
         request.app.state.requirement_delta_review_service = service

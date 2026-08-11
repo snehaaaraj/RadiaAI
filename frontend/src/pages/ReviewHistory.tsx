@@ -18,7 +18,6 @@ import { getReviewQualityScore } from '@/utils/reviewQuality';
 const WORKFLOW_OPTIONS: Array<{ label: string; value: ReviewWorkflow | 'all' }> = [
   { label: 'All workflows', value: 'all' },
   { label: 'Individual requirement', value: 'requirement' },
-  { label: 'Requirement set', value: 'requirement-set' },
   { label: 'Delta', value: 'delta' },
 ];
 

@@ -8,7 +8,6 @@ from app.models.review_models import (
     FindingSeverity,
     PassFail,
     RequirementReviewInput,
-    RequirementSetReviewInput,
     ReviewerResult,
     ReviewFinding,
     ReviewStatus,
@@ -23,7 +22,6 @@ class VerifiabilityReviewer(RequirementReviewer):
     prompt_version = "verifiability.v1"
     standards_version = "incose.v1"
     supports_individual_review = True
-    supports_requirement_set_review = False
 
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
         text = payload.text.strip()
@@ -91,16 +89,6 @@ class VerifiabilityReviewer(RequirementReviewer):
             standards_version=self.standards_version,
             overall=overall,
             findings=findings,
-        )
-
-    def review_requirement_set(self, payload: RequirementSetReviewInput) -> ReviewerResult:
-        return ReviewerResult(
-            reviewer=self.name,
-            reviewer_version=self.reviewer_version,
-            prompt_version=self.prompt_version,
-            standards_version=self.standards_version,
-            overall=ReviewStatus.ACCEPTABLE,
-            findings=[],
         )
 
 

@@ -7,7 +7,6 @@ import { AppLayout } from '@/components/layout/AppLayout';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import Landing from '@/pages/Landing';
 import Home from '@/pages/Home';
-import RequirementSetReview from '@/pages/RequirementSetReview';
 import RequirementReview from '@/pages/RequirementReview';
 import DeltaReview from '@/pages/DeltaReview';
 import ReviewHistory from '@/pages/ReviewHistory';
@@ -42,7 +41,6 @@ export default function App() {
               <Route path={ROUTES.LANDING} element={<Landing />} />
               <Route element={<AppLayout />}>
                 <Route path={ROUTES.HOME} element={<Home />} />
-                <Route path={ROUTES.REVIEW_REQUIREMENT_SET} element={<RequirementSetReview />} />
                 <Route path={ROUTES.REVIEW_REQUIREMENT} element={<RequirementReview />} />
                 <Route path={ROUTES.REVIEW_DELTA} element={<DeltaReview />} />
                 <Route path={ROUTES.REVIEW_HISTORY} element={<ReviewHistory />} />

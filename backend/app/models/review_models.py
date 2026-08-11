@@ -110,14 +110,6 @@ class RequirementReviewInput(BaseModel):
     metadata: dict[str, str] = Field(default_factory=dict)
 
 
-class RequirementSetReviewInput(BaseModel):
-    """Input payload for requirement-set review."""
-
-    specification_id: str | None = None
-    requirements: list[RequirementReviewInput] = Field(default_factory=list)
-    metadata: dict[str, str] = Field(default_factory=dict)
-
-
 class ReviewVersionEntry(BaseModel):
     """Version metadata for a single reviewer implementation."""
 
@@ -126,7 +118,6 @@ class ReviewVersionEntry(BaseModel):
     prompt_version: str
     standards_version: str
     supports_individual_review: bool = False
-    supports_requirement_set_review: bool = False
 
 
 class ReviewVersionResponse(BaseModel):
@@ -152,17 +143,6 @@ class RequirementReviewResponse(BaseModel):
     overall: ReviewStatus
     category_results: list[CategoryResult] = Field(default_factory=list)
     findings: list[ReviewFinding] = Field(default_factory=list)
-    determinism: DeterminismContext
-
-
-class RequirementSetReviewResponse(BaseModel):
-    """Aggregated deterministic response for requirement-set review."""
-
-    review_id: str | None = None
-    overall: ReviewStatus
-    category_results: list[CategoryResult] = Field(default_factory=list)
-    findings: list[ReviewFinding] = Field(default_factory=list)
-    requirement_count: int = 0
     determinism: DeterminismContext
 
 
@@ -217,5 +197,4 @@ class DeltaReviewResponse(BaseModel):
     overall: ReviewStatus
     change_summary: DeltaChangeSummary
     reviewed_requirements: list[DeltaRequirementReviewResult] = Field(default_factory=list)
-    requirement_set_findings: list[ReviewFinding] = Field(default_factory=list)
     determinism: DeterminismContext

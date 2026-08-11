@@ -12,7 +12,6 @@ from app.models.review_models import (
     DeltaReviewResponse,
     DeterminismContext,
     RequirementReviewResponse,
-    RequirementSetReviewResponse,
     ReviewFinding,
     ReviewStatus,
 )
@@ -22,7 +21,6 @@ class ReviewWorkflow(StrEnum):
     """Supported review workflows tracked in history."""
 
     REQUIREMENT = "requirement"
-    REQUIREMENT_SET = "requirement-set"
     DELTA = "delta"
 
 
@@ -93,25 +91,6 @@ def create_requirement_history_entry(
     )
 
 
-def create_requirement_set_history_entry(
-    review_id: str,
-    created_at: str,
-    subject_id: str | None,
-    response: RequirementSetReviewResponse,
-) -> ReviewHistoryEntry:
-    """Create a normalized history entry from requirement-set response."""
-    return ReviewHistoryEntry(
-        review_id=review_id,
-        workflow=ReviewWorkflow.REQUIREMENT_SET,
-        subject_id=subject_id,
-        created_at=created_at,
-        overall=response.overall,
-        category_results=response.category_results,
-        findings=response.findings,
-        determinism=response.determinism,
-    )
-
-
 def create_delta_history_entry(
     review_id: str,
     created_at: str,
@@ -125,7 +104,6 @@ def create_delta_history_entry(
         findings.extend(requirement_result.findings)
         category_results.extend(requirement_result.category_results)
 
-    findings.extend(response.requirement_set_findings)
     return ReviewHistoryEntry(
         review_id=review_id,
         workflow=ReviewWorkflow.DELTA,

@@ -404,9 +404,9 @@ export default function DeltaReview() {
         <Stack spacing={2} ref={resultRef}>
           <ReviewResultHero
             title="Delta review score"
-            score={getReviewQualityScore(activeResult.overall, activeResult.requirement_set_findings)}
+            score={getReviewQualityScore(activeResult.overall, activeResult.reviewed_requirements.flatMap(r => r.findings))}
             status={activeResult.overall}
-            findings={activeResult.requirement_set_findings}
+            findings={activeResult.reviewed_requirements.flatMap(r => r.findings)}
             reviewId={activeResult.review_id}
             metadata={[
               { label: 'Specification', value: specificationId || 'Not provided' },
@@ -462,19 +462,6 @@ export default function DeltaReview() {
                     </Stack>
                   </Paper>
                 ))
-              )}
-              {activeResult.requirement_set_findings.length > 0 && (
-                <>
-                  <Divider />
-                  <ReviewChangeSet
-                    findings={activeResult.requirement_set_findings}
-                    reviewId={activeResult.review_id}
-                    onApplyDisposition={(reviewId, payload) =>
-                      applyDisposition({ reviewId, payload })
-                    }
-                    isApplyingDisposition={isApplyingDisposition}
-                  />
-                </>
               )}
             </Stack>
           </Paper>
