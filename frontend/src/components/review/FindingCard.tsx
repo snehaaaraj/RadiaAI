@@ -1,24 +1,24 @@
 import { useMemo, useState } from 'react';
 import Accordion from '@mui/material/Accordion';
-import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
-import Alert from '@mui/material/Alert';
+import AccordionSummary from '@mui/material/AccordionSummary';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
-import Stack from '@mui/material/Stack';
+import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import Link from '@mui/material/Link';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import TextField from '@mui/material/TextField';
-import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
-import Link from '@mui/material/Link';
+import Typography from '@mui/material/Typography';
 import type {
   ApplyFindingDispositionRequest,
-  FindingSeverity,
   FindingDisposition,
   FindingDispositionStatus,
+  FindingSeverity,
   ReviewFinding,
 } from '@/types/api';
 import { ReviewStatusChip } from './ReviewStatusChip';
@@ -58,9 +58,11 @@ export function FindingCard({
   );
 
   return (
-    <Accordion
-      disableGutters
+    <Paper
+      variant="outlined"
       sx={{
+        p: 1.5,
+        borderRadius: 3,
         borderLeft: '5px solid',
         borderLeftColor:
           finding.severity === 'Critical' || finding.severity === 'High'
@@ -68,157 +70,169 @@ export function FindingCard({
             : finding.severity === 'Medium'
               ? 'warning.main'
               : 'info.main',
-        borderRadius: '18px !important',
-        overflow: 'hidden',
       }}
     >
-      <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-        <Box display="flex" width="100%" alignItems="center" justifyContent="space-between" pr={1}>
-          <Box minWidth={0}>
-            <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center" mb={0.5}>
-              <Chip label={finding.category} size="small" color="primary" variant="outlined" />
-              <Chip
-                label={finding.severity}
-                size="small"
-                color={SEVERITY_COLOR[finding.severity]}
-              />
-            </Stack>
-            <Typography variant="subtitle1" fontWeight={800}>
-              {finding.category}
+      <Stack spacing={1.25}>
+        <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap">
+          <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
+            <Chip label={finding.category} size="small" color="primary" variant="outlined" />
+            <Chip label={finding.severity} size="small" color={SEVERITY_COLOR[finding.severity]} />
+            <Typography variant="subtitle2" fontWeight={800}>
+              Change {index + 1}
             </Typography>
-            <Typography variant="body2" color="text.secondary" noWrap>
-              {finding.reviewer} • {finding.rule}
-            </Typography>
-          </Box>
-          <Stack direction="row" spacing={1} alignItems="center">
+          </Stack>
+          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
             <Chip label={finding.pass_fail} size="small" variant="outlined" />
             <ReviewStatusChip status={finding.status} />
           </Stack>
         </Box>
-      </AccordionSummary>
-      <AccordionDetails>
-        <Stack spacing={2}>
-          <Alert
-            severity={SEVERITY_COLOR[finding.severity]}
-            variant="outlined"
-            sx={{ alignItems: 'center' }}
-          >
+
+        <Box
+          sx={{
+            p: 1.25,
+            borderRadius: 2,
+            bgcolor: 'action.hover',
+          }}
+        >
+          <Typography variant="overline" color="text.secondary">
+            What should change
+          </Typography>
+          <Typography variant="body2" mt={0.5}>
+            {finding.recommendation}
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            p: 1.25,
+            borderRadius: 2,
+            border: '1px solid',
+            borderColor: 'divider',
+          }}
+        >
+          <Stack spacing={0.5}>
+            <Typography variant="overline" color="text.secondary">
+              Source of truth
+            </Typography>
             <Typography variant="body2" fontWeight={700}>
-              Suggested change
+              {finding.reference_title ?? finding.reference}
             </Typography>
-            <Typography variant="body2">{finding.recommendation}</Typography>
-          </Alert>
+            <Typography variant="body2" color="text.secondary">
+              {finding.reference}
+            </Typography>
+            {finding.reference_url && (
+              <Link href={finding.reference_url} target="_blank" rel="noopener noreferrer" underline="hover">
+                Open source standard
+              </Link>
+            )}
+          </Stack>
+        </Box>
 
-          <Box
-            sx={{
-              p: 1.5,
-              borderRadius: 3,
-              bgcolor: 'action.hover',
-              border: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
-            <Typography variant="overline" color="text.secondary">
-              Why this was flagged
+        <Accordion
+          disableGutters
+          sx={{
+            boxShadow: 'none',
+            border: '1px solid',
+            borderColor: 'divider',
+            borderRadius: 2,
+            '&:before': { display: 'none' },
+            overflow: 'hidden',
+          }}
+        >
+          <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              Details
             </Typography>
-            <Typography variant="body2" mt={0.5}>
-              {finding.explanation}
-            </Typography>
-          </Box>
-
-          <Box
-            sx={{
-              p: 1.5,
-              borderRadius: 3,
-              border: '1px dashed',
-              borderColor: 'divider',
-              background:
-                'linear-gradient(180deg, rgba(27,79,216,0.04), rgba(27,79,216,0.00))',
-            }}
-          >
-            <Typography variant="overline" color="text.secondary">
-              Observed source text
-            </Typography>
-            <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.75 }}>
-              {finding.evidence}
-            </Typography>
-          </Box>
-
-          <Box
-            sx={{
-              p: 1.5,
-              borderRadius: 3,
-              border: '1px solid',
-              borderColor: 'divider',
-            }}
-          >
-            <Stack spacing={0.75}>
-              <Typography variant="overline" color="text.secondary">
-                Standards source
-              </Typography>
-              <Typography variant="body2" fontWeight={700}>
-                {finding.reference_title ?? finding.reference}
-              </Typography>
-              <Typography variant="body2" color="text.secondary">
-                {finding.reference}
-              </Typography>
-              <Typography variant="body2">
-                {finding.reference_url ? (
-                  <Link href={finding.reference_url} target="_blank" rel="noopener noreferrer" underline="hover">
-                    Open source document
-                  </Link>
-                ) : (
-                  'No direct source URL provided.'
-                )}
-              </Typography>
-            </Stack>
-          </Box>
-
-          {onApplyDisposition && (
-            <>
-              <Divider sx={{ my: 1 }} />
-              <Typography variant="subtitle2" fontWeight={700}>
-                Reviewer Disposition
-              </Typography>
-              <ToggleButtonGroup
-                exclusive
-                size="small"
-                value={selectedDisposition}
-                onChange={(_, value) => setSelectedDisposition(value ?? '')}
-              >
-                <ToggleButton value="Accepted">Accepted</ToggleButton>
-                <ToggleButton value="Rejected">Rejected</ToggleButton>
-                <ToggleButton value="Deferred">Deferred</ToggleButton>
-              </ToggleButtonGroup>
-              <TextField
-                multiline
-                minRows={2}
-                size="small"
-                placeholder="Reviewer comment"
-                value={comment}
-                onChange={(event) => setComment(event.target.value)}
-              />
+          </AccordionSummary>
+          <AccordionDetails>
+            <Stack spacing={1.5}>
               <Box>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={!canSubmitDisposition || isApplyingDisposition}
-                  onClick={() => {
-                    if (!reviewId || !selectedDisposition || !onApplyDisposition) return;
-                    onApplyDisposition(reviewId, {
-                      finding_index: index,
-                      disposition: selectedDisposition,
-                      reviewer_comment: comment,
-                    });
-                  }}
-                >
-                  Save disposition
-                </Button>
+                <Typography variant="overline" color="text.secondary">
+                  Why was this flagged
+                </Typography>
+                <Typography variant="body2" mt={0.5}>
+                  {finding.explanation}
+                </Typography>
               </Box>
-            </>
-          )}
-        </Stack>
-      </AccordionDetails>
-    </Accordion>
+
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 2,
+                  border: '1px dashed',
+                  borderColor: 'divider',
+                }}
+              >
+                <Typography variant="overline" color="text.secondary">
+                  Observed source text
+                </Typography>
+                <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap', mt: 0.5 }}>
+                  {finding.evidence}
+                </Typography>
+              </Box>
+
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 2,
+                  bgcolor: 'action.hover',
+                }}
+              >
+                <Typography variant="overline" color="text.secondary">
+                  What do we do about it
+                </Typography>
+                <Typography variant="body2" mt={0.5}>
+                  {finding.recommendation}
+                </Typography>
+              </Box>
+
+              {onApplyDisposition && (
+                <>
+                  <Divider />
+                  <Typography variant="subtitle2" fontWeight={700}>
+                    Reviewer disposition
+                  </Typography>
+                  <ToggleButtonGroup
+                    exclusive
+                    size="small"
+                    value={selectedDisposition}
+                    onChange={(_, value) => setSelectedDisposition(value ?? '')}
+                  >
+                    <ToggleButton value="Accepted">Accepted</ToggleButton>
+                    <ToggleButton value="Rejected">Rejected</ToggleButton>
+                    <ToggleButton value="Deferred">Deferred</ToggleButton>
+                  </ToggleButtonGroup>
+                  <TextField
+                    multiline
+                    minRows={2}
+                    size="small"
+                    placeholder="Reviewer comment"
+                    value={comment}
+                    onChange={(event) => setComment(event.target.value)}
+                  />
+                  <Box>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={!canSubmitDisposition || isApplyingDisposition}
+                      onClick={() => {
+                        if (!reviewId || !selectedDisposition || !onApplyDisposition) return;
+                        onApplyDisposition(reviewId, {
+                          finding_index: index,
+                          disposition: selectedDisposition,
+                          reviewer_comment: comment,
+                        });
+                      }}
+                    >
+                      Save disposition
+                    </Button>
+                  </Box>
+                </>
+              )}
+            </Stack>
+          </AccordionDetails>
+        </Accordion>
+      </Stack>
+    </Paper>
   );
 }
