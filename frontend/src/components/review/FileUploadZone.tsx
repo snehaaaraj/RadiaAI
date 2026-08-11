@@ -5,17 +5,27 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import mammoth from 'mammoth/mammoth.browser';
 
 interface FileUploadZoneProps {
   /** Comma-separated MIME types or extensions, e.g. ".txt,.json,.csv" */
   accept: string;
   /** Hint shown inside the drop zone */
   label: string;
-  /** Called with the raw file text content and the filename */
+  /** Called with the extracted file text content and the filename */
   onFileContent: (content: string, filename: string) => void;
   /** Filename currently loaded — pass to show the "loaded" state */
   filename?: string;
   onClear?: () => void;
+}
+
+function normalizeText(content: string) {
+  return content
+    .replace(/\r\n?/g, '\n')
+    .split('\n')
+    .map((line) => line.replace(/[ \t]+$/g, ''))
+    .join('\n')
+    .trim();
 }
 
 export function FileUploadZone({ accept, label, onFileContent, filename, onClear }: FileUploadZoneProps) {
@@ -24,17 +34,31 @@ export function FileUploadZone({ accept, label, onFileContent, filename, onClear
   const [readError, setReadError] = useState('');
 
   const readFile = useCallback(
-    (file: File) => {
+    async (file: File) => {
       setReadError('');
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const content = event.target?.result;
-        if (typeof content === 'string') {
-          onFileContent(content, file.name);
+      const lowerName = file.name.toLowerCase();
+      const isDocx =
+        lowerName.endsWith('.docx') ||
+        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
+      try {
+        if (lowerName.endsWith('.doc')) {
+          setReadError('Legacy .doc files are not supported. Please upload a .docx or .txt file.');
+          return;
         }
-      };
-      reader.onerror = () => setReadError('Failed to read file.');
-      reader.readAsText(file);
+
+        if (isDocx) {
+          const arrayBuffer = await file.arrayBuffer();
+          const result = await mammoth.extractRawText({ arrayBuffer });
+          onFileContent(normalizeText(result.value), file.name);
+          return;
+        }
+
+        const content = await file.text();
+        onFileContent(normalizeText(content), file.name);
+      } catch {
+        setReadError('Failed to read file.');
+      }
     },
     [onFileContent]
   );
