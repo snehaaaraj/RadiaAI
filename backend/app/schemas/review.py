@@ -5,8 +5,6 @@ from app.models.review_models import (
     DeltaReviewResponse,
     RequirementReviewInput,
     RequirementReviewResponse,
-    RequirementSetReviewInput,
-    RequirementSetReviewResponse,
     ReviewVersionResponse,
 )
 
@@ -15,7 +13,5 @@ __all__ = [
     "DeltaReviewResponse",
     "RequirementReviewInput",
     "RequirementReviewResponse",
-    "RequirementSetReviewInput",
-    "RequirementSetReviewResponse",
     "ReviewVersionResponse",
 ]

@@ -10,7 +10,6 @@ export const SIDEBAR_COLLAPSED_WIDTH = 76;
 export const ROUTES = {
   LANDING: '/',
   HOME: '/workspace',
-  REVIEW_REQUIREMENT_SET: '/review/requirement-set',
   REVIEW_REQUIREMENT: '/review/requirement',
   REVIEW_DELTA: '/review/delta',
   REVIEW_HISTORY: '/review/history',
@@ -24,7 +23,6 @@ export const ROUTES = {
 export const ROUTE_TITLES: Record<string, string> = {
   [ROUTES.LANDING]: 'Launchpad',
   [ROUTES.HOME]: 'Workspace Home',
-  [ROUTES.REVIEW_REQUIREMENT_SET]: 'Requirement Set Review',
   [ROUTES.REVIEW_REQUIREMENT]: 'Individual Requirement Review',
   [ROUTES.REVIEW_DELTA]: 'Delta Review',
   [ROUTES.REVIEW_HISTORY]: 'Review History',

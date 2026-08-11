@@ -6,7 +6,6 @@ from app.core.logging import get_logger
 from app.dependencies.container import (
     RequirementDeltaReviewServiceDep,
     RequirementReviewServiceDep,
-    RequirementSetReviewServiceDep,
     ReviewHistoryServiceDep,
     ReviewVersionServiceDep,
 )
@@ -16,8 +15,6 @@ from app.schemas.review import (
     DeltaReviewResponse,
     RequirementReviewInput,
     RequirementReviewResponse,
-    RequirementSetReviewInput,
-    RequirementSetReviewResponse,
     ReviewVersionResponse,
 )
 from app.schemas.review_history import (
@@ -70,36 +67,6 @@ async def review_requirement(
     response = service.review_requirement(body)
     review_id = history_service.record_requirement_review(
         subject_id=body.requirement_id, response=response
-    )
-    response = response.model_copy(update={"review_id": review_id})
-    return APIResponse(data=response, request_id=request.state.request_id)
-
-
-@router.post(
-    "/requirement-set",
-    response_model=APIResponse[RequirementSetReviewResponse],
-    summary="Run deterministic review for a requirement set",
-    description=(
-        "Runs requirement set reviewers for duplicate, overlap, contradiction, "
-        "traceability, and verification completeness checks."
-    ),
-    status_code=status.HTTP_200_OK,
-)
-async def review_requirement_set(
-    body: RequirementSetReviewInput,
-    request: Request,
-    service: RequirementSetReviewServiceDep,
-    history_service: ReviewHistoryServiceDep,
-) -> APIResponse[RequirementSetReviewResponse]:
-    logger.info(
-        "requirement_set_review_requested",
-        specification_id=body.specification_id or "",
-        requirement_count=len(body.requirements),
-    )
-    response = service.review_requirement_set(body)
-    review_id = history_service.record_requirement_set_review(
-        subject_id=body.specification_id,
-        response=response,
     )
     response = response.model_copy(update={"review_id": review_id})
     return APIResponse(data=response, request_id=request.state.request_id)

@@ -1,2 +1,0 @@
-"""Requirement-set reviewer package."""
-

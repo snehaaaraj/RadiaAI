@@ -148,7 +148,7 @@ export interface DocumentSummary {
 export type ReviewStatus = 'Acceptable' | 'Revision Recommended' | 'Unacceptable';
 export type PassFail = 'Pass' | 'Fail';
 export type FindingSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
-export type ReviewWorkflow = 'requirement' | 'requirement-set' | 'delta';
+export type ReviewWorkflow = 'requirement' | 'delta';
 export type FindingDispositionStatus = 'Accepted' | 'Rejected' | 'Deferred';
 export type TraceLinkChangeType = 'added' | 'removed' | 'modified';
 
@@ -193,12 +193,6 @@ export interface RequirementReviewInput {
   metadata?: Record<string, string>;
 }
 
-export interface RequirementSetReviewInput {
-  specification_id?: string | null;
-  requirements: RequirementReviewInput[];
-  metadata?: Record<string, string>;
-}
-
 export interface TraceLinkChange {
   requirement_id: string;
   change_type: TraceLinkChangeType;
@@ -221,15 +215,6 @@ export interface RequirementReviewResponse {
   determinism: DeterminismContext;
 }
 
-export interface RequirementSetReviewResponse {
-  review_id: string | null;
-  overall: ReviewStatus;
-  category_results: CategoryResult[];
-  findings: ReviewFinding[];
-  requirement_count: number;
-  determinism: DeterminismContext;
-}
-
 export interface DeltaChangeSummary {
   new_requirement_ids: string[];
   modified_requirement_ids: string[];
@@ -249,7 +234,6 @@ export interface DeltaReviewResponse {
   overall: ReviewStatus;
   change_summary: DeltaChangeSummary;
   reviewed_requirements: DeltaRequirementReviewResult[];
-  requirement_set_findings: ReviewFinding[];
   determinism: DeterminismContext;
 }
 

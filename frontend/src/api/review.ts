@@ -6,8 +6,6 @@ import type {
   DeltaReviewResponse,
   RequirementReviewInput,
   RequirementReviewResponse,
-  RequirementSetReviewInput,
-  RequirementSetReviewResponse,
   ReviewHistoryEntry,
   ReviewHistoryListResponse,
   ReviewWorkflow,
@@ -19,16 +17,6 @@ export async function reviewRequirement(
 ): Promise<RequirementReviewResponse> {
   const { data } = await apiClient.post<APIResponse<RequirementReviewResponse>>(
     '/review/requirement',
-    payload
-  );
-  return data.data;
-}
-
-export async function reviewRequirementSet(
-  payload: RequirementSetReviewInput
-): Promise<RequirementSetReviewResponse> {
-  const { data } = await apiClient.post<APIResponse<RequirementSetReviewResponse>>(
-    '/review/requirement-set',
     payload
   );
   return data.data;

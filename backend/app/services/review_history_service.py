@@ -14,12 +14,10 @@ from app.models.review_history_models import (
     ReviewWorkflow,
     create_delta_history_entry,
     create_requirement_history_entry,
-    create_requirement_set_history_entry,
 )
 from app.models.review_models import (
     DeltaReviewResponse,
     RequirementReviewResponse,
-    RequirementSetReviewResponse,
 )
 from app.repositories.review_history_repository import ReviewHistoryRepository
 
@@ -37,21 +35,6 @@ class ReviewHistoryService:
     ) -> str:
         review_id = self._new_review_id()
         entry = create_requirement_history_entry(
-            review_id=review_id,
-            created_at=self._utc_now(),
-            subject_id=subject_id,
-            response=response,
-        )
-        self._repository.add_entry(entry)
-        return review_id
-
-    def record_requirement_set_review(
-        self,
-        subject_id: str | None,
-        response: RequirementSetReviewResponse,
-    ) -> str:
-        review_id = self._new_review_id()
-        entry = create_requirement_set_history_entry(
             review_id=review_id,
             created_at=self._utc_now(),
             subject_id=subject_id,

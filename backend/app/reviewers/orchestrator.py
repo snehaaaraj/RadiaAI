@@ -12,8 +12,6 @@ from app.models.review_models import (
     DeterminismContext,
     RequirementReviewInput,
     RequirementReviewResponse,
-    RequirementSetReviewInput,
-    RequirementSetReviewResponse,
     ReviewStatus,
     ReviewVersionEntry,
     ReviewVersionResponse,
@@ -61,29 +59,6 @@ class ReviewOrchestrator:
             determinism=self.build_version_response().determinism,
         )
 
-    def review_requirement_set(
-        self, payload: RequirementSetReviewInput
-    ) -> RequirementSetReviewResponse:
-        """Run all reviewers that support requirement set review."""
-        reviewer_results = [
-            reviewer.review_requirement_set(payload)
-            for reviewer in self._reviewers
-            if reviewer.supports_requirement_set_review
-        ]
-        findings = self._enrich_findings([finding for result in reviewer_results for finding in result.findings])
-        category_results = [
-            CategoryResult(category=result.reviewer, status=result.overall)
-            for result in reviewer_results
-        ]
-        overall = overall_from_statuses([result.overall for result in reviewer_results])
-        return RequirementSetReviewResponse(
-            overall=overall,
-            category_results=category_results,
-            findings=findings,
-            requirement_count=len(payload.requirements),
-            determinism=self.build_version_response().determinism,
-        )
-
     def build_version_response(self) -> ReviewVersionResponse:
         """Return deterministic reviewer/prompt/standards version metadata."""
         prompt_versions = {reviewer.name: reviewer.prompt_version for reviewer in self._reviewers}
@@ -108,7 +83,7 @@ class ReviewOrchestrator:
 
         return ReviewVersionResponse(
             product="Radia AI Requirements Engineering Assistant",
-            workflow_default="requirement-set-review",
+            workflow_default="requirement",
             determinism=determinism_context,
             reviewers=[
                 ReviewVersionEntry(
@@ -117,7 +92,6 @@ class ReviewOrchestrator:
                     prompt_version=reviewer.prompt_version,
                     standards_version=reviewer.standards_version,
                     supports_individual_review=reviewer.supports_individual_review,
-                    supports_requirement_set_review=reviewer.supports_requirement_set_review,
                 )
                 for reviewer in self._reviewers
             ],

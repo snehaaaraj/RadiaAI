@@ -110,7 +110,6 @@ RadiaAi-2.0/
 - Animated page transitions and cards using **Framer Motion**
 - Persistent review form/results state across navigation for:
   - individual requirement review
-  - requirement set review
   - delta review
 - Explicit **Clear Review** actions to reset persisted review state
 - Auto-scroll to score/result area after a review completes
@@ -199,7 +198,6 @@ pytest --cov=app                # with coverage report
 | GET | `/api/v1/review/version` | Reviewer/prompt/standards determinism metadata |
 | GET | `/api/v1/standards` | Standards/reference libraries used by reviewers |
 | POST | `/api/v1/review/requirement` | Deterministic individual requirement review |
-| POST | `/api/v1/review/requirement-set` | Deterministic requirement set review |
 | POST | `/api/v1/review/delta` | Deterministic incremental delta review |
 | GET | `/api/v1/review/history` | List stored review runs and findings |
 | POST | `/api/v1/review/history/{review_id}/disposition` | Apply finding disposition (Accepted/Rejected/Deferred) |
