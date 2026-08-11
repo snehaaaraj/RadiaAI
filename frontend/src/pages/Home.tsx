@@ -8,7 +8,6 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid2';
 import RuleIcon from '@mui/icons-material/Rule';
-import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
@@ -19,13 +18,6 @@ import { useHealth } from '@/hooks/useHealth';
 import { ROUTES } from '@/utils/constants';
 
 const QUICK_ACTIONS = [
-  {
-    title: 'Requirement Set Review',
-    description: 'Review an entire specification for duplicates, overlaps, contradictions, and traceability gaps.',
-    icon: <PlaylistAddCheckIcon color="primary" />,
-    path: ROUTES.REVIEW_REQUIREMENT_SET,
-    label: 'Open set review',
-  },
   {
     title: 'Single Requirement Review',
     description: 'Check one requirement for language, structure, and verifiability.',
@@ -140,13 +132,12 @@ export default function Home() {
               What this app does
             </Typography>
             <Typography variant="body2" color="text.secondary">
-              It supports single requirement review, set review, delta review, review history, and
-              standards references for aerospace requirements engineering.
+              It supports single requirement review, delta review, review history, and standards
+              references for aerospace requirements engineering.
             </Typography>
             <Divider sx={{ my: 2 }} />
             <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
               <Chip label="Single Review" size="small" />
-              <Chip label="Set Review" size="small" />
               <Chip label="Delta Review" size="small" />
               <Chip label="Standards" size="small" />
               <Chip icon={<RocketLaunchIcon />} label="Launch-ready workflow" size="small" />

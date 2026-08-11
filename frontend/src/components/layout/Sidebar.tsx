@@ -11,7 +11,6 @@ import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import HomeIcon from '@mui/icons-material/Home';
 import RuleIcon from '@mui/icons-material/Rule';
-import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
@@ -25,7 +24,6 @@ import { RadiaMark } from './RadiaMark';
 
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
-  { label: 'Set Review', icon: <PlaylistAddCheckIcon />, path: ROUTES.REVIEW_REQUIREMENT_SET },
   { label: 'Single Review', icon: <RuleIcon />, path: ROUTES.REVIEW_REQUIREMENT },
   { label: 'Delta Review', icon: <CompareArrowsIcon />, path: ROUTES.REVIEW_DELTA },
   { label: 'Review History', icon: <HistoryIcon />, path: ROUTES.REVIEW_HISTORY },
