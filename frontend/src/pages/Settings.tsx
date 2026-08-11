@@ -312,32 +312,6 @@ export default function Settings() {
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, x: 14 }}
               animate={reduceMotion ? {} : { opacity: 1, x: 0 }}
-              transition={{ duration: 0.3, ease: 'easeOut', delay: 0.1 }}
-            >
-              <Card>
-                <CardContent>
-                  <Typography variant="h6" fontWeight={700} gutterBottom>
-                    Active profile
-                  </Typography>
-                  <Stack spacing={1}>
-                    <Chip label={`Theme: ${themePreference}`} variant="outlined" />
-                    <Chip label={`Accent: ${accentColor}`} variant="outlined" />
-                    <Chip label={`Density: ${uiDensity}`} variant="outlined" />
-                    <Chip label={`Motion: ${motionPreference}`} variant="outlined" />
-                    <Chip
-                      label={`Launch page: ${
-                        START_PAGE_OPTIONS.find((option) => option.value === defaultWorkspaceRoute)?.label ?? 'Workspace Home'
-                      }`}
-                      variant="outlined"
-                    />
-                  </Stack>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0, x: 14 }}
-              animate={reduceMotion ? {} : { opacity: 1, x: 0 }}
               transition={{ duration: 0.3, ease: 'easeOut', delay: 0.14 }}
             >
               <Card>

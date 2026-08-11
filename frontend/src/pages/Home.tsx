@@ -62,35 +62,22 @@ export default function Home() {
         animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
         transition={{ duration: 0.24, ease: 'easeOut', delay: 0.06 }}
       >
-        <Card>
-          <CardContent>
-            <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
-              <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  System status
-                </Typography>
-                <Box mt={1}>
-                  {isLoading ? (
-                    <Chip label="Checking..." size="small" />
-                  ) : (
-                    <Chip
-                      icon={<CheckCircleIcon />}
-                      label={`API ${health?.status ?? 'unknown'} — v${health?.version ?? '—'}`}
-                      color={health?.status === 'ok' ? 'success' : 'warning'}
-                      size="small"
-                      variant="outlined"
-                    />
-                  )}
-                </Box>
-              </Box>
-              <Box display="flex" gap={1} flexWrap="wrap">
-                <Chip label="Deterministic" variant="outlined" />
-                <Chip label="Explainable" variant="outlined" />
-                <Chip label="Traceable" variant="outlined" />
-              </Box>
-            </Box>
-          </CardContent>
-        </Card>
+        <Box display="flex" justifyContent="flex-end" alignItems="center" gap={2}>
+          <Typography variant="subtitle2" color="text.secondary">
+            System status
+          </Typography>
+          {isLoading ? (
+            <Chip label="Checking..." size="small" />
+          ) : (
+            <Chip
+              icon={<CheckCircleIcon />}
+              label={`API ${health?.status ?? 'unknown'} — v${health?.version ?? '—'}`}
+              color={health?.status === 'ok' ? 'success' : 'warning'}
+              size="small"
+              variant="outlined"
+            />
+          )}
+        </Box>
       </motion.div>
 
       <Grid container spacing={2}>
@@ -120,31 +107,6 @@ export default function Home() {
           </Grid>
         ))}
       </Grid>
-
-      <motion.div
-        initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-        animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-        transition={{ duration: 0.24, ease: 'easeOut', delay: 0.2 }}
-      >
-        <Card>
-          <CardContent>
-            <Typography variant="h6" fontWeight={700} gutterBottom>
-              What this app does
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              It supports single requirement review, delta review, review history, and standards
-              references for aerospace requirements engineering.
-            </Typography>
-            <Divider sx={{ my: 2 }} />
-            <Box display="flex" gap={1} flexWrap="wrap" alignItems="center">
-              <Chip label="Single Review" size="small" />
-              <Chip label="Delta Review" size="small" />
-              <Chip label="Standards" size="small" />
-              <Chip icon={<RocketLaunchIcon />} label="Launch-ready workflow" size="small" />
-            </Box>
-          </CardContent>
-        </Card>
-      </motion.div>
     </Stack>
   );
 }
