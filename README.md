@@ -44,10 +44,10 @@ RadiaAi-2.0/
 │   │   ├── api/v1/endpoints/   # HTTP endpoint handlers (thin — no logic)
 │   │   ├── core/               # config, logging, exceptions, security
 │   │   ├── schemas/            # Pydantic v2 request/response models
-│   │   ├── services/           # business logic (Phase 2+)
-│   │   ├── rag/                # RAG pipeline (Phase 4)
-│   │   ├── ingestion/          # ingestion pipeline (Phase 2)
-│   │   ├── connectors/         # document source connectors (Phase 2+)
+│   │   ├── services/           # business logic and orchestration
+│   │   ├── rag/                # retrieval-augmented generation components
+│   │   ├── ingestion/          # document ingestion pipeline
+│   │   ├── connectors/         # source system adapters
 │   │   ├── dependencies/       # FastAPI DI container
 │   │   └── main.py             # app factory
 │   ├── tests/
@@ -76,16 +76,22 @@ RadiaAi-2.0/
 
 ---
 
-## Phase Roadmap
+## Functional Coverage Status
 
-| Phase | Scope | Status |
-|-------|-------|--------|
-| 1 | Repo structure, Docker, config, FastAPI skeleton, React skeleton | **Complete** |
-| 2 | Azure wrappers, ingestion pipeline, chunking, embeddings | Planned |
-| 3 | Azure AI Search indexing + search service | Planned |
-| 4 | RAG pipeline (retrieval → prompt → LLM) | Planned |
-| 5 | React chat interface (full UI) | Planned |
-| 6 | Testing, logging, monitoring | Planned |
+### Requirements analysis workflow
+
+- [x] Upload or copy/paste requirement content
+- [x] Color-coded overall scoring
+- [x] Sub-category scoring displayed directly below overall score
+- [x] Persistent review state across navigation with explicit **Clear Review**
+
+### AI-assisted modification workflow
+
+- [x] AI-generated suggested changes from findings
+- [x] Detailed change-set display:
+  - [x] What was changed
+  - [x] Source-of-truth standard reference with direct link
+  - [x] Supporting evidence/context for each change
 
 ---
 
@@ -228,7 +234,7 @@ Key settings:
 ## Security Notes
 
 - Secrets are loaded from `.env` (never committed to git)
-- Authentication uses Microsoft Entra ID (stubbed in Phase 1, active in Phase 2)
+- Authentication supports Microsoft Entra ID configuration with local development fallback
 - All API responses use a standardized error envelope (no stack traces exposed)
 - Containers run as non-root users
 - Input validation via Pydantic v2 on all endpoints

@@ -14,6 +14,7 @@ import Typography from '@mui/material/Typography';
 import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { FindingCard } from '@/components/review/FindingCard';
+import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useRequirementReview } from '@/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
@@ -109,7 +110,7 @@ export default function RequirementReview() {
           Individual Requirement Review
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Deterministic review across language, structure, and verifiability categories.
+          Deterministic review across syntax, correctness, and verifiability categories.
         </Typography>
       </Box>
 
@@ -266,32 +267,33 @@ export default function RequirementReview() {
               </Box>
               <CategoryScoreGrid categories={activeResult.category_results} />
               <Divider />
+              <ReviewChangeSet findings={activeResult.findings} />
+              <Divider />
               <Box>
-            <Typography variant="h6" fontWeight={800} gutterBottom>
-              Suggested changes
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Findings are color-coded by severity and highlight the recommended improvement plus the
-              standards source behind it.
-            </Typography>
+                <Typography variant="h6" fontWeight={800} gutterBottom>
+                  Detailed findings
+                </Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Expand each item for explanation, evidence, and reviewer disposition controls.
+                </Typography>
               </Box>
               <Stack spacing={1.5}>
-            {activeResult.findings.length === 0 ? (
-              <Alert severity="success">No findings. Requirement is acceptable.</Alert>
-            ) : (
-              activeResult.findings.map((finding, index) => (
-                <FindingCard
-                  key={`${finding.category}-${index}`}
-                  finding={finding}
-                  index={index}
-                  reviewId={activeResult.review_id}
-                  onApplyDisposition={(reviewId, payload) =>
-                    applyDisposition({ reviewId, payload })
-                  }
-                  isApplyingDisposition={isApplyingDisposition}
-                />
-              ))
-            )}
+                {activeResult.findings.length === 0 ? (
+                  <Alert severity="success">No findings. Requirement is acceptable.</Alert>
+                ) : (
+                  activeResult.findings.map((finding, index) => (
+                    <FindingCard
+                      key={`${finding.category}-${index}`}
+                      finding={finding}
+                      index={index}
+                      reviewId={activeResult.review_id}
+                      onApplyDisposition={(reviewId, payload) =>
+                        applyDisposition({ reviewId, payload })
+                      }
+                      isApplyingDisposition={isApplyingDisposition}
+                    />
+                  ))
+                )}
               </Stack>
             </Stack>
           </Paper>
