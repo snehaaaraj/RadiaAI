@@ -62,7 +62,10 @@ export default function Home() {
         animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
         transition={{ duration: 0.24, ease: 'easeOut', delay: 0.06 }}
       >
-        <Box display="flex" justifyContent="flex-end">
+        <Box display="flex" justifyContent="flex-end" alignItems="center" gap={2}>
+          <Typography variant="subtitle2" color="text.secondary">
+            System status
+          </Typography>
           {isLoading ? (
             <Chip label="Checking..." size="small" />
           ) : (
