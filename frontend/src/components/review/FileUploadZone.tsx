@@ -6,6 +6,10 @@ import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import mammoth from 'mammoth/mammoth.browser';
+import * as pdfjsLib from 'pdfjs-dist';
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
 interface FileUploadZoneProps {
   /** Comma-separated MIME types or extensions, e.g. ".txt,.json,.csv" */
@@ -28,6 +32,24 @@ function normalizeText(content: string) {
     .trim();
 }
 
+async function extractPdfText(arrayBuffer: ArrayBuffer) {
+  const document = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const pageTexts: string[] = [];
+
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    const page = await document.getPage(pageNumber);
+    const textContent = await page.getTextContent();
+    const pageText = textContent.items
+      .map((item) => ('str' in item ? item.str : ''))
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+    if (pageText) pageTexts.push(pageText);
+  }
+
+  return normalizeText(pageTexts.join('\n\n'));
+}
+
 export function FileUploadZone({ accept, label, onFileContent, filename, onClear }: FileUploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -40,10 +62,11 @@ export function FileUploadZone({ accept, label, onFileContent, filename, onClear
       const isDocx =
         lowerName.endsWith('.docx') ||
         file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      const isPdf = lowerName.endsWith('.pdf') || file.type === 'application/pdf';
 
       try {
         if (lowerName.endsWith('.doc')) {
-          setReadError('Legacy .doc files are not supported. Please upload a .docx or .txt file.');
+          setReadError('Legacy .doc files are not supported. Please upload a .docx, .pdf, or .txt file.');
           return;
         }
 
@@ -51,6 +74,13 @@ export function FileUploadZone({ accept, label, onFileContent, filename, onClear
           const arrayBuffer = await file.arrayBuffer();
           const result = await mammoth.extractRawText({ arrayBuffer });
           onFileContent(normalizeText(result.value), file.name);
+          return;
+        }
+
+        if (isPdf) {
+          const arrayBuffer = await file.arrayBuffer();
+          const content = await extractPdfText(arrayBuffer);
+          onFileContent(content, file.name);
           return;
         }
 

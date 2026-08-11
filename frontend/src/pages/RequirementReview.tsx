@@ -202,8 +202,8 @@ export default function RequirementReview() {
               />
             ) : (
               <FileUploadZone
-                accept=".txt,.docx"
-                label="Upload a .txt or Word .docx document containing the requirement"
+                accept=".txt,.docx,.pdf"
+                label="Upload a .txt, Word .docx, or .pdf document containing the requirement"
                 onFileContent={handleFileContent}
                 filename={uploadedFilename}
                 onClear={handleClearFile}
