@@ -64,29 +64,22 @@ export default function Home() {
       >
         <Card>
           <CardContent>
-            <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
+            <Box display="flex" alignItems="center" justifyContent="space-between" gap={2}>
+              <Typography variant="subtitle2" color="text.secondary">
+                System status
+              </Typography>
               <Box>
-                <Typography variant="subtitle2" color="text.secondary">
-                  System status
-                </Typography>
-                <Box mt={1}>
-                  {isLoading ? (
-                    <Chip label="Checking..." size="small" />
-                  ) : (
-                    <Chip
-                      icon={<CheckCircleIcon />}
-                      label={`API ${health?.status ?? 'unknown'} — v${health?.version ?? '—'}`}
-                      color={health?.status === 'ok' ? 'success' : 'warning'}
-                      size="small"
-                      variant="outlined"
-                    />
-                  )}
-                </Box>
-              </Box>
-              <Box display="flex" gap={1} flexWrap="wrap">
-                <Chip label="Deterministic" variant="outlined" />
-                <Chip label="Explainable" variant="outlined" />
-                <Chip label="Traceable" variant="outlined" />
+                {isLoading ? (
+                  <Chip label="Checking..." size="small" />
+                ) : (
+                  <Chip
+                    icon={<CheckCircleIcon />}
+                    label={`API ${health?.status ?? 'unknown'} — v${health?.version ?? '—'}`}
+                    color={health?.status === 'ok' ? 'success' : 'warning'}
+                    size="small"
+                    variant="outlined"
+                  />
+                )}
               </Box>
             </Box>
           </CardContent>
