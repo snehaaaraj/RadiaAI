@@ -7,7 +7,7 @@ import { Sidebar } from './Sidebar';
 import { NavigationConfirmDialog } from '@/components/common/NavigationConfirmDialog';
 import { NavigationGuardProvider, useNavigationGuardContext } from '@/context/NavigationGuardContext';
 import { useAppContext } from '@/context/AppContext';
-import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
+import { HEADER_HEIGHT, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 
 function AppLayoutInner() {
   const { sidebarOpen, motionPreference, uiDensity } = useAppContext();
@@ -37,7 +37,7 @@ function AppLayoutInner() {
         }}
       >
         {/* Push content below the AppBar */}
-        <Toolbar />
+        <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important` }} />
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
