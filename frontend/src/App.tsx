@@ -107,20 +107,22 @@ function StartupSplash() {
             color: '#FFFFFF',
           }}
         >
+          <Box
+            component="img"
+            src={logoSrc}
+            alt=""
+            sx={{
+              position: 'absolute',
+              width: { xs: 180, md: 240 },
+              height: { xs: 180, md: 240 },
+              objectFit: 'contain',
+              opacity: 0.16,
+              filter: 'grayscale(1) brightness(1.25)',
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          />
           <Stack direction="row" spacing={1.25} alignItems="center">
-            <Box
-              component="img"
-              src={logoSrc}
-              alt="Radia logo"
-              sx={{
-                width: { xs: 38, md: 46 },
-                height: { xs: 38, md: 46 },
-                objectFit: 'contain',
-                opacity: 0.85,
-                pointerEvents: 'none',
-                userSelect: 'none',
-              }}
-            />
             <Typography variant="h3" fontWeight={900} letterSpacing={1.2}>
               Radia AI
             </Typography>
