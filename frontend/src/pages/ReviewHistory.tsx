@@ -11,7 +11,7 @@ import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useApplyFindingDisposition, useReviewHistory } from '@/hooks/useReviewHistory';
+import { useReviewHistory } from '@/hooks/useReviewHistory';
 import type { FindingDispositionStatus, ReviewWorkflow } from '@/types/api';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 
@@ -33,7 +33,6 @@ export default function ReviewHistory() {
   const [dispositionFilter, setDispositionFilter] = useState<FindingDispositionStatus | 'all'>('all');
   const selectedWorkflow = workflow === 'all' ? undefined : workflow;
   const { data, isLoading, isError, error } = useReviewHistory(selectedWorkflow, 50);
-  const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
 
   const filteredEntries = useMemo(() => {
     if (!data?.entries) return [];
@@ -129,10 +128,7 @@ export default function ReviewHistory() {
                         index={index}
                         reviewId={entry.review_id}
                         disposition={disposition}
-                        onApplyDisposition={(reviewId, payload) =>
-                          applyDisposition({ reviewId, payload })
-                        }
-                        isApplyingDisposition={isApplyingDisposition}
+                        readOnly
                       />
                     );
                   })}

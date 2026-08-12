@@ -38,6 +38,7 @@ interface FindingCardProps {
   disposition?: FindingDisposition;
   onApplyDisposition?: (reviewId: string, payload: ApplyFindingDispositionRequest) => void;
   isApplyingDisposition?: boolean;
+  readOnly?: boolean;
 }
 
 export function FindingCard({
@@ -47,6 +48,7 @@ export function FindingCard({
   disposition,
   onApplyDisposition,
   isApplyingDisposition = false,
+  readOnly = false,
 }: FindingCardProps) {
   const [selectedDisposition, setSelectedDisposition] = useState<FindingDispositionStatus | ''>(
     disposition?.disposition ?? ''
@@ -172,7 +174,50 @@ export function FindingCard({
                 </Typography>
               </Box>
 
-              {onApplyDisposition && (
+              {/* Read-only disposition tag (Review History view) */}
+              {readOnly && disposition && (
+                <>
+                  <Divider />
+                  <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
+                    <Typography variant="subtitle2" fontWeight={700}>
+                      Reviewer disposition
+                    </Typography>
+                    <Chip
+                      label={disposition.disposition}
+                      size="small"
+                      color={
+                        disposition.disposition === 'Accepted'
+                          ? 'success'
+                          : disposition.disposition === 'Rejected'
+                            ? 'error'
+                            : 'warning'
+                      }
+                      variant="filled"
+                    />
+                  </Box>
+                  {disposition.reviewer_comment && (
+                    <Box
+                      sx={{
+                        p: 1.25,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        bgcolor: 'action.hover',
+                      }}
+                    >
+                      <Typography variant="overline" color="text.secondary">
+                        Reviewer comment
+                      </Typography>
+                      <Typography variant="body2" mt={0.5}>
+                        {disposition.reviewer_comment}
+                      </Typography>
+                    </Box>
+                  )}
+                </>
+              )}
+
+              {/* Editable disposition controls (Single / Delta Review view) */}
+              {!readOnly && onApplyDisposition && (
                 <>
                   <Divider />
                   <Typography variant="subtitle2" fontWeight={700}>
