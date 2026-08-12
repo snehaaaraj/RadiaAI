@@ -21,7 +21,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
-import { ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
+import { HEADER_HEIGHT, ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
@@ -213,9 +213,9 @@ export function Sidebar() {
     <Box
       sx={{
         position: 'fixed',
-        top: '64px',
+        top: `${HEADER_HEIGHT}px`,
         left: 0,
-        height: 'calc(100% - 64px)',
+        height: `calc(100% - ${HEADER_HEIGHT}px)`,
         width: currentWidth,
         transition: (theme) =>
           theme.transitions.create('width', {

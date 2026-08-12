@@ -4,6 +4,7 @@
  */
 
 export const APP_NAME = 'Radia AI';
+export const HEADER_HEIGHT = 84;
 export const SIDEBAR_WIDTH = 248;
 export const SIDEBAR_COLLAPSED_WIDTH = 76;
 

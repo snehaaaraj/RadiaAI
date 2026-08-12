@@ -18,7 +18,7 @@ import type { KeyboardEvent, MouseEvent } from 'react';
 import { useMemo, useState } from 'react';
 import { RadiaMark } from './RadiaMark';
 import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
-import { ROUTES } from '@/utils/constants';
+import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 
 type HeaderSearchOption = {
   label: string;
@@ -91,7 +91,7 @@ export function TopBar() {
         boxShadow: 'none',
       }}
     >
-      <Toolbar sx={{ gap: 1.5, color: headerForegroundColor }}>
+      <Toolbar sx={{ gap: 1.5, color: headerForegroundColor, minHeight: `${HEADER_HEIGHT}px !important` }}>
         <RadiaMark size={32} />
         <Link
           href="https://radia.com/"
