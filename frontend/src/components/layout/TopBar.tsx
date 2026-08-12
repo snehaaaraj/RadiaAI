@@ -9,6 +9,7 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Autocomplete from '@mui/material/Autocomplete';
 import InputAdornment from '@mui/material/InputAdornment';
+import { useTheme } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import BugReportIcon from '@mui/icons-material/BugReport';
@@ -34,10 +35,11 @@ const HEADER_SEARCH_OPTIONS: HeaderSearchOption[] = [
   { label: 'Settings', path: ROUTES.SETTINGS, keywords: ['settings', 'preferences'] },
 ];
 
-const SUPPORT_EMAIL = 'support@radia.com';
-const BUG_REPORT_EMAIL = 'support@radia.com';
+const SUPPORT_EMAIL = 'sneha.nagaraju@radia.com';
+const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
 
 export function TopBar() {
+  const theme = useTheme();
   const { guardedNavigate } = useNavigationGuardContext();
   const [searchValue, setSearchValue] = useState<HeaderSearchOption | null>(null);
   const [searchInputValue, setSearchInputValue] = useState('');
@@ -93,12 +95,12 @@ export function TopBar() {
           target="_blank"
           rel="noopener noreferrer"
           underline="none"
-          color="text.primary"
+          color={theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659'}
           variant="h6"
           fontWeight={800}
           sx={{ '&:hover': { textDecoration: 'underline' } }}
         >
-          Radia
+          RADIA
         </Link>
         <Box sx={{ width: 3, height: 24, bgcolor: 'text.primary', borderRadius: 1 }} />
         <Link
@@ -149,7 +151,7 @@ export function TopBar() {
           onClick={openSupport}
           sx={{ textTransform: 'none', minWidth: 'auto', fontWeight: 600 }}
         >
-          Support
+          Contact
         </Button>
         <Popover
           open={Boolean(supportAnchor)}
