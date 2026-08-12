@@ -7,6 +7,7 @@ import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -51,6 +52,7 @@ export function FindingCard({
     disposition?.disposition ?? ''
   );
   const [comment, setComment] = useState(disposition?.reviewer_comment ?? '');
+  const [saved, setSaved] = useState(false);
 
   const canSubmitDisposition = useMemo(
     () => Boolean(reviewId && selectedDisposition && onApplyDisposition),
@@ -194,22 +196,32 @@ export function FindingCard({
                     value={comment}
                     onChange={(event) => setComment(event.target.value)}
                   />
-                  <Box>
+                  <Box display="flex" alignItems="center" gap={1.5}>
                     <Button
                       variant="contained"
                       size="small"
                       disabled={!canSubmitDisposition || isApplyingDisposition}
                       onClick={() => {
                         if (!reviewId || !selectedDisposition || !onApplyDisposition) return;
+                        setSaved(false);
                         onApplyDisposition(reviewId, {
                           finding_index: index,
                           disposition: selectedDisposition,
                           reviewer_comment: comment,
                         });
+                        setSaved(true);
                       }}
                     >
                       Save disposition
                     </Button>
+                    {saved && (
+                      <Box display="flex" alignItems="center" gap={0.5} sx={{ color: 'success.main' }}>
+                        <CheckCircleIcon fontSize="small" />
+                        <Typography variant="caption" fontWeight={700} color="success.main">
+                          Saved
+                        </Typography>
+                      </Box>
+                    )}
                   </Box>
                 </>
               )}
