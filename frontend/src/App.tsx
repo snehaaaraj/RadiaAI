@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { Box, CssBaseline, Stack, ThemeProvider, Typography } from '@mui/material';
-import { useTheme } from '@mui/material/styles';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
@@ -21,7 +20,6 @@ import { createAppTheme } from '@/theme';
 import { ROUTES } from '@/utils/constants';
 import useMediaQuery from '@mui/material/useMediaQuery';
 
-const lightLogoUrl = new URL('./assets/radia-circle-white background.png', import.meta.url).href;
 const darkLogoUrl = new URL('./assets/radia-circle-white lines.jpg', import.meta.url).href;
 
 const queryClient = new QueryClient({
@@ -82,9 +80,8 @@ function ThemeShell({ children }: { children: ReactNode }) {
 }
 
 function StartupSplash() {
-  const theme = useTheme();
   const [visible, setVisible] = useState(true);
-  const logoSrc = theme.palette.mode === 'dark' ? darkLogoUrl : lightLogoUrl;
+  const logoSrc = darkLogoUrl;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setVisible(false), 1700);
@@ -110,20 +107,20 @@ function StartupSplash() {
             color: '#FFFFFF',
           }}
         >
-          <Box
-            component="img"
-            src={logoSrc}
-            alt=""
-            sx={{
-              position: 'absolute',
-              width: { xs: 140, md: 180 },
-              height: { xs: 140, md: 180 },
-              opacity: 0.1,
-              pointerEvents: 'none',
-              userSelect: 'none',
-            }}
-          />
           <Stack direction="row" spacing={1.25} alignItems="center">
+            <Box
+              component="img"
+              src={logoSrc}
+              alt="Radia logo"
+              sx={{
+                width: { xs: 38, md: 46 },
+                height: { xs: 38, md: 46 },
+                objectFit: 'contain',
+                opacity: 0.85,
+                pointerEvents: 'none',
+                userSelect: 'none',
+              }}
+            />
             <Typography variant="h3" fontWeight={900} letterSpacing={1.2}>
               Radia AI
             </Typography>
