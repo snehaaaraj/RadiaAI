@@ -108,27 +108,83 @@ export function TopBar() {
             position: 'relative',
             display: 'inline-flex',
             alignItems: 'center',
-            transition: 'transform 160ms ease',
+            overflow: 'visible',
+            transition: 'transform 180ms ease',
             '&:hover': {
               textDecoration: 'none',
-              transform: 'scale(1.07)',
+              transform: 'scale(1.05)',
             },
-            '& .radia-hover-plane': {
+            '@keyframes radiaPlaneFly': {
+              '0%': {
+                opacity: 0,
+                transform: 'translate(-18px, 12px) rotate(-18deg) scale(0.9)',
+              },
+              '20%': {
+                opacity: 0.95,
+              },
+              '100%': {
+                opacity: 0,
+                transform: 'translate(26px, -14px) rotate(4deg) scale(1)',
+              },
+            },
+            '@keyframes radiaTrailFade': {
+              '0%': {
+                opacity: 0,
+                transform: 'scaleX(0.55)',
+              },
+              '35%': {
+                opacity: 0.4,
+              },
+              '100%': {
+                opacity: 0,
+                transform: 'scaleX(1.15)',
+              },
+            },
+            '& .radia-hover-flight': {
               position: 'absolute',
-              left: -22,
-              top: -6,
+              left: -26,
+              top: -8,
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               fontSize: 20,
               opacity: 0,
-              transform: 'translateX(-18px) translateY(12px) rotate(-16deg)',
-              transition: 'transform 260ms ease, opacity 220ms ease',
+              pointerEvents: 'none',
+              willChange: 'transform, opacity',
             },
-            '&:hover .radia-hover-plane': {
-              opacity: 0.95,
-              transform: 'translateX(22px) translateY(-12px) rotate(2deg)',
+            '& .radia-hover-plane': {
+              fontSize: 20,
+            },
+            '& .radia-hover-trail': {
+              position: 'absolute',
+              left: -10,
+              top: 16,
+              width: 24,
+              height: 2,
+              borderRadius: 999,
+              bgcolor: headerForegroundColor,
+              opacity: 0,
+              transformOrigin: 'left center',
+              pointerEvents: 'none',
+            },
+            '&:hover .radia-hover-flight': {
+              animation: 'radiaPlaneFly 520ms cubic-bezier(0.22, 1, 0.36, 1)',
+            },
+            '&:hover .radia-hover-trail': {
+              animation: 'radiaTrailFade 500ms ease-out',
+            },
+            '@media (prefers-reduced-motion: reduce)': {
+              transition: 'none',
+              '&:hover': { transform: 'none' },
+              '&:hover .radia-hover-flight': { animation: 'none', opacity: 0 },
+              '&:hover .radia-hover-trail': { animation: 'none', opacity: 0 },
             },
           }}
         >
-          <FlightTakeoffIcon className="radia-hover-plane" />
+          <Box className="radia-hover-flight" aria-hidden>
+            <FlightTakeoffIcon className="radia-hover-plane" />
+            <Box className="radia-hover-trail" />
+          </Box>
           RADIA
         </Link>
         <Box sx={{ width: 3, height: 24, bgcolor: headerForegroundColor, borderRadius: 1 }} />
