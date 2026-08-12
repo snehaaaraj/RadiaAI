@@ -99,8 +99,8 @@ export function TopBar() {
           rel="noopener noreferrer"
           underline="none"
           color={headerForegroundColor}
-          variant="h6"
-          fontWeight={800}
+          variant="h5"
+          fontWeight={900}
           sx={{
             px: 1.3,
             py: 0.25,
