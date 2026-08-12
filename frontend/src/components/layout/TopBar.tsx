@@ -40,6 +40,7 @@ const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
 
 export function TopBar() {
   const theme = useTheme();
+  const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
   const { guardedNavigate } = useNavigationGuardContext();
   const [searchValue, setSearchValue] = useState<HeaderSearchOption | null>(null);
   const [searchInputValue, setSearchInputValue] = useState('');
@@ -88,26 +89,26 @@ export function TopBar() {
         boxShadow: 'none',
       }}
     >
-      <Toolbar sx={{ gap: 1.5 }}>
+      <Toolbar sx={{ gap: 1.5, color: headerForegroundColor }}>
         <RadiaMark size={32} />
         <Link
           href="https://radia.com/"
           target="_blank"
           rel="noopener noreferrer"
           underline="none"
-          color={theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659'}
+          color={headerForegroundColor}
           variant="h6"
           fontWeight={800}
           sx={{ '&:hover': { textDecoration: 'underline' } }}
         >
           RADIA
         </Link>
-        <Box sx={{ width: 3, height: 24, bgcolor: 'text.primary', borderRadius: 1 }} />
+        <Box sx={{ width: 3, height: 24, bgcolor: headerForegroundColor, borderRadius: 1 }} />
         <Link
           component="button"
           type="button"
           underline="none"
-          color="text.primary"
+          color={headerForegroundColor}
           variant="h6"
           fontWeight={800}
           onClick={() => guardedNavigate(ROUTES.LANDING)}
@@ -128,7 +129,15 @@ export function TopBar() {
           options={uniqueSearchOptions}
           getOptionLabel={(option) => option.label}
           size="small"
-          sx={{ width: 320 }}
+          sx={{
+            width: 320,
+            '& .MuiInputBase-root': {
+              color: headerForegroundColor,
+            },
+            '& .MuiOutlinedInput-notchedOutline': {
+              borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(47,70,89,0.35)',
+            },
+          }}
           renderInput={(params) => (
             <TextField
               {...params}
@@ -138,7 +147,7 @@ export function TopBar() {
                 ...params.InputProps,
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon fontSize="small" />
+                    <SearchIcon fontSize="small" sx={{ color: headerForegroundColor }} />
                   </InputAdornment>
                 ),
               }}
@@ -149,7 +158,7 @@ export function TopBar() {
         <Button
           color="inherit"
           onClick={openSupport}
-          sx={{ textTransform: 'none', minWidth: 'auto', fontWeight: 600 }}
+          sx={{ textTransform: 'none', minWidth: 'auto', fontWeight: 600, color: headerForegroundColor }}
         >
           Contact
         </Button>
