@@ -18,6 +18,7 @@ import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useRequirementReview } from '@/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
+import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
@@ -66,13 +67,34 @@ export default function RequirementReview() {
     error,
   } = useRequirementReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
+  const playReviewCompleteSound = useReviewCompleteSound();
+
+  const DISPOSITION_SAVED_KEY = 'requirement-review-disposition-saved';
+
+  // On mount: if disposition was saved last time, clear all review data
+  useEffect(() => {
+    if (sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true') {
+      sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
+      clearFormState();
+      clearPersistedResult();
+      setRequirementId(DEFAULT_FORM_STATE.requirementId);
+      setRequirementLevel(DEFAULT_FORM_STATE.requirementLevel);
+      setText(DEFAULT_FORM_STATE.text);
+      setInputMode(DEFAULT_FORM_STATE.inputMode);
+      setUploadedFilename(DEFAULT_FORM_STATE.uploadedFilename);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canSubmit = useMemo(() => text.trim().length > 0, [text]);
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
 
-  // Guard navigation when user has entered data or has a result
-  const isDirty = text.trim().length > 0 || !!activeResult || isPending;
+  const dispositionSavedThisSession = sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true';
+
+  // Guard navigation: dirty while input exists or result is unacknowledged.
+  // Once the user saves a disposition, the result is considered acknowledged.
+  const isDirty = (text.trim().length > 0 || !!activeResult || isPending) && !dispositionSavedThisSession;
   useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<RequirementReviewFormState>) => {
@@ -99,6 +121,7 @@ export default function RequirementReview() {
   const handleClearAll = () => {
     clearFormState();
     clearPersistedResult();
+    sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
     setRequirementId(DEFAULT_FORM_STATE.requirementId);
     setRequirementLevel(DEFAULT_FORM_STATE.requirementLevel);
     setText(DEFAULT_FORM_STATE.text);
@@ -234,6 +257,7 @@ export default function RequirementReview() {
                 }, {
                   onSuccess: (response) => {
                     setPersistedResult(response);
+                    playReviewCompleteSound();
                   },
                 })
               }
@@ -274,7 +298,10 @@ export default function RequirementReview() {
               <ReviewChangeSet
                 findings={activeResult.findings}
                 reviewId={activeResult.review_id}
-                onApplyDisposition={(reviewId, payload) => applyDisposition({ reviewId, payload })}
+                onApplyDisposition={(reviewId, payload) => {
+                  sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
+                  applyDisposition({ reviewId, payload });
+                }}
                 isApplyingDisposition={isApplyingDisposition}
               />
             </Stack>

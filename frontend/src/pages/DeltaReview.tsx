@@ -18,6 +18,7 @@ import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useDeltaReview } from '@/hooks/useDeltaReview';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
+import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
@@ -133,19 +134,47 @@ export default function DeltaReview() {
     error,
   } = useDeltaReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
+  const playReviewCompleteSound = useReviewCompleteSound();
+
+  const DISPOSITION_SAVED_KEY = 'delta-review-disposition-saved';
+
+  // On mount: if disposition was saved last time, clear all review data
+  useEffect(() => {
+    if (sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true') {
+      sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
+      clearFormState();
+      clearPersistedResult();
+      setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
+      setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
+      setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
+      setTraceJson(DEFAULT_DELTA_FORM_STATE.traceJson);
+      setParseError(DEFAULT_DELTA_FORM_STATE.parseError);
+      setBaselineMode(DEFAULT_DELTA_FORM_STATE.baselineMode);
+      setUpdatedMode(DEFAULT_DELTA_FORM_STATE.updatedMode);
+      setTraceMode(DEFAULT_DELTA_FORM_STATE.traceMode);
+      setBaselineFilename(DEFAULT_DELTA_FORM_STATE.baselineFilename);
+      setUpdatedFilename(DEFAULT_DELTA_FORM_STATE.updatedFilename);
+      setTraceFilename(DEFAULT_DELTA_FORM_STATE.traceFilename);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canSubmit = useMemo(() => baselineJson.trim() && updatedJson.trim(), [baselineJson, updatedJson]);
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
 
-  // Dirty = user has changed from the default sample values, is running a review, or has a result
-  const isDirty =
+  const dispositionSavedThisSession = sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true';
+
+  // Guard navigation: dirty while input is changed or result is unacknowledged.
+  // Once the user saves a disposition, the result is considered acknowledged.
+  const isDirty = (
     baselineJson !== DEFAULT_DELTA_FORM_STATE.baselineJson ||
     updatedJson !== DEFAULT_DELTA_FORM_STATE.updatedJson ||
     traceJson !== DEFAULT_DELTA_FORM_STATE.traceJson ||
     specificationId !== DEFAULT_DELTA_FORM_STATE.specificationId ||
     !!activeResult ||
-    isPending;
+    isPending
+  ) && !dispositionSavedThisSession;
   useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
@@ -160,6 +189,7 @@ export default function DeltaReview() {
   const handleClearAll = () => {
     clearFormState();
     clearPersistedResult();
+    sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
     setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
     setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
     setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
@@ -393,6 +423,7 @@ export default function DeltaReview() {
                   runDeltaReview(payload, {
                     onSuccess: (response) => {
                       setPersistedResult(response);
+                      playReviewCompleteSound();
                     },
                   });
                 } catch (parseException) {
@@ -465,9 +496,10 @@ export default function DeltaReview() {
                       <ReviewChangeSet
                         findings={reviewedRequirement.findings}
                         reviewId={activeResult.review_id}
-                        onApplyDisposition={(reviewId, payload) =>
-                          applyDisposition({ reviewId, payload })
-                        }
+                        onApplyDisposition={(reviewId, payload) => {
+                          sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
+                          applyDisposition({ reviewId, payload });
+                        }}
                         isApplyingDisposition={isApplyingDisposition}
                       />
                     </Stack>

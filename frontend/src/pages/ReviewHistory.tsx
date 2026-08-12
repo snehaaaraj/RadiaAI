@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -11,8 +11,8 @@ import { FindingCard } from '@/components/review/FindingCard';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useApplyFindingDisposition, useReviewHistory } from '@/hooks/useReviewHistory';
-import type { ReviewWorkflow } from '@/types/api';
+import { useReviewHistory } from '@/hooks/useReviewHistory';
+import type { FindingDispositionStatus, ReviewWorkflow } from '@/types/api';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 const WORKFLOW_OPTIONS: Array<{ label: string; value: ReviewWorkflow | 'all' }> = [
@@ -21,11 +21,26 @@ const WORKFLOW_OPTIONS: Array<{ label: string; value: ReviewWorkflow | 'all' }> 
   { label: 'Delta', value: 'delta' },
 ];
 
+const DISPOSITION_OPTIONS: Array<{ label: string; value: FindingDispositionStatus | 'all' }> = [
+  { label: 'All dispositions', value: 'all' },
+  { label: 'Accepted', value: 'Accepted' },
+  { label: 'Rejected', value: 'Rejected' },
+  { label: 'Deferred', value: 'Deferred' },
+];
+
 export default function ReviewHistory() {
   const [workflow, setWorkflow] = useState<ReviewWorkflow | 'all'>('all');
+  const [dispositionFilter, setDispositionFilter] = useState<FindingDispositionStatus | 'all'>('all');
   const selectedWorkflow = workflow === 'all' ? undefined : workflow;
   const { data, isLoading, isError, error } = useReviewHistory(selectedWorkflow, 50);
-  const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
+
+  const filteredEntries = useMemo(() => {
+    if (!data?.entries) return [];
+    if (dispositionFilter === 'all') return data.entries;
+    return data.entries.filter((entry) =>
+      entry.dispositions.some((d) => d.disposition === dispositionFilter)
+    );
+  }, [data?.entries, dispositionFilter]);
 
   if (isLoading) return <LoadingSpinner message="Loading review history..." />;
   if (isError) return <Alert severity="error">Failed to load history: {(error as Error).message}</Alert>;
@@ -41,16 +56,31 @@ export default function ReviewHistory() {
         </Typography>
       </Box>
 
-      <Box maxWidth={320}>
+      <Box display="flex" gap={2} flexWrap="wrap">
         <TextField
-          fullWidth
           select
           size="small"
-          label="Workflow Filter"
+          label="Workflow"
           value={workflow}
           onChange={(event) => setWorkflow(event.target.value as ReviewWorkflow | 'all')}
+          sx={{ minWidth: 200 }}
         >
           {WORKFLOW_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          select
+          size="small"
+          label="Disposition"
+          value={dispositionFilter}
+          onChange={(event) => setDispositionFilter(event.target.value as FindingDispositionStatus | 'all')}
+          sx={{ minWidth: 200 }}
+        >
+          {DISPOSITION_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
               {option.label}
             </MenuItem>
@@ -59,10 +89,10 @@ export default function ReviewHistory() {
       </Box>
 
       <Stack spacing={2}>
-        {data?.entries.length === 0 ? (
-          <Alert severity="info">No review history entries yet.</Alert>
+        {filteredEntries.length === 0 ? (
+          <Alert severity="info">No review history entries match the selected filters.</Alert>
         ) : (
-          data?.entries.map((entry) => (
+          filteredEntries.map((entry) => (
             <Paper key={entry.review_id} variant="outlined" sx={{ p: 2.5 }}>
               <Stack spacing={1.5}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
@@ -98,10 +128,7 @@ export default function ReviewHistory() {
                         index={index}
                         reviewId={entry.review_id}
                         disposition={disposition}
-                        onApplyDisposition={(reviewId, payload) =>
-                          applyDisposition({ reviewId, payload })
-                        }
-                        isApplyingDisposition={isApplyingDisposition}
+                        readOnly
                       />
                     );
                   })}

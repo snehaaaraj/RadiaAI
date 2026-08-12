@@ -32,6 +32,7 @@ interface StoredPreferences {
   uiDensity: UiDensity;
   motionPreference: MotionPreference;
   defaultWorkspaceRoute: WorkspaceStartPage;
+  soundOnReviewComplete: boolean;
 }
 
 const DEFAULT_PREFERENCES: StoredPreferences = {
@@ -40,6 +41,7 @@ const DEFAULT_PREFERENCES: StoredPreferences = {
   uiDensity: 'comfortable',
   motionPreference: 'full',
   defaultWorkspaceRoute: ROUTES.HOME,
+  soundOnReviewComplete: true,
 };
 const WORKSPACE_ROUTES: WorkspaceStartPage[] = [
   ROUTES.HOME,
@@ -66,6 +68,8 @@ interface AppContextValue {
   setMotionPreference: (motion: MotionPreference) => void;
   defaultWorkspaceRoute: WorkspaceStartPage;
   setDefaultWorkspaceRoute: (path: WorkspaceStartPage) => void;
+  soundOnReviewComplete: boolean;
+  setSoundOnReviewComplete: (enabled: boolean) => void;
   resetPersonalization: () => void;
 }
 
@@ -121,6 +125,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setPreferences((prev) => ({ ...prev, defaultWorkspaceRoute: path }));
   };
 
+  const setSoundOnReviewComplete = (enabled: boolean) => {
+    setPreferences((prev) => ({ ...prev, soundOnReviewComplete: enabled }));
+  };
+
   const resetPersonalization = () => {
     setPreferences(DEFAULT_PREFERENCES);
     setSidebarOpenState(true);
@@ -152,6 +160,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setMotionPreference,
       defaultWorkspaceRoute: preferences.defaultWorkspaceRoute,
       setDefaultWorkspaceRoute,
+      soundOnReviewComplete: preferences.soundOnReviewComplete,
+      setSoundOnReviewComplete,
       resetPersonalization,
     }),
     [sidebarOpen, preferences]
