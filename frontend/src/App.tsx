@@ -106,7 +106,7 @@ function StartupSplash() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundImage: `linear-gradient(135deg, rgba(47,70,89,0.97) 0%, rgba(20,32,50,0.97) 100%), url("${logoSrc}")`,
+            backgroundImage: `linear-gradient(135deg, #2F4659 0%, #142032 100%), url("${logoSrc}")`,
             backgroundSize: 'cover, min(56vw, 620px)',
             backgroundRepeat: 'no-repeat, no-repeat',
             backgroundPosition: 'center, center',
