@@ -68,13 +68,15 @@ export default function RequirementReview() {
   } = useRequirementReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
   const playReviewCompleteSound = useReviewCompleteSound();
+  const dispositionSaved = useRef(false);
 
   const canSubmit = useMemo(() => text.trim().length > 0, [text]);
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
 
-  // Guard navigation when user has entered data or has a result
-  const isDirty = text.trim().length > 0 || !!activeResult || isPending;
+  // Guard navigation: dirty while input exists or result is unacknowledged.
+  // Once the user saves a disposition, the result is considered acknowledged.
+  const isDirty = (text.trim().length > 0 || !!activeResult || isPending) && !dispositionSaved.current;
   useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<RequirementReviewFormState>) => {
@@ -101,6 +103,7 @@ export default function RequirementReview() {
   const handleClearAll = () => {
     clearFormState();
     clearPersistedResult();
+    dispositionSaved.current = false;
     setRequirementId(DEFAULT_FORM_STATE.requirementId);
     setRequirementLevel(DEFAULT_FORM_STATE.requirementLevel);
     setText(DEFAULT_FORM_STATE.text);
@@ -277,7 +280,10 @@ export default function RequirementReview() {
               <ReviewChangeSet
                 findings={activeResult.findings}
                 reviewId={activeResult.review_id}
-                onApplyDisposition={(reviewId, payload) => applyDisposition({ reviewId, payload })}
+                onApplyDisposition={(reviewId, payload) => {
+                  dispositionSaved.current = true;
+                  applyDisposition({ reviewId, payload });
+                }}
                 isApplyingDisposition={isApplyingDisposition}
               />
             </Stack>

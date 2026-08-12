@@ -135,19 +135,22 @@ export default function DeltaReview() {
   } = useDeltaReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
   const playReviewCompleteSound = useReviewCompleteSound();
+  const dispositionSaved = useRef(false);
 
   const canSubmit = useMemo(() => baselineJson.trim() && updatedJson.trim(), [baselineJson, updatedJson]);
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
 
-  // Dirty = user has changed from the default sample values, is running a review, or has a result
-  const isDirty =
+  // Guard navigation: dirty while input is changed or result is unacknowledged.
+  // Once the user saves a disposition, the result is considered acknowledged.
+  const isDirty = (
     baselineJson !== DEFAULT_DELTA_FORM_STATE.baselineJson ||
     updatedJson !== DEFAULT_DELTA_FORM_STATE.updatedJson ||
     traceJson !== DEFAULT_DELTA_FORM_STATE.traceJson ||
     specificationId !== DEFAULT_DELTA_FORM_STATE.specificationId ||
     !!activeResult ||
-    isPending;
+    isPending
+  ) && !dispositionSaved.current;
   useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
@@ -162,6 +165,7 @@ export default function DeltaReview() {
   const handleClearAll = () => {
     clearFormState();
     clearPersistedResult();
+    dispositionSaved.current = false;
     setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
     setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
     setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
@@ -468,9 +472,10 @@ export default function DeltaReview() {
                       <ReviewChangeSet
                         findings={reviewedRequirement.findings}
                         reviewId={activeResult.review_id}
-                        onApplyDisposition={(reviewId, payload) =>
-                          applyDisposition({ reviewId, payload })
-                        }
+                        onApplyDisposition={(reviewId, payload) => {
+                          dispositionSaved.current = true;
+                          applyDisposition({ reviewId, payload });
+                        }}
                         isApplyingDisposition={isApplyingDisposition}
                       />
                     </Stack>
