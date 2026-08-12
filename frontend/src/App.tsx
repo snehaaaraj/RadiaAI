@@ -1,9 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { Box, CssBaseline, Stack, ThemeProvider, Typography } from '@mui/material';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import { CssBaseline, ThemeProvider } from '@mui/material';
+import { useMemo, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import Landing from '@/pages/Landing';
@@ -19,8 +18,6 @@ import Settings from '@/pages/Settings';
 import { createAppTheme } from '@/theme';
 import { ROUTES } from '@/utils/constants';
 import useMediaQuery from '@mui/material/useMediaQuery';
-
-const darkLogoUrl = new URL('./assets/radia-circle-white lines.jpg', import.meta.url).href;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -40,7 +37,6 @@ export default function App() {
       <AppProvider>
         <ThemeShell>
           <BrowserRouter>
-            <StartupSplash />
             <Routes>
               <Route path={ROUTES.LANDING} element={<Landing />} />
               <Route element={<AppLayout />}>
@@ -76,59 +72,5 @@ function ThemeShell({ children }: { children: ReactNode }) {
       <CssBaseline />
       {children}
     </ThemeProvider>
-  );
-}
-
-function StartupSplash() {
-  const [visible, setVisible] = useState(true);
-  const logoSrc = darkLogoUrl;
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => setVisible(false), 1700);
-    return () => window.clearTimeout(timer);
-  }, []);
-
-  return (
-    <AnimatePresence>
-      {visible && (
-        <motion.div
-          initial={{ y: 0, opacity: 1 }}
-          animate={{ y: '-100%', opacity: 1 }}
-          exit={{ y: '-100%', opacity: 1 }}
-          transition={{ duration: 0.8, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 4000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            background: 'linear-gradient(135deg, #2F4659 0%, #142032 100%)',
-            color: '#FFFFFF',
-          }}
-        >
-          <Box
-            component="img"
-            src={logoSrc}
-            alt=""
-            sx={{
-              position: 'absolute',
-              width: { xs: 180, md: 240 },
-              height: { xs: 180, md: 240 },
-              objectFit: 'contain',
-              opacity: 0.16,
-              filter: 'grayscale(1) brightness(1.25)',
-              pointerEvents: 'none',
-              userSelect: 'none',
-            }}
-          />
-          <Stack direction="row" spacing={1.25} alignItems="center">
-            <Typography variant="h3" fontWeight={900} letterSpacing={1.2}>
-              Radia AI
-            </Typography>
-          </Stack>
-        </motion.div>
-      )}
-    </AnimatePresence>
   );
 }
