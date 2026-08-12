@@ -41,6 +41,7 @@ const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
 export function TopBar() {
   const theme = useTheme();
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
+  const hoverHighlight = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(47,70,89,0.10)';
   const { guardedNavigate } = useNavigationGuardContext();
   const [searchValue, setSearchValue] = useState<HeaderSearchOption | null>(null);
   const [searchInputValue, setSearchInputValue] = useState('');
@@ -99,7 +100,17 @@ export function TopBar() {
           color={headerForegroundColor}
           variant="h6"
           fontWeight={800}
-          sx={{ '&:hover': { textDecoration: 'underline' } }}
+          sx={{
+            px: 0.75,
+            py: 0.25,
+            borderRadius: 1,
+            transition: 'transform 160ms ease, background-color 160ms ease',
+            '&:hover': {
+              textDecoration: 'none',
+              backgroundColor: hoverHighlight,
+              transform: 'scale(1.04)',
+            },
+          }}
         >
           RADIA
         </Link>
@@ -112,7 +123,17 @@ export function TopBar() {
           variant="h6"
           fontWeight={800}
           onClick={() => guardedNavigate(ROUTES.LANDING)}
-          sx={{ '&:hover': { textDecoration: 'underline' } }}
+          sx={{
+            px: 0.75,
+            py: 0.25,
+            borderRadius: 1,
+            transition: 'transform 160ms ease, background-color 160ms ease',
+            '&:hover': {
+              textDecoration: 'none',
+              backgroundColor: hoverHighlight,
+              transform: 'scale(1.04)',
+            },
+          }}
         >
           Radia AI 2.0
         </Link>
@@ -133,6 +154,11 @@ export function TopBar() {
             width: 320,
             '& .MuiInputBase-root': {
               color: headerForegroundColor,
+              transition: 'transform 160ms ease, background-color 160ms ease',
+              '&:hover': {
+                backgroundColor: hoverHighlight,
+                transform: 'scale(1.01)',
+              },
             },
             '& .MuiOutlinedInput-notchedOutline': {
               borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(47,70,89,0.35)',
@@ -158,7 +184,19 @@ export function TopBar() {
         <Button
           color="inherit"
           onClick={openSupport}
-          sx={{ textTransform: 'none', minWidth: 'auto', fontWeight: 600, color: headerForegroundColor }}
+          sx={{
+            textTransform: 'none',
+            minWidth: 'auto',
+            fontWeight: 600,
+            color: headerForegroundColor,
+            px: 1,
+            borderRadius: 1,
+            transition: 'transform 160ms ease, background-color 160ms ease',
+            '&:hover': {
+              backgroundColor: hoverHighlight,
+              transform: 'scale(1.04)',
+            },
+          }}
         >
           Contact
         </Button>
