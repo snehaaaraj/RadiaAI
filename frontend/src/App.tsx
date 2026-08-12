@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { CssBaseline, Stack, ThemeProvider, Typography } from '@mui/material';
+import { Box, CssBaseline, Stack, ThemeProvider, Typography } from '@mui/material';
 import { useTheme } from '@mui/material/styles';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
@@ -106,13 +106,23 @@ function StartupSplash() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            backgroundImage: `linear-gradient(135deg, #2F4659 0%, #142032 100%), url("${logoSrc}")`,
-            backgroundSize: 'cover, min(56vw, 620px)',
-            backgroundRepeat: 'no-repeat, no-repeat',
-            backgroundPosition: 'center, center',
+            background: 'linear-gradient(135deg, #2F4659 0%, #142032 100%)',
             color: '#FFFFFF',
           }}
         >
+          <Box
+            component="img"
+            src={logoSrc}
+            alt=""
+            sx={{
+              position: 'absolute',
+              width: { xs: '62vw', md: 520 },
+              maxWidth: 620,
+              opacity: 0.22,
+              pointerEvents: 'none',
+              userSelect: 'none',
+            }}
+          />
           <Stack direction="row" spacing={1.25} alignItems="center">
             <Typography variant="h3" fontWeight={900} letterSpacing={1.2}>
               Radia AI
