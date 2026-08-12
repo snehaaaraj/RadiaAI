@@ -42,12 +42,12 @@ export function Sidebar() {
 
   const drawerContent = (
     <Box display="flex" flexDirection="column" height="100%">
-      {/* Hamburger toggle — sits flush at top, below the AppBar */}
+      {/* Hamburger toggle — aligned with nav items */}
       <Box
         display="flex"
         alignItems="center"
-        justifyContent={sidebarOpen ? 'flex-end' : 'center'}
-        px={1}
+        justifyContent={sidebarOpen ? 'flex-start' : 'center'}
+        px={sidebarOpen ? 2 : 1}
         py={0.75}
       >
         <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
