@@ -168,10 +168,10 @@ export function TopBar() {
               pointerEvents: 'none',
             },
             '&:hover .radia-hover-flight': {
-              animation: 'radiaPlaneFly 520ms cubic-bezier(0.22, 1, 0.36, 1)',
+              animation: 'radiaPlaneFly 820ms cubic-bezier(0.22, 1, 0.36, 1)',
             },
             '&:hover .radia-hover-trail': {
-              animation: 'radiaTrailFade 500ms ease-out',
+              animation: 'radiaTrailFade 780ms ease-out',
             },
             '@media (prefers-reduced-motion: reduce)': {
               transition: 'none',
