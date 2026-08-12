@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { CssBaseline, ThemeProvider } from '@mui/material';
-import { useMemo, type ReactNode } from 'react';
+import { CssBaseline, Stack, ThemeProvider, Typography } from '@mui/material';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { RadiaMark } from '@/components/layout/RadiaMark';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import Landing from '@/pages/Landing';
 import Home from '@/pages/Home';
@@ -37,6 +39,7 @@ export default function App() {
       <AppProvider>
         <ThemeShell>
           <BrowserRouter>
+            <StartupSplash />
             <Routes>
               <Route path={ROUTES.LANDING} element={<Landing />} />
               <Route element={<AppLayout />}>
@@ -72,5 +75,49 @@ function ThemeShell({ children }: { children: ReactNode }) {
       <CssBaseline />
       {children}
     </ThemeProvider>
+  );
+}
+
+function StartupSplash() {
+  const { motionPreference } = useAppContext();
+  const reduceMotion = motionPreference === 'reduced';
+  const [visible, setVisible] = useState(!reduceMotion);
+
+  useEffect(() => {
+    if (reduceMotion) return;
+    const timer = window.setTimeout(() => setVisible(false), 1200);
+    return () => window.clearTimeout(timer);
+  }, [reduceMotion]);
+
+  if (reduceMotion) return null;
+
+  return (
+    <AnimatePresence>
+      {visible && (
+        <motion.div
+          initial={{ y: 0 }}
+          animate={{ y: '-100%' }}
+          exit={{ y: '-100%' }}
+          transition={{ duration: 0.75, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 4000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            background: 'linear-gradient(135deg, #2F4659 0%, #142032 100%)',
+            color: '#FFFFFF',
+          }}
+        >
+          <Stack direction="row" spacing={1.25} alignItems="center">
+            <RadiaMark size={42} />
+            <Typography variant="h3" fontWeight={900} letterSpacing={1.2}>
+              Radia AI
+            </Typography>
+          </Stack>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 }
