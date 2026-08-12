@@ -145,7 +145,7 @@ export function Sidebar() {
       {sidebarOpen && (
         <Box px={2} pb={2}>
           <Typography variant="caption" color="text.secondary">
-            v0.1.0 — Phase 2
+            v0.1.0 - Phase 2
           </Typography>
         </Box>
       )}
