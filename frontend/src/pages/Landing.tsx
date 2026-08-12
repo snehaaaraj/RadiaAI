@@ -10,7 +10,8 @@ import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import { motion } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RadiaMark } from '@/components/layout/RadiaMark';
 import { useAppContext } from '@/context/AppContext';
@@ -38,89 +39,126 @@ export default function Landing() {
   const navigate = useNavigate();
   const { defaultWorkspaceRoute, motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
+  const [showLaunchIntro, setShowLaunchIntro] = useState(!reduceMotion);
+
+  useEffect(() => {
+    if (!showLaunchIntro) return;
+    const timer = window.setTimeout(() => setShowLaunchIntro(false), 1100);
+    return () => window.clearTimeout(timer);
+  }, [showLaunchIntro]);
 
   return (
-    <Container maxWidth="lg" sx={{ minHeight: '100vh', py: { xs: 6, md: 10 } }}>
-      <Stack spacing={5}>
-        <motion.div
-          initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-          transition={{ duration: 0.45, ease: 'easeOut' }}
-        >
-          <Card
-            sx={{
-              p: { xs: 1, md: 2 },
-              background:
-                'linear-gradient(120deg, rgba(27,79,216,0.14), rgba(107,33,168,0.10), rgba(2,132,199,0.08))',
+    <Box sx={{ position: 'relative' }}>
+      <AnimatePresence>
+        {showLaunchIntro && (
+          <motion.div
+            initial={{ y: 0 }}
+            animate={{ y: '-100%' }}
+            exit={{ y: '-100%' }}
+            transition={{ duration: 0.75, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 2000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'linear-gradient(135deg, #2F4659 0%, #142032 100%)',
+              color: '#FFFFFF',
             }}
           >
-            <CardContent>
-              <Stack spacing={3}>
-                <Box display="flex" alignItems="center" gap={1}>
-                  <RadiaMark size={26} />
-                  <Typography variant="subtitle2" color="text.secondary">
-                    Welcome to {APP_NAME}
+            <Stack direction="row" spacing={1.25} alignItems="center">
+              <RadiaMark size={42} />
+              <Typography variant="h3" fontWeight={900} letterSpacing={1.2}>
+                Radia AI
+              </Typography>
+            </Stack>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <Container maxWidth="lg" sx={{ minHeight: '100vh', py: { xs: 6, md: 10 } }}>
+        <Stack spacing={5}>
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+            animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: 'easeOut' }}
+          >
+            <Card
+              sx={{
+                p: { xs: 1, md: 2 },
+                background:
+                  'linear-gradient(120deg, rgba(27,79,216,0.14), rgba(107,33,168,0.10), rgba(2,132,199,0.08))',
+              }}
+            >
+              <CardContent>
+                <Stack spacing={3}>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    <RadiaMark size={26} />
+                    <Typography variant="subtitle2" color="text.secondary">
+                      Welcome to {APP_NAME}
+                    </Typography>
+                  </Box>
+                  <Typography variant="h3" fontWeight={800} maxWidth={840}>
+                    Intelligent requirements quality review, built for modern engineering teams.
                   </Typography>
-                </Box>
-                <Typography variant="h3" fontWeight={800} maxWidth={840}>
-                  Intelligent requirements quality review, built for modern engineering teams.
-                </Typography>
-                <Typography variant="body1" color="text.secondary" maxWidth={780}>
-                  Start from a polished workspace tailored to your preferences, then run requirement
-                  set, single, and delta workflows with consistent output quality.
-                </Typography>
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                  <Button variant="contained" size="large" onClick={() => navigate(defaultWorkspaceRoute)}>
-                    Enter workspace
-                  </Button>
-                  <Button variant="outlined" size="large" onClick={() => navigate(ROUTES.SETTINGS)}>
-                    Personalize experience
-                  </Button>
+                  <Typography variant="body1" color="text.secondary" maxWidth={780}>
+                    Start from a polished workspace tailored to your preferences, then run requirement
+                    set, single, and delta workflows with consistent output quality.
+                  </Typography>
+                  <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                    <Button variant="contained" size="large" onClick={() => navigate(defaultWorkspaceRoute)}>
+                      Enter workspace
+                    </Button>
+                    <Button variant="outlined" size="large" onClick={() => navigate(ROUTES.SETTINGS)}>
+                      Personalize experience
+                    </Button>
+                  </Stack>
                 </Stack>
-              </Stack>
-            </CardContent>
-          </Card>
-        </motion.div>
+              </CardContent>
+            </Card>
+          </motion.div>
 
-        <Grid container spacing={2}>
-          {highlights.map((highlight, index) => (
-            <Grid key={highlight.title} size={{ xs: 12, md: 4 }}>
-              <motion.div
-                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
-                animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-                transition={{ duration: 0.35, ease: 'easeOut', delay: 0.08 * (index + 1) }}
-                whileHover={reduceMotion ? undefined : { y: -4 }}
-              >
-                <Card sx={{ height: '100%' }}>
-                  <CardContent>
-                    <Box mb={1.5}>{highlight.icon}</Box>
-                    <Typography variant="h6" fontWeight={700} gutterBottom>
-                      {highlight.title}
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {highlight.description}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            </Grid>
-          ))}
-        </Grid>
+          <Grid container spacing={2}>
+            {highlights.map((highlight, index) => (
+              <Grid key={highlight.title} size={{ xs: 12, md: 4 }}>
+                <motion.div
+                  initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                  animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, ease: 'easeOut', delay: 0.08 * (index + 1) }}
+                  whileHover={reduceMotion ? undefined : { y: -4 }}
+                >
+                  <Card sx={{ height: '100%' }}>
+                    <CardContent>
+                      <Box mb={1.5}>{highlight.icon}</Box>
+                      <Typography variant="h6" fontWeight={700} gutterBottom>
+                        {highlight.title}
+                      </Typography>
+                      <Typography variant="body2" color="text.secondary">
+                        {highlight.description}
+                      </Typography>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              </Grid>
+            ))}
+          </Grid>
 
-        <motion.div
-          initial={reduceMotion ? false : { opacity: 0 }}
-          animate={reduceMotion ? {} : { opacity: 1 }}
-          transition={{ duration: 0.45, delay: 0.22 }}
-        >
-          <Box display="flex" alignItems="center" gap={1} color="text.secondary">
-            <AutoAwesomeIcon fontSize="small" />
-            <Typography variant="body2">
-              Tip: set your preferred default workspace page in Settings so “Enter workspace” takes
-              you exactly where you want to start.
-            </Typography>
-          </Box>
-        </motion.div>
-      </Stack>
-    </Container>
+          <motion.div
+            initial={reduceMotion ? false : { opacity: 0 }}
+            animate={reduceMotion ? {} : { opacity: 1 }}
+            transition={{ duration: 0.45, delay: 0.22 }}
+          >
+            <Box display="flex" alignItems="center" gap={1} color="text.secondary">
+              <AutoAwesomeIcon fontSize="small" />
+              <Typography variant="body2">
+                Tip: set your preferred default workspace page in Settings so “Enter workspace” takes
+                you exactly where you want to start.
+              </Typography>
+            </Box>
+          </motion.div>
+        </Stack>
+      </Container>
+    </Box>
   );
 }
