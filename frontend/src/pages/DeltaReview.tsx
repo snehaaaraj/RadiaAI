@@ -139,8 +139,14 @@ export default function DeltaReview() {
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
 
-  // Guard navigation when user has entered data or has a result
-  const isDirty = baselineJson.trim().length > 0 || updatedJson.trim().length > 0 || !!activeResult || isPending;
+  // Dirty = user has changed from the default sample values, is running a review, or has a result
+  const isDirty =
+    baselineJson !== DEFAULT_DELTA_FORM_STATE.baselineJson ||
+    updatedJson !== DEFAULT_DELTA_FORM_STATE.updatedJson ||
+    traceJson !== DEFAULT_DELTA_FORM_STATE.traceJson ||
+    specificationId !== DEFAULT_DELTA_FORM_STATE.specificationId ||
+    !!activeResult ||
+    isPending;
   const { dialogOpen, handleConfirm, handleCancel } = useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
