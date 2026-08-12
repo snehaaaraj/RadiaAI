@@ -19,8 +19,7 @@ import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
-import { ROUTES, APP_NAME, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
-import { RadiaMark } from './RadiaMark';
+import { ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
@@ -43,44 +42,28 @@ export function Sidebar() {
 
   const drawerContent = (
     <Box display="flex" flexDirection="column" height="100%">
+      {/* Hamburger toggle — aligned with nav items */}
       <Box
-        mx={1.25}
-        mt={1.25}
-        mb={1}
-        p={1.25}
-        sx={{
-          borderRadius: 3,
-          background: 'linear-gradient(135deg, rgba(225,29,72,0.13), rgba(27,79,216,0.12))',
-        }}
+        display="flex"
+        alignItems="center"
+        justifyContent={sidebarOpen ? 'flex-start' : 'center'}
+        px={sidebarOpen ? 2 : 1}
+        py={0.75}
       >
-        <Box display="flex" alignItems="center" justifyContent={sidebarOpen ? 'space-between' : 'center'} gap={1}>
-          <Box display="flex" alignItems="center" gap={1.25} minWidth={0}>
-            <RadiaMark size={34} />
-            {sidebarOpen && (
-              <Box minWidth={0}>
-                <Typography variant="h6" fontWeight={800} color="text.primary" lineHeight={1.1} noWrap>
-                  {APP_NAME}
-                </Typography>
-                <Typography variant="caption" color="text.secondary" noWrap>
-                  Deterministic reviews
-                </Typography>
-              </Box>
-            )}
-          </Box>
-          <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
-            <IconButton
-              size="small"
-              aria-label="toggle sidebar"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              sx={{
-                color: 'text.secondary',
-                transform: sidebarOpen ? 'none' : 'rotate(180deg)',
-              }}
-            >
-              <MenuOpenIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
+        <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
+          <IconButton
+            size="small"
+            aria-label="toggle sidebar"
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            sx={{
+              color: 'text.secondary',
+              transform: sidebarOpen ? 'none' : 'rotate(180deg)',
+              transition: 'transform 200ms ease',
+            }}
+          >
+            <MenuOpenIcon />
+          </IconButton>
+        </Tooltip>
       </Box>
       <Divider />
 
@@ -181,6 +164,8 @@ export function Sidebar() {
           borderRight: '1px solid',
           borderColor: 'divider',
           overflowX: 'hidden',
+          top: '64px',
+          height: 'calc(100% - 64px)',
           transition: (theme) =>
             theme.transitions.create('width', {
               easing: theme.transitions.easing.sharp,

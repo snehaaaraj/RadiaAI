@@ -18,7 +18,7 @@ export function AppLayout() {
 
   return (
     <Box display="flex">
-      <TopBar drawerWidth={SIDEBAR_WIDTH} />
+      <TopBar />
       <Sidebar />
 
       <Box
