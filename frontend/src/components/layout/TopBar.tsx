@@ -102,7 +102,7 @@ export function TopBar() {
           variant="h6"
           fontWeight={800}
           sx={{
-            px: 0.75,
+            px: 1.3,
             py: 0.25,
             borderRadius: 1,
             position: 'relative',
@@ -111,20 +111,20 @@ export function TopBar() {
             transition: 'transform 160ms ease',
             '&:hover': {
               textDecoration: 'none',
-              transform: 'scale(1.04)',
+              transform: 'scale(1.07)',
             },
             '& .radia-hover-plane': {
               position: 'absolute',
-              left: -14,
-              top: -2,
-              fontSize: 14,
+              left: -22,
+              top: -6,
+              fontSize: 20,
               opacity: 0,
-              transform: 'translateX(-10px) translateY(6px) rotate(-16deg)',
-              transition: 'transform 220ms ease, opacity 220ms ease',
+              transform: 'translateX(-18px) translateY(12px) rotate(-16deg)',
+              transition: 'transform 260ms ease, opacity 220ms ease',
             },
             '&:hover .radia-hover-plane': {
               opacity: 0.95,
-              transform: 'translateX(8px) translateY(-8px) rotate(0deg)',
+              transform: 'translateX(22px) translateY(-12px) rotate(2deg)',
             },
           }}
         >
