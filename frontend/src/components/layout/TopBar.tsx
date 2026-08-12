@@ -104,10 +104,9 @@ export function TopBar() {
             px: 0.75,
             py: 0.25,
             borderRadius: 1,
-            transition: 'transform 160ms ease, background-color 160ms ease',
+            transition: 'transform 160ms ease',
             '&:hover': {
               textDecoration: 'none',
-              backgroundColor: hoverHighlight,
               transform: 'scale(1.04)',
             },
           }}
