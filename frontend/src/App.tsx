@@ -2,10 +2,10 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { CssBaseline, Stack, ThemeProvider, Typography } from '@mui/material';
+import { useTheme } from '@mui/material/styles';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
-import { RadiaMark } from '@/components/layout/RadiaMark';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import Landing from '@/pages/Landing';
 import Home from '@/pages/Home';
@@ -20,6 +20,9 @@ import Settings from '@/pages/Settings';
 import { createAppTheme } from '@/theme';
 import { ROUTES } from '@/utils/constants';
 import useMediaQuery from '@mui/material/useMediaQuery';
+
+const lightLogoUrl = new URL('./assets/radia-circle-white background.png', import.meta.url).href;
+const darkLogoUrl = new URL('./assets/radia-circle-white lines.jpg', import.meta.url).href;
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -79,7 +82,9 @@ function ThemeShell({ children }: { children: ReactNode }) {
 }
 
 function StartupSplash() {
+  const theme = useTheme();
   const [visible, setVisible] = useState(true);
+  const logoSrc = theme.palette.mode === 'dark' ? darkLogoUrl : lightLogoUrl;
 
   useEffect(() => {
     const timer = window.setTimeout(() => setVisible(false), 1700);
@@ -101,12 +106,14 @@ function StartupSplash() {
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            background: 'linear-gradient(135deg, #2F4659 0%, #142032 100%)',
+            backgroundImage: `linear-gradient(135deg, rgba(47,70,89,0.97) 0%, rgba(20,32,50,0.97) 100%), url("${logoSrc}")`,
+            backgroundSize: 'cover, min(56vw, 620px)',
+            backgroundRepeat: 'no-repeat, no-repeat',
+            backgroundPosition: 'center, center',
             color: '#FFFFFF',
           }}
         >
           <Stack direction="row" spacing={1.25} alignItems="center">
-            <RadiaMark size={42} />
             <Typography variant="h3" fontWeight={900} letterSpacing={1.2}>
               Radia AI
             </Typography>
