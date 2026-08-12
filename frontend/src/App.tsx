@@ -79,26 +79,21 @@ function ThemeShell({ children }: { children: ReactNode }) {
 }
 
 function StartupSplash() {
-  const { motionPreference } = useAppContext();
-  const reduceMotion = motionPreference === 'reduced';
-  const [visible, setVisible] = useState(!reduceMotion);
+  const [visible, setVisible] = useState(true);
 
   useEffect(() => {
-    if (reduceMotion) return;
-    const timer = window.setTimeout(() => setVisible(false), 1200);
+    const timer = window.setTimeout(() => setVisible(false), 1700);
     return () => window.clearTimeout(timer);
-  }, [reduceMotion]);
-
-  if (reduceMotion) return null;
+  }, []);
 
   return (
     <AnimatePresence>
       {visible && (
         <motion.div
-          initial={{ y: 0 }}
-          animate={{ y: '-100%' }}
-          exit={{ y: '-100%' }}
-          transition={{ duration: 0.75, delay: 0.35, ease: [0.22, 1, 0.36, 1] }}
+          initial={{ y: 0, opacity: 1 }}
+          animate={{ y: '-100%', opacity: 1 }}
+          exit={{ y: '-100%', opacity: 1 }}
+          transition={{ duration: 0.8, delay: 0.9, ease: [0.22, 1, 0.36, 1] }}
           style={{
             position: 'fixed',
             inset: 0,
