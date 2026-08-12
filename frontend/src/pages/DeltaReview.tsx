@@ -16,7 +16,9 @@ import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
+import { NavigationConfirmDialog } from '@/components/common/NavigationConfirmDialog';
 import { useDeltaReview } from '@/hooks/useDeltaReview';
+import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
@@ -136,6 +138,10 @@ export default function DeltaReview() {
   const canSubmit = useMemo(() => baselineJson.trim() && updatedJson.trim(), [baselineJson, updatedJson]);
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Guard navigation when user has entered data or has a result
+  const isDirty = baselineJson.trim().length > 0 || updatedJson.trim().length > 0 || !!activeResult || isPending;
+  const { dialogOpen, handleConfirm, handleCancel } = useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
     setFormState((current) => ({ ...current, ...next }));
@@ -468,5 +474,11 @@ export default function DeltaReview() {
         </Stack>
       )}
     </Stack>
+
+      <NavigationConfirmDialog
+        open={dialogOpen}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
   );
 }

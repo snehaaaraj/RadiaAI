@@ -15,8 +15,10 @@ import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
+import { NavigationConfirmDialog } from '@/components/common/NavigationConfirmDialog';
 import { useRequirementReview } from '@/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
+import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
@@ -69,6 +71,10 @@ export default function RequirementReview() {
   const canSubmit = useMemo(() => text.trim().length > 0, [text]);
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Guard navigation when user has entered data or has a result
+  const isDirty = text.trim().length > 0 || !!activeResult || isPending;
+  const { dialogOpen, handleConfirm, handleCancel } = useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<RequirementReviewFormState>) => {
     setFormState((current) => ({ ...current, ...next }));
@@ -277,5 +283,11 @@ export default function RequirementReview() {
         </Stack>
       )}
     </Stack>
+
+      <NavigationConfirmDialog
+        open={dialogOpen}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
   );
 }
