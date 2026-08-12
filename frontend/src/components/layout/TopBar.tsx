@@ -11,6 +11,7 @@ import Autocomplete from '@mui/material/Autocomplete';
 import InputAdornment from '@mui/material/InputAdornment';
 import { useTheme } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
+import FlightTakeoffIcon from '@mui/icons-material/FlightTakeoff';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import type { KeyboardEvent, MouseEvent } from 'react';
@@ -104,13 +105,30 @@ export function TopBar() {
             px: 0.75,
             py: 0.25,
             borderRadius: 1,
+            position: 'relative',
+            display: 'inline-flex',
+            alignItems: 'center',
             transition: 'transform 160ms ease',
             '&:hover': {
               textDecoration: 'none',
               transform: 'scale(1.04)',
             },
+            '& .radia-hover-plane': {
+              position: 'absolute',
+              left: -14,
+              top: -2,
+              fontSize: 14,
+              opacity: 0,
+              transform: 'translateX(-10px) translateY(6px) rotate(-16deg)',
+              transition: 'transform 220ms ease, opacity 220ms ease',
+            },
+            '&:hover .radia-hover-plane': {
+              opacity: 0.95,
+              transform: 'translateX(8px) translateY(-8px) rotate(0deg)',
+            },
           }}
         >
+          <FlightTakeoffIcon className="radia-hover-plane" />
           RADIA
         </Link>
         <Box sx={{ width: 3, height: 24, bgcolor: headerForegroundColor, borderRadius: 1 }} />
