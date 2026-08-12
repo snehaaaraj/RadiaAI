@@ -473,12 +473,12 @@ export default function DeltaReview() {
           </Paper>
         </Stack>
       )}
-    </Stack>
 
       <NavigationConfirmDialog
         open={dialogOpen}
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />
+    </Stack>
   );
 }

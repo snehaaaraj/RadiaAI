@@ -282,12 +282,12 @@ export default function RequirementReview() {
           </Paper>
         </Stack>
       )}
-    </Stack>
 
       <NavigationConfirmDialog
         open={dialogOpen}
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />
+    </Stack>
   );
 }
