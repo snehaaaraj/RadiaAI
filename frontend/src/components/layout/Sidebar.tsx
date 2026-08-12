@@ -53,10 +53,10 @@ export function Sidebar() {
           background: 'linear-gradient(135deg, rgba(225,29,72,0.13), rgba(27,79,216,0.12))',
         }}
       >
-        <Box display="flex" alignItems="center" justifyContent={sidebarOpen ? 'space-between' : 'center'} gap={1}>
-          <Box display="flex" alignItems="center" gap={1.25} minWidth={0}>
-            <RadiaMark size={34} />
-            {sidebarOpen && (
+        {sidebarOpen ? (
+          <Box display="flex" alignItems="center" justifyContent="space-between" gap={1}>
+            <Box display="flex" alignItems="center" gap={1.25} minWidth={0}>
+              <RadiaMark size={34} />
               <Box minWidth={0}>
                 <Typography variant="h6" fontWeight={800} color="text.primary" lineHeight={1.1} noWrap>
                   {APP_NAME}
@@ -65,22 +65,33 @@ export function Sidebar() {
                   Deterministic reviews
                 </Typography>
               </Box>
-            )}
+            </Box>
+            <Tooltip title="Collapse sidebar" placement="right">
+              <IconButton
+                size="small"
+                aria-label="collapse sidebar"
+                onClick={() => setSidebarOpen(false)}
+                sx={{ color: 'text.secondary', flexShrink: 0 }}
+              >
+                <MenuOpenIcon />
+              </IconButton>
+            </Tooltip>
           </Box>
-          <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
-            <IconButton
-              size="small"
-              aria-label="toggle sidebar"
-              onClick={() => setSidebarOpen(!sidebarOpen)}
-              sx={{
-                color: 'text.secondary',
-                transform: sidebarOpen ? 'none' : 'rotate(180deg)',
-              }}
-            >
-              <MenuOpenIcon />
-            </IconButton>
-          </Tooltip>
-        </Box>
+        ) : (
+          <Box display="flex" flexDirection="column" alignItems="center" gap={1}>
+            <RadiaMark size={34} />
+            <Tooltip title="Expand sidebar" placement="right">
+              <IconButton
+                size="small"
+                aria-label="expand sidebar"
+                onClick={() => setSidebarOpen(true)}
+                sx={{ color: 'text.secondary', transform: 'rotate(180deg)' }}
+              >
+                <MenuOpenIcon />
+              </IconButton>
+            </Tooltip>
+          </Box>
+        )}
       </Box>
       <Divider />
 
@@ -162,7 +173,7 @@ export function Sidebar() {
       {sidebarOpen && (
         <Box px={2} pb={2}>
           <Typography variant="caption" color="text.secondary">
-            v0.1.0 — Phase 1
+            v0.1.0 — Phase 2
           </Typography>
         </Box>
       )}
