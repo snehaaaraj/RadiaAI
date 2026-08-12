@@ -25,11 +25,11 @@ function AppLayoutInner() {
         sx={{
           flexGrow: 1,
           transition: (t) =>
-            t.transitions.create('margin', {
+            t.transitions.create(['margin-left', 'width'], {
               easing: t.transitions.easing.sharp,
-              duration: t.transitions.duration.leavingScreen,
+              duration: t.transitions.duration.standard,
             }),
-          marginLeft: 0,
+          marginLeft: `${sidebarWidth}px`,
           width: `calc(100% - ${sidebarWidth}px)`,
           minHeight: '100vh',
           bgcolor: 'background.default',
