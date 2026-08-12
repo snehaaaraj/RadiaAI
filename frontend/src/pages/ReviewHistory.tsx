@@ -3,6 +3,7 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
 import MenuItem from '@mui/material/MenuItem';
+import Pagination from '@mui/material/Pagination';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
@@ -28,9 +29,12 @@ const DISPOSITION_OPTIONS: Array<{ label: string; value: FindingDispositionStatu
   { label: 'Deferred', value: 'Deferred' },
 ];
 
+const PAGE_SIZE = 10;
+
 export default function ReviewHistory() {
   const [workflow, setWorkflow] = useState<ReviewWorkflow | 'all'>('all');
   const [dispositionFilter, setDispositionFilter] = useState<FindingDispositionStatus | 'all'>('all');
+  const [page, setPage] = useState(1);
   const selectedWorkflow = workflow === 'all' ? undefined : workflow;
   const { data, isLoading, isError, error } = useReviewHistory(selectedWorkflow, 50);
 
@@ -41,6 +45,19 @@ export default function ReviewHistory() {
       entry.dispositions.some((d) => d.disposition === dispositionFilter)
     );
   }, [data?.entries, dispositionFilter]);
+
+  const totalPages = Math.ceil(filteredEntries.length / PAGE_SIZE);
+  const pagedEntries = filteredEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+  // Reset to page 1 whenever filters change
+  const handleWorkflowChange = (value: ReviewWorkflow | 'all') => {
+    setWorkflow(value);
+    setPage(1);
+  };
+  const handleDispositionChange = (value: FindingDispositionStatus | 'all') => {
+    setDispositionFilter(value);
+    setPage(1);
+  };
 
   if (isLoading) return <LoadingSpinner message="Loading review history..." />;
   if (isError) return <Alert severity="error">Failed to load history: {(error as Error).message}</Alert>;
@@ -62,7 +79,7 @@ export default function ReviewHistory() {
           size="small"
           label="Workflow"
           value={workflow}
-          onChange={(event) => setWorkflow(event.target.value as ReviewWorkflow | 'all')}
+          onChange={(e) => handleWorkflowChange(e.target.value as ReviewWorkflow | 'all')}
           sx={{ minWidth: 200 }}
         >
           {WORKFLOW_OPTIONS.map((option) => (
@@ -77,7 +94,7 @@ export default function ReviewHistory() {
           size="small"
           label="Disposition"
           value={dispositionFilter}
-          onChange={(event) => setDispositionFilter(event.target.value as FindingDispositionStatus | 'all')}
+          onChange={(e) => handleDispositionChange(e.target.value as FindingDispositionStatus | 'all')}
           sx={{ minWidth: 200 }}
         >
           {DISPOSITION_OPTIONS.map((option) => (
@@ -86,13 +103,19 @@ export default function ReviewHistory() {
             </MenuItem>
           ))}
         </TextField>
+
+        {filteredEntries.length > 0 && (
+          <Typography variant="body2" color="text.secondary" alignSelf="center">
+            {filteredEntries.length} result{filteredEntries.length !== 1 ? 's' : ''}
+          </Typography>
+        )}
       </Box>
 
       <Stack spacing={2}>
-        {filteredEntries.length === 0 ? (
+        {pagedEntries.length === 0 ? (
           <Alert severity="info">No review history entries match the selected filters.</Alert>
         ) : (
-          filteredEntries.map((entry) => (
+          pagedEntries.map((entry) => (
             <Paper key={entry.review_id} variant="outlined" sx={{ p: 2.5 }}>
               <Stack spacing={1.5}>
                 <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
@@ -138,6 +161,18 @@ export default function ReviewHistory() {
           ))
         )}
       </Stack>
+
+      {totalPages > 1 && (
+        <Box display="flex" justifyContent="center" pt={1}>
+          <Pagination
+            count={totalPages}
+            page={page}
+            onChange={(_e, value) => setPage(value)}
+            color="primary"
+            shape="rounded"
+          />
+        </Box>
+      )}
     </Stack>
   );
 }
