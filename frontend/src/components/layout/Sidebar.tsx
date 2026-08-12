@@ -36,6 +36,8 @@ const BOTTOM_ITEMS = [
   { label: 'Settings', icon: <SettingsIcon />, path: ROUTES.SETTINGS },
 ] as const;
 
+const LABEL_ANIMATION_MS = 220;
+
 export function Sidebar() {
   const { sidebarOpen, setSidebarOpen } = useAppContext();
   const { guardedNavigate } = useNavigationGuardContext();
@@ -59,7 +61,11 @@ export function Sidebar() {
                   borderRadius: 1.5,
                   position: 'relative',
                   overflow: 'hidden',
-                  transition: 'background-color 120ms ease, transform 120ms ease',
+                  transition: (theme) =>
+                    theme.transitions.create(['background-color', 'transform', 'padding'], {
+                      duration: LABEL_ANIMATION_MS,
+                      easing: theme.transitions.easing.easeInOut,
+                    }),
                   '&::before': {
                     content: '""',
                     position: 'absolute',
@@ -83,10 +89,38 @@ export function Sidebar() {
                   },
                 }}
               >
-                <ListItemIcon sx={{ minWidth: sidebarOpen ? 36 : 0, mr: sidebarOpen ? 1 : 0 }}>
+                <ListItemIcon
+                  sx={(theme) => ({
+                    minWidth: sidebarOpen ? 36 : 0,
+                    mr: sidebarOpen ? 1 : 0,
+                    justifyContent: 'center',
+                    transition: theme.transitions.create(['min-width', 'margin-right'], {
+                      duration: LABEL_ANIMATION_MS,
+                      easing: theme.transitions.easing.easeInOut,
+                    }),
+                  })}
+                >
                   {icon}
                 </ListItemIcon>
-                {sidebarOpen && <ListItemText primary={label} />}
+                <ListItemText
+                  primary={label}
+                  primaryTypographyProps={{ noWrap: true }}
+                  sx={(theme) => ({
+                    m: 0,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    maxWidth: sidebarOpen ? 200 : 0,
+                    opacity: sidebarOpen ? 1 : 0,
+                    transform: sidebarOpen ? 'translateX(0)' : 'translateX(-6px)',
+                    transition: theme.transitions.create(
+                      ['max-width', 'opacity', 'transform'],
+                      {
+                        duration: LABEL_ANIMATION_MS,
+                        easing: theme.transitions.easing.easeInOut,
+                      }
+                    ),
+                  })}
+                />
               </ListItemButton>
             </Tooltip>
           </ListItem>
@@ -104,28 +138,73 @@ export function Sidebar() {
                 onClick={() => guardedNavigate(path)}
                 sx={{
                   mx: 1,
+                  my: 0.5,
                   px: sidebarOpen ? 1.5 : 1.25,
                   justifyContent: sidebarOpen ? 'flex-start' : 'center',
                   borderRadius: 1.5,
+                  overflow: 'hidden',
+                  transition: (theme) =>
+                    theme.transitions.create(['padding'], {
+                      duration: LABEL_ANIMATION_MS,
+                      easing: theme.transitions.easing.easeInOut,
+                    }),
                 }}
               >
-                <ListItemIcon sx={{ minWidth: sidebarOpen ? 36 : 0, mr: sidebarOpen ? 1 : 0 }}>
+                <ListItemIcon
+                  sx={(theme) => ({
+                    minWidth: sidebarOpen ? 36 : 0,
+                    mr: sidebarOpen ? 1 : 0,
+                    justifyContent: 'center',
+                    transition: theme.transitions.create(['min-width', 'margin-right'], {
+                      duration: LABEL_ANIMATION_MS,
+                      easing: theme.transitions.easing.easeInOut,
+                    }),
+                  })}
+                >
                   {icon}
                 </ListItemIcon>
-                {sidebarOpen && <ListItemText primary={label} />}
+                <ListItemText
+                  primary={label}
+                  primaryTypographyProps={{ noWrap: true }}
+                  sx={(theme) => ({
+                    m: 0,
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    maxWidth: sidebarOpen ? 200 : 0,
+                    opacity: sidebarOpen ? 1 : 0,
+                    transform: sidebarOpen ? 'translateX(0)' : 'translateX(-6px)',
+                    transition: theme.transitions.create(
+                      ['max-width', 'opacity', 'transform'],
+                      {
+                        duration: LABEL_ANIMATION_MS,
+                        easing: theme.transitions.easing.easeInOut,
+                      }
+                    ),
+                  })}
+                />
               </ListItemButton>
             </Tooltip>
           </ListItem>
         ))}
       </List>
 
-      {sidebarOpen && (
-        <Box px={2} pb={2}>
-          <Typography variant="caption" color="text.secondary">
-            v0.1.0 - Phase 2
-          </Typography>
-        </Box>
-      )}
+      <Box
+        px={2}
+        pb={2}
+        sx={(theme) => ({
+          overflow: 'hidden',
+          maxHeight: sidebarOpen ? 28 : 0,
+          opacity: sidebarOpen ? 1 : 0,
+          transition: theme.transitions.create(['max-height', 'opacity'], {
+            duration: LABEL_ANIMATION_MS,
+            easing: theme.transitions.easing.easeInOut,
+          }),
+        })}
+      >
+        <Typography variant="caption" color="text.secondary" noWrap>
+          v0.1.0 - Phase 2
+        </Typography>
+      </Box>
     </Box>
   );
 
