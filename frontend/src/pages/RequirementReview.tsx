@@ -15,7 +15,6 @@ import { FileUploadZone } from '@/components/review/FileUploadZone';
 import { CategoryScoreGrid } from '@/components/review/CategoryScoreGrid';
 import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
-import { NavigationConfirmDialog } from '@/components/common/NavigationConfirmDialog';
 import { useRequirementReview } from '@/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
@@ -74,7 +73,7 @@ export default function RequirementReview() {
 
   // Guard navigation when user has entered data or has a result
   const isDirty = text.trim().length > 0 || !!activeResult || isPending;
-  const { dialogOpen, handleConfirm, handleCancel } = useNavigationGuard(isDirty);
+  useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<RequirementReviewFormState>) => {
     setFormState((current) => ({ ...current, ...next }));
@@ -282,12 +281,6 @@ export default function RequirementReview() {
           </Paper>
         </Stack>
       )}
-
-      <NavigationConfirmDialog
-        open={dialogOpen}
-        onConfirm={handleConfirm}
-        onCancel={handleCancel}
-      />
     </Stack>
   );
 }

@@ -16,7 +16,6 @@ import { ReviewChangeSet } from '@/components/review/ReviewChangeSet';
 import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
-import { NavigationConfirmDialog } from '@/components/common/NavigationConfirmDialog';
 import { useDeltaReview } from '@/hooks/useDeltaReview';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -147,7 +146,7 @@ export default function DeltaReview() {
     specificationId !== DEFAULT_DELTA_FORM_STATE.specificationId ||
     !!activeResult ||
     isPending;
-  const { dialogOpen, handleConfirm, handleCancel } = useNavigationGuard(isDirty);
+  useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
     setFormState((current) => ({ ...current, ...next }));
@@ -479,12 +478,6 @@ export default function DeltaReview() {
           </Paper>
         </Stack>
       )}
-
-      <NavigationConfirmDialog
-        open={dialogOpen}
-        onConfirm={handleConfirm}
-        onCancel={handleCancel}
-      />
     </Stack>
   );
 }

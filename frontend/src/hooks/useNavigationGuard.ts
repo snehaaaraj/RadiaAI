@@ -1,60 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useBeforeUnload } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useBeforeUnload } from 'react-router-dom';
+import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
 
 /**
- * Intercepts in-app navigation and browser tab close/refresh when `isDirty` is true.
- * Returns a `guardedNavigate` function to use in place of `navigate`, and dialog
- * state so the caller can render a confirmation dialog.
+ * Call this in a page component to register whether it has unsaved/in-progress state.
+ * When dirty, the global NavigationGuardContext will intercept sidebar navigation
+ * and show a confirmation dialog before leaving.
  */
 export function useNavigationGuard(isDirty: boolean) {
-  const navigate = useNavigate();
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const pendingPath = useRef<string | null>(null);
+  const { setDirty } = useNavigationGuardContext();
 
-  // Block browser tab close / hard refresh when dirty
-  useBeforeUnload(
-    useCallback(
-      (e: BeforeUnloadEvent) => {
-        if (isDirty) {
-          e.preventDefault();
-        }
-      },
-      [isDirty]
-    )
-  );
-
-  // Reset pending path whenever dirty state is cleared
+  // Keep context in sync whenever isDirty changes
   useEffect(() => {
-    if (!isDirty) {
-      pendingPath.current = null;
-    }
-  }, [isDirty]);
+    setDirty(isDirty);
+    // Clear on unmount (user navigated away after confirming)
+    return () => setDirty(false);
+  }, [isDirty, setDirty]);
 
-  /** Call this instead of `navigate(path)` from nav items / buttons */
-  const guardedNavigate = useCallback(
-    (path: string) => {
-      if (isDirty) {
-        pendingPath.current = path;
-        setDialogOpen(true);
-      } else {
-        navigate(path);
-      }
-    },
-    [isDirty, navigate]
+  // Also block browser tab close / hard refresh
+  useBeforeUnload(
+    (e: BeforeUnloadEvent) => {
+      if (isDirty) e.preventDefault();
+    }
   );
-
-  const handleConfirm = useCallback(() => {
-    setDialogOpen(false);
-    if (pendingPath.current) {
-      navigate(pendingPath.current);
-      pendingPath.current = null;
-    }
-  }, [navigate]);
-
-  const handleCancel = useCallback(() => {
-    setDialogOpen(false);
-    pendingPath.current = null;
-  }, []);
-
-  return { guardedNavigate, dialogOpen, handleConfirm, handleCancel };
 }
