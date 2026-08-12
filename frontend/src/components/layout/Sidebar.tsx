@@ -16,7 +16,8 @@ import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
-import MenuOpenIcon from '@mui/icons-material/MenuOpen';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
@@ -43,31 +44,6 @@ export function Sidebar() {
 
   const drawerContent = (
     <Box display="flex" flexDirection="column" height="100%">
-      {/* Hamburger toggle — aligned with nav items */}
-      <Box
-        display="flex"
-        alignItems="center"
-        justifyContent={sidebarOpen ? 'flex-start' : 'center'}
-        px={sidebarOpen ? 2 : 1}
-        py={0.75}
-      >
-        <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
-          <IconButton
-            size="small"
-            aria-label="toggle sidebar"
-            onClick={() => setSidebarOpen(!sidebarOpen)}
-            sx={{
-              color: 'text.secondary',
-              transform: sidebarOpen ? 'none' : 'rotate(180deg)',
-              transition: 'transform 200ms ease',
-            }}
-          >
-            <MenuOpenIcon />
-          </IconButton>
-        </Tooltip>
-      </Box>
-      <Divider />
-
       <List sx={{ flexGrow: 1, pt: 1 }}>
         {NAV_ITEMS.map(({ label, icon, path }) => (
           <ListItem key={path} disablePadding>
@@ -154,28 +130,74 @@ export function Sidebar() {
   );
 
   return (
-    <Drawer
-      variant="permanent"
+    /* Wrapper positions the Drawer + the edge toggle button together */
+    <Box
       sx={{
+        position: 'fixed',
+        top: '64px',
+        left: 0,
+        height: 'calc(100% - 64px)',
         width: currentWidth,
+        transition: (theme) =>
+          theme.transitions.create('width', {
+            easing: theme.transitions.easing.sharp,
+            duration: theme.transitions.duration.standard,
+          }),
+        zIndex: (theme) => theme.zIndex.drawer,
         flexShrink: 0,
-        '& .MuiDrawer-paper': {
-          width: currentWidth,
-          boxSizing: 'border-box',
-          borderRight: '1px solid',
-          borderColor: 'divider',
-          overflowX: 'hidden',
-          top: '64px',
-          height: 'calc(100% - 64px)',
-          transition: (theme) =>
-            theme.transitions.create('width', {
-              easing: theme.transitions.easing.sharp,
-              duration: theme.transitions.duration.standard,
-            }),
-        },
       }}
     >
-      {drawerContent}
-    </Drawer>
+      <Drawer
+        variant="permanent"
+        sx={{
+          width: '100%',
+          height: '100%',
+          flexShrink: 0,
+          '& .MuiDrawer-paper': {
+            width: '100%',
+            boxSizing: 'border-box',
+            borderRight: '1px solid',
+            borderColor: 'divider',
+            overflowX: 'hidden',
+            position: 'relative',
+            top: 'unset',
+            height: '100%',
+          },
+        }}
+      >
+        {drawerContent}
+      </Drawer>
+
+      {/* Edge collapse/expand arrow — sits on the right border of the sidebar */}
+      <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
+        <IconButton
+          size="small"
+          aria-label="toggle sidebar"
+          onClick={() => setSidebarOpen(!sidebarOpen)}
+          sx={{
+            position: 'absolute',
+            top: '50%',
+            right: -12,
+            transform: 'translateY(-50%)',
+            zIndex: (theme) => theme.zIndex.drawer + 1,
+            width: 24,
+            height: 24,
+            bgcolor: 'background.paper',
+            border: '1px solid',
+            borderColor: 'divider',
+            boxShadow: 2,
+            '&:hover': {
+              bgcolor: 'action.hover',
+            },
+          }}
+        >
+          {sidebarOpen ? (
+            <ChevronLeftIcon sx={{ fontSize: 16 }} />
+          ) : (
+            <ChevronRightIcon sx={{ fontSize: 16 }} />
+          )}
+        </IconButton>
+      </Tooltip>
+    </Box>
   );
 }
