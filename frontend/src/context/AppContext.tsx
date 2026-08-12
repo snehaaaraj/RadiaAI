@@ -14,7 +14,6 @@ export type UiDensity = 'comfortable' | 'compact';
 export type MotionPreference = 'full' | 'reduced';
 export type WorkspaceStartPage =
   | typeof ROUTES.HOME
-  | typeof ROUTES.REVIEW_REQUIREMENT_SET
   | typeof ROUTES.REVIEW_REQUIREMENT
   | typeof ROUTES.REVIEW_DELTA
   | typeof ROUTES.REVIEW_HISTORY
@@ -45,7 +44,6 @@ const DEFAULT_PREFERENCES: StoredPreferences = {
 };
 const WORKSPACE_ROUTES: WorkspaceStartPage[] = [
   ROUTES.HOME,
-  ROUTES.REVIEW_REQUIREMENT_SET,
   ROUTES.REVIEW_REQUIREMENT,
   ROUTES.REVIEW_DELTA,
   ROUTES.REVIEW_HISTORY,
