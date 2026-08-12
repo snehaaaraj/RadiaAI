@@ -7,6 +7,7 @@ import ViewCompactAltIcon from '@mui/icons-material/ViewCompactAlt';
 import ViewComfyAltIcon from '@mui/icons-material/ViewComfyAlt';
 import MotionPhotosAutoIcon from '@mui/icons-material/MotionPhotosAuto';
 import ReduceCapacityIcon from '@mui/icons-material/ReduceCapacity';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -89,6 +90,8 @@ export default function Settings() {
     setMotionPreference,
     defaultWorkspaceRoute,
     setDefaultWorkspaceRoute,
+    soundOnReviewComplete,
+    setSoundOnReviewComplete,
     resetPersonalization,
   } = useAppContext();
 
@@ -301,6 +304,42 @@ export default function Settings() {
                       </Select>
                     </Box>
                   </Stack>
+                </CardContent>
+              </Card>
+            </motion.div>
+
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+              transition={{ duration: 0.28, ease: 'easeOut', delay: 0.17 }}
+            >
+              <Card>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
+                   <NotificationsActiveIcon color="primary" />
+                   <Typography variant="h6" fontWeight={700}>
+                     Review notifications
+                   </Typography>
+                  </Box>
+                  <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
+                   <Box>
+                     <Typography variant="subtitle2" fontWeight={700}>
+                       Sound on review complete
+                     </Typography>
+                     <Typography variant="body2" color="text.secondary">
+                       Play a short chime when a deterministic review finishes.
+                     </Typography>
+                   </Box>
+                   <FormControlLabel
+                     control={
+                       <Switch
+                         checked={soundOnReviewComplete}
+                         onChange={(_, checked) => setSoundOnReviewComplete(checked)}
+                       />
+                     }
+                     label={soundOnReviewComplete ? 'On' : 'Off'}
+                   />
+                  </Box>
                 </CardContent>
               </Card>
             </motion.div>

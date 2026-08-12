@@ -18,6 +18,7 @@ import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useDeltaReview } from '@/hooks/useDeltaReview';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
+import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
@@ -133,6 +134,7 @@ export default function DeltaReview() {
     error,
   } = useDeltaReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
+  const playReviewCompleteSound = useReviewCompleteSound();
 
   const canSubmit = useMemo(() => baselineJson.trim() && updatedJson.trim(), [baselineJson, updatedJson]);
   const activeResult = result ?? persistedResult;
@@ -393,6 +395,7 @@ export default function DeltaReview() {
                   runDeltaReview(payload, {
                     onSuccess: (response) => {
                       setPersistedResult(response);
+                      playReviewCompleteSound();
                     },
                   });
                 } catch (parseException) {

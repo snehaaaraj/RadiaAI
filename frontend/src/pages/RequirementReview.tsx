@@ -18,6 +18,7 @@ import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useRequirementReview } from '@/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
+import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
@@ -66,6 +67,7 @@ export default function RequirementReview() {
     error,
   } = useRequirementReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
+  const playReviewCompleteSound = useReviewCompleteSound();
 
   const canSubmit = useMemo(() => text.trim().length > 0, [text]);
   const activeResult = result ?? persistedResult;
@@ -234,6 +236,7 @@ export default function RequirementReview() {
                 }, {
                   onSuccess: (response) => {
                     setPersistedResult(response);
+                    playReviewCompleteSound();
                   },
                 })
               }
