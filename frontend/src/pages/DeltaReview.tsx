@@ -135,11 +135,35 @@ export default function DeltaReview() {
   } = useDeltaReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
   const playReviewCompleteSound = useReviewCompleteSound();
-  const dispositionSaved = useRef(false);
+
+  const DISPOSITION_SAVED_KEY = 'delta-review-disposition-saved';
+
+  // On mount: if disposition was saved last time, clear all review data
+  useEffect(() => {
+    if (sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true') {
+      sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
+      clearFormState();
+      clearPersistedResult();
+      setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
+      setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
+      setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
+      setTraceJson(DEFAULT_DELTA_FORM_STATE.traceJson);
+      setParseError(DEFAULT_DELTA_FORM_STATE.parseError);
+      setBaselineMode(DEFAULT_DELTA_FORM_STATE.baselineMode);
+      setUpdatedMode(DEFAULT_DELTA_FORM_STATE.updatedMode);
+      setTraceMode(DEFAULT_DELTA_FORM_STATE.traceMode);
+      setBaselineFilename(DEFAULT_DELTA_FORM_STATE.baselineFilename);
+      setUpdatedFilename(DEFAULT_DELTA_FORM_STATE.updatedFilename);
+      setTraceFilename(DEFAULT_DELTA_FORM_STATE.traceFilename);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const canSubmit = useMemo(() => baselineJson.trim() && updatedJson.trim(), [baselineJson, updatedJson]);
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
+
+  const dispositionSavedThisSession = sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true';
 
   // Guard navigation: dirty while input is changed or result is unacknowledged.
   // Once the user saves a disposition, the result is considered acknowledged.
@@ -150,7 +174,7 @@ export default function DeltaReview() {
     specificationId !== DEFAULT_DELTA_FORM_STATE.specificationId ||
     !!activeResult ||
     isPending
-  ) && !dispositionSaved.current;
+  ) && !dispositionSavedThisSession;
   useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
@@ -165,7 +189,7 @@ export default function DeltaReview() {
   const handleClearAll = () => {
     clearFormState();
     clearPersistedResult();
-    dispositionSaved.current = false;
+    sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
     setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
     setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
     setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
@@ -473,7 +497,7 @@ export default function DeltaReview() {
                         findings={reviewedRequirement.findings}
                         reviewId={activeResult.review_id}
                         onApplyDisposition={(reviewId, payload) => {
-                          dispositionSaved.current = true;
+                          sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
                           applyDisposition({ reviewId, payload });
                         }}
                         isApplyingDisposition={isApplyingDisposition}
