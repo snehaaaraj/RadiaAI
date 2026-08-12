@@ -4,17 +4,16 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Outlet, useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
+import { NavigationConfirmDialog } from '@/components/common/NavigationConfirmDialog';
+import { NavigationGuardProvider, useNavigationGuardContext } from '@/context/NavigationGuardContext';
 import { useAppContext } from '@/context/AppContext';
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 
-/**
- * Root layout wrapper — renders TopBar + Sidebar + page content (via Outlet).
- * All authenticated pages are rendered inside this layout.
- */
-export function AppLayout() {
+function AppLayoutInner() {
   const { sidebarOpen, motionPreference, uiDensity } = useAppContext();
   const location = useLocation();
   const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+  const { dialogOpen, handleConfirm, handleCancel } = useNavigationGuardContext();
 
   return (
     <Box display="flex">
@@ -51,6 +50,24 @@ export function AppLayout() {
           </motion.div>
         </AnimatePresence>
       </Box>
+
+      <NavigationConfirmDialog
+        open={dialogOpen}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
     </Box>
+  );
+}
+
+/**
+ * Root layout wrapper — renders TopBar + Sidebar + page content (via Outlet).
+ * All authenticated pages are rendered inside this layout.
+ */
+export function AppLayout() {
+  return (
+    <NavigationGuardProvider>
+      <AppLayoutInner />
+    </NavigationGuardProvider>
   );
 }

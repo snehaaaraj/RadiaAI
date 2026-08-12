@@ -17,6 +17,7 @@ import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
 import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
 import { ReviewResultHero } from '@/components/review/ReviewResultHero';
 import { useDeltaReview } from '@/hooks/useDeltaReview';
+import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useApplyFindingDisposition } from '@/hooks/useReviewHistory';
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
@@ -136,6 +137,16 @@ export default function DeltaReview() {
   const canSubmit = useMemo(() => baselineJson.trim() && updatedJson.trim(), [baselineJson, updatedJson]);
   const activeResult = result ?? persistedResult;
   const resultRef = useRef<HTMLDivElement | null>(null);
+
+  // Dirty = user has changed from the default sample values, is running a review, or has a result
+  const isDirty =
+    baselineJson !== DEFAULT_DELTA_FORM_STATE.baselineJson ||
+    updatedJson !== DEFAULT_DELTA_FORM_STATE.updatedJson ||
+    traceJson !== DEFAULT_DELTA_FORM_STATE.traceJson ||
+    specificationId !== DEFAULT_DELTA_FORM_STATE.specificationId ||
+    !!activeResult ||
+    isPending;
+  useNavigationGuard(isDirty);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
     setFormState((current) => ({ ...current, ...next }));

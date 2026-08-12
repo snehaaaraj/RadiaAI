@@ -17,7 +17,8 @@ import MenuBookIcon from '@mui/icons-material/MenuBook';
 import SettingsIcon from '@mui/icons-material/Settings';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import MenuOpenIcon from '@mui/icons-material/MenuOpen';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
+import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
 import { ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 
@@ -36,7 +37,7 @@ const BOTTOM_ITEMS = [
 
 export function Sidebar() {
   const { sidebarOpen, setSidebarOpen } = useAppContext();
-  const navigate = useNavigate();
+  const { guardedNavigate } = useNavigationGuardContext();
   const location = useLocation();
   const currentWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
@@ -73,7 +74,7 @@ export function Sidebar() {
             <Tooltip title={sidebarOpen ? '' : label} placement="right">
               <ListItemButton
                 selected={location.pathname === path}
-                onClick={() => navigate(path)}
+                onClick={() => guardedNavigate(path)}
                 sx={{
                   mx: 1,
                   my: 0.5,
@@ -124,7 +125,7 @@ export function Sidebar() {
             <Tooltip title={sidebarOpen ? '' : label} placement="right">
               <ListItemButton
                 selected={location.pathname === path}
-                onClick={() => navigate(path)}
+                onClick={() => guardedNavigate(path)}
                 sx={{
                   mx: 1,
                   px: sidebarOpen ? 1.5 : 1.25,
@@ -145,7 +146,7 @@ export function Sidebar() {
       {sidebarOpen && (
         <Box px={2} pb={2}>
           <Typography variant="caption" color="text.secondary">
-            v0.1.0 — Phase 2
+            v0.1.0 - Phase 2
           </Typography>
         </Box>
       )}
