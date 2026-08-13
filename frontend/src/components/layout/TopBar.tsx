@@ -16,9 +16,10 @@ import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import BugReportIcon from '@mui/icons-material/BugReport';
 import type { KeyboardEvent, MouseEvent } from 'react';
 import { useMemo, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { RadiaMark } from './RadiaMark';
 import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
-import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
+import { HEADER_HEIGHT, ROUTES, ROUTE_TITLES } from '@/utils/constants';
 
 type HeaderSearchOption = {
   label: string;
@@ -63,6 +64,7 @@ interface TopBarProps {
 
 export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
   const theme = useTheme();
+  const location = useLocation();
   const isLandingMode = mode === 'landing';
   const flightColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000';
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
@@ -105,6 +107,10 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
 
   const openSupport = (event: MouseEvent<HTMLButtonElement>) => setSupportAnchor(event.currentTarget);
   const closeSupport = () => setSupportAnchor(null);
+  const currentWorkspaceLabel =
+    location.pathname === ROUTES.REVIEW_REQUIREMENT
+      ? 'Jama Requirement Review'
+      : (ROUTE_TITLES[location.pathname] ?? 'Workspace');
 
   return (
     <AppBar
@@ -197,7 +203,13 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             <FlightTakeoffIcon className="radia-hover-plane" />
           </Box>
           <RadiaMark size={32} />
-          <Typography component="span" variant={isLandingMode ? 'h4' : 'h5'} fontWeight={900} color={brandWordmarkColor}>
+          <Typography
+            component="span"
+            variant={isLandingMode ? 'h4' : 'h5'}
+            fontWeight={900}
+            color={brandWordmarkColor}
+            sx={{ letterSpacing: '-0.02em', lineHeight: 1.05 }}
+          >
             RADIA
           </Typography>
         </Link>
@@ -240,28 +252,41 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             ))}
           </Stack>
         ) : (
-          <Link
-            component="button"
-            type="button"
-            underline="none"
-            color={brandWordmarkColor}
-            variant="h6"
-            fontWeight={800}
-            onClick={() => guardedNavigate(ROUTES.HOME)}
-            sx={{
-              px: 0.75,
-              py: 0.25,
-              borderRadius: 1,
-              transition: 'transform 160ms ease, background-color 160ms ease',
-              '&:hover': {
-                textDecoration: 'none',
-                backgroundColor: hoverHighlight,
-                transform: 'scale(1.04)',
-              },
-            }}
-          >
-            Radia AI 2.0
-          </Link>
+          <Stack direction="row" alignItems="center" spacing={1.25}>
+            <Link
+              component="button"
+              type="button"
+              underline="none"
+              color={brandWordmarkColor}
+              variant="subtitle1"
+              fontWeight={700}
+              onClick={() => guardedNavigate(ROUTES.RADIA_AI_RESOURCES)}
+              sx={{
+                px: 0.35,
+                py: 0.2,
+                borderRadius: 1,
+                fontSize: { xs: '0.86rem', md: '0.95rem' },
+                transition: 'transform 160ms ease, background-color 160ms ease',
+                '&:hover': {
+                  textDecoration: 'none',
+                  backgroundColor: hoverHighlight,
+                  transform: 'scale(1.03)',
+                },
+              }}
+            >
+              Radia AI
+            </Link>
+            <Typography component="span" sx={{ color: headerForegroundColor, opacity: 0.65, fontWeight: 700 }}>
+              |
+            </Typography>
+            <Typography
+              component="span"
+              variant="subtitle1"
+              sx={{ color: brandWordmarkColor, fontWeight: 600, fontSize: { xs: '0.84rem', md: '0.93rem' } }}
+            >
+              {currentWorkspaceLabel}
+            </Typography>
+          </Stack>
         )}
         <Box sx={{ flexGrow: 1 }} />
 
