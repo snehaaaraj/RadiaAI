@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { CssBaseline, ThemeProvider } from '@mui/material';
-import { useMemo, type ReactNode } from 'react';
+import { useEffect, useMemo, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import Landing from '@/pages/Landing';
@@ -68,6 +68,23 @@ function ThemeShell({ children }: { children: ReactNode }) {
   const mode = themePreference === 'system' ? (prefersDark ? 'dark' : 'light') : themePreference;
 
   const theme = useMemo(() => createAppTheme(mode, accentColor, uiDensity), [mode, accentColor, uiDensity]);
+  useEffect(() => {
+    const faviconHref = mode === 'dark' ? '/radia-icon-dark.jpg' : '/radia-icon-light.png';
+    const faviconType = mode === 'dark' ? 'image/jpeg' : 'image/png';
+    const faviconLink = document.querySelector("link[rel='icon']") as HTMLLinkElement | null;
+
+    if (faviconLink) {
+      faviconLink.href = faviconHref;
+      faviconLink.type = faviconType;
+      return;
+    }
+
+    const newFaviconLink = document.createElement('link');
+    newFaviconLink.rel = 'icon';
+    newFaviconLink.href = faviconHref;
+    newFaviconLink.type = faviconType;
+    document.head.appendChild(newFaviconLink);
+  }, [mode]);
 
   return (
     <ThemeProvider theme={theme}>
