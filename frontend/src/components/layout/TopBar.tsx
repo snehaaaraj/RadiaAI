@@ -39,8 +39,13 @@ const HEADER_SEARCH_OPTIONS: HeaderSearchOption[] = [
 const SUPPORT_EMAIL = 'sneha.nagaraju@radia.com';
 const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
 
-export function TopBar() {
+interface TopBarProps {
+  showSearch?: boolean;
+}
+
+export function TopBar({ showSearch = true }: TopBarProps) {
   const theme = useTheme();
+  const flightColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000';
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
   const hoverHighlight = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(47,70,89,0.10)';
   const { guardedNavigate } = useNavigationGuardContext();
@@ -92,22 +97,19 @@ export function TopBar() {
       }}
     >
       <Toolbar sx={{ gap: 1.5, color: headerForegroundColor, minHeight: `${HEADER_HEIGHT}px !important` }}>
-        <RadiaMark size={32} />
         <Link
           href="https://radia.com/"
           target="_blank"
           rel="noopener noreferrer"
           underline="none"
-          color={headerForegroundColor}
-          variant="h5"
-          fontWeight={900}
           sx={{
-            px: 1.3,
+            px: 0.65,
             py: 0.25,
             borderRadius: 1,
             position: 'relative',
             display: 'inline-flex',
             alignItems: 'center',
+            gap: 1,
             overflow: 'visible',
             transition: 'transform 180ms ease',
             '&:hover': {
@@ -127,22 +129,9 @@ export function TopBar() {
                 transform: 'translate(26px, -14px) rotate(4deg) scale(1)',
               },
             },
-            '@keyframes radiaTrailFade': {
-              '0%': {
-                opacity: 0,
-                transform: 'scaleX(0.55)',
-              },
-              '35%': {
-                opacity: 0.4,
-              },
-              '100%': {
-                opacity: 0,
-                transform: 'scaleX(1.15)',
-              },
-            },
             '& .radia-hover-flight': {
               position: 'absolute',
-              left: -26,
+              left: 20,
               top: -8,
               display: 'inline-flex',
               alignItems: 'center',
@@ -154,38 +143,25 @@ export function TopBar() {
             },
             '& .radia-hover-plane': {
               fontSize: 20,
-            },
-            '& .radia-hover-trail': {
-              position: 'absolute',
-              left: -10,
-              top: 16,
-              width: 24,
-              height: 2,
-              borderRadius: 999,
-              bgcolor: headerForegroundColor,
-              opacity: 0,
-              transformOrigin: 'left center',
-              pointerEvents: 'none',
+              color: flightColor,
             },
             '&:hover .radia-hover-flight': {
               animation: 'radiaPlaneFly 2850ms cubic-bezier(0.22, 1, 0.36, 1)',
-            },
-            '&:hover .radia-hover-trail': {
-              animation: 'radiaTrailFade 2800ms ease-out',
             },
             '@media (prefers-reduced-motion: reduce)': {
               transition: 'none',
               '&:hover': { transform: 'none' },
               '&:hover .radia-hover-flight': { animation: 'none', opacity: 0 },
-              '&:hover .radia-hover-trail': { animation: 'none', opacity: 0 },
             },
           }}
         >
           <Box className="radia-hover-flight" aria-hidden>
             <FlightTakeoffIcon className="radia-hover-plane" />
-            <Box className="radia-hover-trail" />
           </Box>
-          RADIA
+          <RadiaMark size={32} />
+          <Typography component="span" variant="h5" fontWeight={900} color={headerForegroundColor}>
+            RADIA
+          </Typography>
         </Link>
         <Box sx={{ width: 3, height: 24, bgcolor: headerForegroundColor, borderRadius: 1 }} />
         <Link
@@ -195,7 +171,7 @@ export function TopBar() {
           color={headerForegroundColor}
           variant="h6"
           fontWeight={800}
-          onClick={() => guardedNavigate(ROUTES.LANDING)}
+          onClick={() => guardedNavigate(ROUTES.HOME)}
           sx={{
             px: 0.75,
             py: 0.25,
@@ -212,47 +188,49 @@ export function TopBar() {
         </Link>
         <Box sx={{ flexGrow: 1 }} />
 
-        <Autocomplete
-          value={searchValue}
-          onChange={(_event, option) => {
-            setSearchValue(option);
-            navigateToSearchOption(option);
-          }}
-          inputValue={searchInputValue}
-          onInputChange={(_event, value) => setSearchInputValue(value)}
-          options={uniqueSearchOptions}
-          getOptionLabel={(option) => option.label}
-          size="small"
-          sx={{
-            width: 320,
-            '& .MuiInputBase-root': {
-              color: headerForegroundColor,
-              transition: 'transform 160ms ease, background-color 160ms ease',
-              '&:hover': {
-                backgroundColor: hoverHighlight,
-                transform: 'scale(1.01)',
+        {showSearch && (
+          <Autocomplete
+            value={searchValue}
+            onChange={(_event, option) => {
+              setSearchValue(option);
+              navigateToSearchOption(option);
+            }}
+            inputValue={searchInputValue}
+            onInputChange={(_event, value) => setSearchInputValue(value)}
+            options={uniqueSearchOptions}
+            getOptionLabel={(option) => option.label}
+            size="small"
+            sx={{
+              width: 320,
+              '& .MuiInputBase-root': {
+                color: headerForegroundColor,
+                transition: 'transform 160ms ease, background-color 160ms ease',
+                '&:hover': {
+                  backgroundColor: hoverHighlight,
+                  transform: 'scale(1.01)',
+                },
               },
-            },
-            '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(47,70,89,0.35)',
-            },
-          }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              placeholder="Search tabs..."
-              onKeyDown={handleSearchEnter}
-              InputProps={{
-                ...params.InputProps,
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" sx={{ color: headerForegroundColor }} />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          )}
-        />
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(47,70,89,0.35)',
+              },
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search tabs..."
+                onKeyDown={handleSearchEnter}
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" sx={{ color: headerForegroundColor }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            )}
+          />
+        )}
 
         <Button
           color="inherit"
