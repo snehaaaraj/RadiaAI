@@ -121,6 +121,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
   const openSupport = (event: MouseEvent<HTMLButtonElement>) => setSupportAnchor(event.currentTarget);
   const closeSupport = () => setSupportAnchor(null);
   const currentSubpageLabel = WORKSPACE_SUBPAGE_LABELS[location.pathname] ?? 'Workspace';
+  const showGlobalSettings = location.pathname !== ROUTES.LANDING;
 
   return (
     <AppBar
@@ -376,6 +377,27 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
           />
         )}
 
+        {showGlobalSettings && (
+          <Button
+            color="inherit"
+            onClick={() => guardedNavigate(ROUTES.SETTINGS)}
+            sx={{
+              textTransform: 'none',
+              minWidth: 'auto',
+              fontWeight: 600,
+              color: headerForegroundColor,
+              px: 1,
+              borderRadius: 1,
+              transition: 'transform 160ms ease, background-color 160ms ease',
+              '&:hover': {
+                backgroundColor: hoverHighlight,
+                transform: 'scale(1.04)',
+              },
+            }}
+          >
+            Settings
+          </Button>
+        )}
         <Button
           color="inherit"
           onClick={openSupport}

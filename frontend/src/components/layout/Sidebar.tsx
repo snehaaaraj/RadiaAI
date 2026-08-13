@@ -14,7 +14,6 @@ import RuleIcon from '@mui/icons-material/Rule';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import SettingsIcon from '@mui/icons-material/Settings';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -33,7 +32,6 @@ const NAV_ITEMS = [
 
 const BOTTOM_ITEMS = [
   { label: 'Launchpad', icon: <RocketLaunchIcon />, path: ROUTES.LANDING },
-  { label: 'Settings', icon: <SettingsIcon />, path: ROUTES.SETTINGS },
 ] as const;
 
 const LABEL_ANIMATION_MS = 220;
