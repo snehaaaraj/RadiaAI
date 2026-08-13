@@ -41,6 +41,7 @@ const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
 
 export function TopBar() {
   const theme = useTheme();
+  const flightColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000';
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
   const hoverHighlight = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(47,70,89,0.10)';
   const { guardedNavigate } = useNavigationGuardContext();
@@ -138,7 +139,7 @@ export function TopBar() {
             },
             '& .radia-hover-plane': {
               fontSize: 20,
-              color: '#FFFFFF',
+              color: flightColor,
             },
             '&:hover .radia-hover-flight': {
               animation: 'radiaPlaneFly 2850ms cubic-bezier(0.22, 1, 0.36, 1)',
