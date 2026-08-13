@@ -124,19 +124,6 @@ export function TopBar() {
                 transform: 'translate(26px, -14px) rotate(4deg) scale(1)',
               },
             },
-            '@keyframes radiaTrailFade': {
-              '0%': {
-                opacity: 0,
-                transform: 'scaleX(0.55)',
-              },
-              '35%': {
-                opacity: 0.4,
-              },
-              '100%': {
-                opacity: 0,
-                transform: 'scaleX(1.15)',
-              },
-            },
             '& .radia-hover-flight': {
               position: 'absolute',
               left: 20,
@@ -153,35 +140,18 @@ export function TopBar() {
               fontSize: 20,
               color: '#FFFFFF',
             },
-            '& .radia-hover-trail': {
-              position: 'absolute',
-              left: -10,
-              top: 16,
-              width: 24,
-              height: 2,
-              borderRadius: 999,
-              bgcolor: '#FFFFFF',
-              opacity: 0,
-              transformOrigin: 'left center',
-              pointerEvents: 'none',
-            },
             '&:hover .radia-hover-flight': {
               animation: 'radiaPlaneFly 2850ms cubic-bezier(0.22, 1, 0.36, 1)',
-            },
-            '&:hover .radia-hover-trail': {
-              animation: 'radiaTrailFade 2800ms ease-out',
             },
             '@media (prefers-reduced-motion: reduce)': {
               transition: 'none',
               '&:hover': { transform: 'none' },
               '&:hover .radia-hover-flight': { animation: 'none', opacity: 0 },
-              '&:hover .radia-hover-trail': { animation: 'none', opacity: 0 },
             },
           }}
         >
           <Box className="radia-hover-flight" aria-hidden>
             <FlightTakeoffIcon className="radia-hover-plane" />
-            <Box className="radia-hover-trail" />
           </Box>
           <RadiaMark size={32} />
           <Typography component="span" variant="h5" fontWeight={900} color={headerForegroundColor}>
