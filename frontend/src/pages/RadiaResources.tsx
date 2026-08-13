@@ -9,7 +9,7 @@ import Tabs from '@mui/material/Tabs';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { TopBar } from '@/components/layout/TopBar';
 import { NavigationGuardProvider } from '@/context/NavigationGuardContext';
@@ -49,11 +49,12 @@ export default function RadiaResources() {
   const isDark = theme.palette.mode === 'dark';
 
   const requestedToolId = searchParams.get('tool');
-  const initialToolId = useMemo<ToolResource['id']>(() => {
-    if (requestedToolId === 'jama-roundtrip') return 'jama-roundtrip';
-    return DEFAULT_TOOL_ID;
-  }, [requestedToolId]);
-  const [selectedToolId, setSelectedToolId] = useState<ToolResource['id']>(initialToolId);
+  const requestedTabToolId: ToolResource['id'] = requestedToolId === 'jama-roundtrip' ? 'jama-roundtrip' : DEFAULT_TOOL_ID;
+  const [selectedToolId, setSelectedToolId] = useState<ToolResource['id']>(requestedTabToolId);
+
+  useEffect(() => {
+    setSelectedToolId(requestedTabToolId);
+  }, [requestedTabToolId]);
 
   const selectedTool = TOOL_RESOURCES.find((tool) => tool.id === selectedToolId) ?? TOOL_RESOURCES[0];
 
