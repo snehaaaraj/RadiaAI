@@ -52,7 +52,7 @@ const THEMES: Array<{
 ];
 
 const START_PAGE_OPTIONS: Array<{ value: WorkspaceStartPage; label: string }> = [
-  { value: ROUTES.HOME, label: 'Workspace Home' },
+  { value: ROUTES.HOME, label: 'Home' },
   { value: ROUTES.REVIEW_REQUIREMENT, label: 'Single Requirement Review' },
   { value: ROUTES.REVIEW_DELTA, label: 'Delta Review' },
   { value: ROUTES.REVIEW_HISTORY, label: 'Review History' },
