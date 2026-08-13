@@ -28,14 +28,14 @@ const TOOL_RESOURCES: ToolResource[] = [
     id: 'jama-requirement-review',
     label: 'Jama Requirement Review',
     description:
-      'Run deterministic quality checks for Jama requirements with explainable findings and traceability-ready outputs.',
+      'Run deterministic quality checks for Jama requirements with explainable findings/suggestions and resource traceability-ready outputs.',
     route: ROUTES.HOME,
   },
   {
     id: 'jama-roundtrip',
     label: 'Jama Roundtrip',
     description:
-      'Synchronize requirement changes across systems with guided roundtrip flows. This tool is planned and will be added here when ready.',
+      'Simplify Jama Roundtrip tasks with automated scripts. This tool is planned and will be added here when ready.',
     route: null,
   },
 ];

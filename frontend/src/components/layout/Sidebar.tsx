@@ -14,7 +14,10 @@ import RuleIcon from '@mui/icons-material/Rule';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
-import SettingsIcon from '@mui/icons-material/Settings';
+import PaletteIcon from '@mui/icons-material/Palette';
+import TuneIcon from '@mui/icons-material/Tune';
+import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -22,6 +25,7 @@ import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
 import { HEADER_HEIGHT, ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
+import { SETTINGS_SECTION_ITEMS } from '@/utils/settingsSections';
 
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
@@ -33,7 +37,6 @@ const NAV_ITEMS = [
 
 const BOTTOM_ITEMS = [
   { label: 'Launchpad', icon: <RocketLaunchIcon />, path: ROUTES.LANDING },
-  { label: 'Settings', icon: <SettingsIcon />, path: ROUTES.SETTINGS },
 ] as const;
 
 const LABEL_ANIMATION_MS = 220;
@@ -42,151 +45,252 @@ export function Sidebar() {
   const { sidebarOpen, setSidebarOpen } = useAppContext();
   const { guardedNavigate } = useNavigationGuardContext();
   const location = useLocation();
+  const isSettingsPage = location.pathname === ROUTES.SETTINGS;
   const currentWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+  const activeSettingsSection = location.hash.replace('#', '') || SETTINGS_SECTION_ITEMS[0].id;
+
+  const scrollToSettingsSection = (sectionId: string) => {
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (window.location.hash !== `#${sectionId}`) {
+      window.history.replaceState(null, '', `#${sectionId}`);
+    }
+  };
+
+  const settingsSectionIcons: Record<string, JSX.Element> = {
+    'theme-mode': <PaletteIcon />,
+    'startup-behavior': <TuneIcon />,
+    'review-notifications': <NotificationsActiveIcon />,
+    'reset-personalization': <RestartAltIcon />,
+  };
 
   const drawerContent = (
     <Box display="flex" flexDirection="column" height="100%">
       <List sx={{ flexGrow: 1, pt: 1 }}>
-        {NAV_ITEMS.map(({ label, icon, path }) => (
-          <ListItem key={path} disablePadding>
-            <Tooltip title={sidebarOpen ? '' : label} placement="right">
-              <ListItemButton
-                selected={location.pathname === path}
-                onClick={() => guardedNavigate(path)}
-                sx={{
-                  mx: 1,
-                  my: 0.5,
-                  px: sidebarOpen ? 1.5 : 1.25,
-                  justifyContent: sidebarOpen ? 'flex-start' : 'center',
-                  borderRadius: 1.5,
-                  position: 'relative',
-                  overflow: 'hidden',
-                  transition: (theme) =>
-                    theme.transitions.create(['background-color', 'transform', 'padding'], {
-                      duration: LABEL_ANIMATION_MS,
-                      easing: theme.transitions.easing.easeInOut,
-                    }),
-                  '&::before': {
-                    content: '""',
-                    position: 'absolute',
-                    left: 0,
-                    top: 0,
-                    bottom: 0,
-                    width: 4,
-                    bgcolor: 'transparent',
-                  },
-                  '&.Mui-selected': {
-                    bgcolor: 'primary.main',
-                    color: 'white',
-                    '& .MuiListItemIcon-root': { color: 'white' },
-                    '&:hover': { bgcolor: 'primary.dark' },
-                    '&::before': {
-                      bgcolor: 'secondary.main',
-                    },
-                  },
-                  '&:hover': {
-                    transform: sidebarOpen ? 'translateX(2px)' : 'none',
-                  },
-                }}
-              >
-                <ListItemIcon
-                  sx={(theme) => ({
-                    minWidth: sidebarOpen ? 36 : 0,
-                    mr: sidebarOpen ? 1 : 0,
-                    justifyContent: 'center',
-                    transition: theme.transitions.create(['min-width', 'margin-right'], {
-                      duration: LABEL_ANIMATION_MS,
-                      easing: theme.transitions.easing.easeInOut,
-                    }),
-                  })}
-                >
-                  {icon}
-                </ListItemIcon>
-                <ListItemText
-                  primary={label}
-                  primaryTypographyProps={{ noWrap: true }}
-                  sx={(theme) => ({
-                    m: 0,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    maxWidth: sidebarOpen ? 200 : 0,
-                    opacity: sidebarOpen ? 1 : 0,
-                    transform: sidebarOpen ? 'translateX(0)' : 'translateX(-6px)',
-                    transition: theme.transitions.create(
-                      ['max-width', 'opacity', 'transform'],
-                      {
-                        duration: LABEL_ANIMATION_MS,
-                        easing: theme.transitions.easing.easeInOut,
-                      }
-                    ),
-                  })}
-                />
-              </ListItemButton>
-            </Tooltip>
-          </ListItem>
-        ))}
+        {isSettingsPage
+          ? SETTINGS_SECTION_ITEMS.map((item) => (
+              <ListItem key={item.id} disablePadding>
+                <Tooltip title={sidebarOpen ? '' : item.label} placement="right">
+                  <ListItemButton
+                    selected={activeSettingsSection === item.id}
+                    onClick={() => scrollToSettingsSection(item.id)}
+                    sx={{
+                      mx: 1,
+                      my: 0.5,
+                      px: sidebarOpen ? 1.5 : 1.25,
+                      justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                      borderRadius: 1.5,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: (theme) =>
+                        theme.transitions.create(['background-color', 'transform', 'padding'], {
+                          duration: LABEL_ANIMATION_MS,
+                          easing: theme.transitions.easing.easeInOut,
+                        }),
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 4,
+                        bgcolor: 'transparent',
+                      },
+                      '&.Mui-selected': {
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                        '& .MuiListItemIcon-root': { color: 'white' },
+                        '&:hover': { bgcolor: 'primary.dark' },
+                        '&::before': {
+                          bgcolor: 'secondary.main',
+                        },
+                      },
+                      '&:hover': {
+                        transform: sidebarOpen ? 'translateX(2px)' : 'none',
+                      },
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={(theme) => ({
+                        minWidth: sidebarOpen ? 36 : 0,
+                        mr: sidebarOpen ? 1 : 0,
+                        justifyContent: 'center',
+                        transition: theme.transitions.create(['min-width', 'margin-right'], {
+                          duration: LABEL_ANIMATION_MS,
+                          easing: theme.transitions.easing.easeInOut,
+                        }),
+                      })}
+                    >
+                      {settingsSectionIcons[item.id]}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={item.label}
+                      primaryTypographyProps={{ noWrap: true }}
+                      sx={(theme) => ({
+                        m: 0,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        maxWidth: sidebarOpen ? 200 : 0,
+                        opacity: sidebarOpen ? 1 : 0,
+                        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-6px)',
+                        transition: theme.transitions.create(
+                          ['max-width', 'opacity', 'transform'],
+                          {
+                            duration: LABEL_ANIMATION_MS,
+                            easing: theme.transitions.easing.easeInOut,
+                          }
+                        ),
+                      })}
+                    />
+                  </ListItemButton>
+                </Tooltip>
+              </ListItem>
+            ))
+          : NAV_ITEMS.map(({ label, icon, path }) => (
+              <ListItem key={path} disablePadding>
+                <Tooltip title={sidebarOpen ? '' : label} placement="right">
+                  <ListItemButton
+                    selected={location.pathname === path}
+                    onClick={() => guardedNavigate(path)}
+                    sx={{
+                      mx: 1,
+                      my: 0.5,
+                      px: sidebarOpen ? 1.5 : 1.25,
+                      justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                      borderRadius: 1.5,
+                      position: 'relative',
+                      overflow: 'hidden',
+                      transition: (theme) =>
+                        theme.transitions.create(['background-color', 'transform', 'padding'], {
+                          duration: LABEL_ANIMATION_MS,
+                          easing: theme.transitions.easing.easeInOut,
+                        }),
+                      '&::before': {
+                        content: '""',
+                        position: 'absolute',
+                        left: 0,
+                        top: 0,
+                        bottom: 0,
+                        width: 4,
+                        bgcolor: 'transparent',
+                      },
+                      '&.Mui-selected': {
+                        bgcolor: 'primary.main',
+                        color: 'white',
+                        '& .MuiListItemIcon-root': { color: 'white' },
+                        '&:hover': { bgcolor: 'primary.dark' },
+                        '&::before': {
+                          bgcolor: 'secondary.main',
+                        },
+                      },
+                      '&:hover': {
+                        transform: sidebarOpen ? 'translateX(2px)' : 'none',
+                      },
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={(theme) => ({
+                        minWidth: sidebarOpen ? 36 : 0,
+                        mr: sidebarOpen ? 1 : 0,
+                        justifyContent: 'center',
+                        transition: theme.transitions.create(['min-width', 'margin-right'], {
+                          duration: LABEL_ANIMATION_MS,
+                          easing: theme.transitions.easing.easeInOut,
+                        }),
+                      })}
+                    >
+                      {icon}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={label}
+                      primaryTypographyProps={{ noWrap: true }}
+                      sx={(theme) => ({
+                        m: 0,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        maxWidth: sidebarOpen ? 200 : 0,
+                        opacity: sidebarOpen ? 1 : 0,
+                        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-6px)',
+                        transition: theme.transitions.create(
+                          ['max-width', 'opacity', 'transform'],
+                          {
+                            duration: LABEL_ANIMATION_MS,
+                            easing: theme.transitions.easing.easeInOut,
+                          }
+                        ),
+                      })}
+                    />
+                  </ListItemButton>
+                </Tooltip>
+              </ListItem>
+            ))}
       </List>
 
-      <Divider />
+      {!isSettingsPage && (
+        <>
+          <Divider />
 
-      <List>
-        {BOTTOM_ITEMS.map(({ label, icon, path }) => (
-          <ListItem key={path} disablePadding>
-            <Tooltip title={sidebarOpen ? '' : label} placement="right">
-              <ListItemButton
-                selected={location.pathname === path}
-                onClick={() => guardedNavigate(path)}
-                sx={{
-                  mx: 1,
-                  my: 0.5,
-                  px: sidebarOpen ? 1.5 : 1.25,
-                  justifyContent: sidebarOpen ? 'flex-start' : 'center',
-                  borderRadius: 1.5,
-                  overflow: 'hidden',
-                  transition: (theme) =>
-                    theme.transitions.create(['padding'], {
-                      duration: LABEL_ANIMATION_MS,
-                      easing: theme.transitions.easing.easeInOut,
-                    }),
-                }}
-              >
-                <ListItemIcon
-                  sx={(theme) => ({
-                    minWidth: sidebarOpen ? 36 : 0,
-                    mr: sidebarOpen ? 1 : 0,
-                    justifyContent: 'center',
-                    transition: theme.transitions.create(['min-width', 'margin-right'], {
-                      duration: LABEL_ANIMATION_MS,
-                      easing: theme.transitions.easing.easeInOut,
-                    }),
-                  })}
-                >
-                  {icon}
-                </ListItemIcon>
-                <ListItemText
-                  primary={label}
-                  primaryTypographyProps={{ noWrap: true }}
-                  sx={(theme) => ({
-                    m: 0,
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    maxWidth: sidebarOpen ? 200 : 0,
-                    opacity: sidebarOpen ? 1 : 0,
-                    transform: sidebarOpen ? 'translateX(0)' : 'translateX(-6px)',
-                    transition: theme.transitions.create(
-                      ['max-width', 'opacity', 'transform'],
-                      {
-                        duration: LABEL_ANIMATION_MS,
-                        easing: theme.transitions.easing.easeInOut,
-                      }
-                    ),
-                  })}
-                />
-              </ListItemButton>
-            </Tooltip>
-          </ListItem>
-        ))}
-      </List>
+          <List>
+            {BOTTOM_ITEMS.map(({ label, icon, path }) => (
+              <ListItem key={path} disablePadding>
+                <Tooltip title={sidebarOpen ? '' : label} placement="right">
+                  <ListItemButton
+                    selected={location.pathname === path}
+                    onClick={() => guardedNavigate(path)}
+                    sx={{
+                      mx: 1,
+                      my: 0.5,
+                      px: sidebarOpen ? 1.5 : 1.25,
+                      justifyContent: sidebarOpen ? 'flex-start' : 'center',
+                      borderRadius: 1.5,
+                      overflow: 'hidden',
+                      transition: (theme) =>
+                        theme.transitions.create(['padding'], {
+                          duration: LABEL_ANIMATION_MS,
+                          easing: theme.transitions.easing.easeInOut,
+                        }),
+                    }}
+                  >
+                    <ListItemIcon
+                      sx={(theme) => ({
+                        minWidth: sidebarOpen ? 36 : 0,
+                        mr: sidebarOpen ? 1 : 0,
+                        justifyContent: 'center',
+                        transition: theme.transitions.create(['min-width', 'margin-right'], {
+                          duration: LABEL_ANIMATION_MS,
+                          easing: theme.transitions.easing.easeInOut,
+                        }),
+                      })}
+                    >
+                      {icon}
+                    </ListItemIcon>
+                    <ListItemText
+                      primary={label}
+                      primaryTypographyProps={{ noWrap: true }}
+                      sx={(theme) => ({
+                        m: 0,
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        maxWidth: sidebarOpen ? 200 : 0,
+                        opacity: sidebarOpen ? 1 : 0,
+                        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-6px)',
+                        transition: theme.transitions.create(
+                          ['max-width', 'opacity', 'transform'],
+                          {
+                            duration: LABEL_ANIMATION_MS,
+                            easing: theme.transitions.easing.easeInOut,
+                          }
+                        ),
+                      })}
+                    />
+                  </ListItemButton>
+                </Tooltip>
+              </ListItem>
+            ))}
+          </List>
+        </>
+      )}
 
       <Box
         px={2}

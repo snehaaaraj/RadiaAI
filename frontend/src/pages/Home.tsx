@@ -3,14 +3,12 @@ import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Chip from '@mui/material/Chip';
-import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid2';
 import RuleIcon from '@mui/icons-material/Rule';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppContext } from '@/context/AppContext';
@@ -49,7 +47,7 @@ export default function Home() {
       >
         <Box>
           <Typography variant="h4" gutterBottom fontWeight={700}>
-            Workspace Home
+            Home
           </Typography>
           <Typography variant="body1" color="text.secondary" maxWidth={720}>
             Deterministic review workflows for requirement quality, traceability, and revision control.

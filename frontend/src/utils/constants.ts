@@ -25,7 +25,7 @@ export const ROUTES = {
 export const ROUTE_TITLES: Record<string, string> = {
   [ROUTES.LANDING]: 'Launchpad',
   [ROUTES.RADIA_AI_RESOURCES]: 'Radia AI Resources',
-  [ROUTES.HOME]: 'Workspace Home',
+  [ROUTES.HOME]: 'Home',
   [ROUTES.REVIEW_REQUIREMENT]: 'Individual Requirement Review',
   [ROUTES.REVIEW_DELTA]: 'Delta Review',
   [ROUTES.REVIEW_HISTORY]: 'Review History',
