@@ -31,6 +31,7 @@ class VerifiabilityReviewer(RequirementReviewer):
         has_number = bool(re.search(r"\b\d+(\.\d+)?\b", text))
         found_unmeasurable = sorted({term for term in UNMEASURABLE_TERMS if term in lower_text})
         if not has_number and found_unmeasurable:
+            rewrite = _flag_unmeasurable_terms(text, found_unmeasurable)
             findings.append(
                 ReviewFinding(
                     category="Missing Quantitative Limits",
@@ -43,6 +44,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     evidence=f"Unmeasurable terms: {', '.join(found_unmeasurable)}",
                     recommendation="Replace qualitative terms with numeric acceptance thresholds.",
                     reference="INCOSE",
+                    suggested_rewrite=rewrite,
                 )
             )
 
@@ -60,6 +62,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     evidence=text,
                     recommendation="Add context such as environmental/mission condition bounds.",
                     reference="EARS",
+                    suggested_rewrite=f"When [operating condition], {text}",
                 )
             )
 
@@ -78,6 +81,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                         "Add measurable values, tolerances, or explicit pass/fail criteria."
                     ),
                     reference="INCOSE",
+                    suggested_rewrite=f"{text.rstrip('.')} within [VALUE ± TOLERANCE] [UNIT].",
                 )
             )
 
@@ -98,3 +102,16 @@ def _overall_from_findings(findings: list[ReviewFinding]) -> ReviewStatus:
     if any(f.status == ReviewStatus.REVISION_RECOMMENDED for f in findings):
         return ReviewStatus.REVISION_RECOMMENDED
     return ReviewStatus.ACCEPTABLE
+
+
+def _flag_unmeasurable_terms(text: str, terms: list[str]) -> str:
+    """Annotate unmeasurable terms with a numeric threshold placeholder."""
+    result = text
+    for term in terms:
+        result = re.sub(
+            rf'\b{re.escape(term)}\b',
+            f'[QUANTIFY: {term} → specify numeric threshold]',
+            result,
+            flags=re.IGNORECASE,
+        )
+    return result
