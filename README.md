@@ -98,15 +98,20 @@ RadiaAi-2.0/
 ## Current Frontend Experience
 
 - Dedicated **Launchpad** landing page at `/`
+- Dedicated **Radia AI Resources** page at `/radia-ai`
 - Main app workspace now starts at `/workspace`
 - Theme-aware branding with separate light and dark logo assets
+- Landing/resources header navigation:
+  - `RADIA | RADIA AI | Jama Requirement Review | Jama Roundtrip`
+- Workspace header breadcrumb:
+  - `RADIA | Radia AI | Jama Requirement Reviewer | <current sub-page>`
+- Resource-based workspace launch:
+  - selecting **Open workspace** launches the resource at `/workspace` (resource home)
 - Personalization controls for:
   - theme mode (system / light / dark)
-  - accent color
-  - UI density
-  - motion preference
   - default workspace start page
   - sidebar open/collapsed state
+  - review-complete sound notification
 - Animated page transitions and cards using **Framer Motion**
 - Persistent review form/results state across navigation for:
   - individual requirement review
@@ -149,8 +154,11 @@ docker compose up --build
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/api/docs
 
-The Dockerized frontend serves the Launchpad on `/` and the main workspace on
-`/workspace`.
+The Dockerized frontend serves:
+
+- Launchpad: `/`
+- Radia AI Resources: `/radia-ai`
+- Main workspace: `/workspace`
 
 ### 3. Local backend development (without Docker)
 
@@ -174,6 +182,7 @@ npm run dev
 Local frontend URLs:
 
 - Launchpad: http://localhost:5173/
+- Radia AI Resources: http://localhost:5173/radia-ai
 - Workspace: http://localhost:5173/workspace
 
 ---
