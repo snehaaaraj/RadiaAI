@@ -2,18 +2,12 @@ import DarkModeIcon from '@mui/icons-material/DarkMode';
 import LightModeIcon from '@mui/icons-material/LightMode';
 import PaletteIcon from '@mui/icons-material/Palette';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
-import TuneIcon from '@mui/icons-material/Tune';
-import ViewCompactAltIcon from '@mui/icons-material/ViewCompactAlt';
-import ViewComfyAltIcon from '@mui/icons-material/ViewComfyAlt';
-import MotionPhotosAutoIcon from '@mui/icons-material/MotionPhotosAuto';
-import ReduceCapacityIcon from '@mui/icons-material/ReduceCapacity';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardActionArea from '@mui/material/CardActionArea';
 import CardContent from '@mui/material/CardContent';
-import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid2';
@@ -26,7 +20,6 @@ import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import {
   useAppContext,
-  type AccentColor,
   type ThemePreference,
   type WorkspaceStartPage,
 } from '@/context/AppContext';
@@ -58,13 +51,6 @@ const THEMES: Array<{
   },
 ];
 
-const ACCENTS: Array<{ key: AccentColor; label: string; color: string }> = [
-  { key: 'indigo', label: 'Indigo', color: '#4F78E3' },
-  { key: 'violet', label: 'Violet', color: '#A855F7' },
-  { key: 'teal', label: 'Teal', color: '#14B8A6' },
-  { key: 'rose', label: 'Rose', color: '#FB7185' },
-];
-
 const START_PAGE_OPTIONS: Array<{ value: WorkspaceStartPage; label: string }> = [
   { value: ROUTES.HOME, label: 'Workspace Home' },
   { value: ROUTES.REVIEW_REQUIREMENT, label: 'Single Requirement Review' },
@@ -80,14 +66,9 @@ export default function Settings() {
   const {
     themePreference,
     setThemePreference,
-    accentColor,
-    setAccentColor,
     sidebarOpen,
     setSidebarOpen,
-    uiDensity,
-    setUiDensity,
     motionPreference,
-    setMotionPreference,
     defaultWorkspaceRoute,
     setDefaultWorkspaceRoute,
     soundOnReviewComplete,
@@ -109,7 +90,7 @@ export default function Settings() {
             Settings
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Personalize your workspace visuals, motion, layout density, and startup behavior.
+            Personalize theme mode, startup behavior, and review notifications.
           </Typography>
         </Box>
       </motion.div>
@@ -163,88 +144,6 @@ export default function Settings() {
                       </Grid>
                     ))}
                   </Grid>
-                </CardContent>
-              </Card>
-            </motion.div>
-
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-              animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-              transition={{ duration: 0.28, ease: 'easeOut', delay: 0.09 }}
-            >
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
-                    <TuneIcon color="primary" />
-                    <Typography variant="h6" fontWeight={700}>
-                      Workspace style
-                    </Typography>
-                  </Box>
-                  <Stack spacing={2.25}>
-                    <Box>
-                      <Typography variant="subtitle2" fontWeight={700} mb={1}>
-                        Accent color
-                      </Typography>
-                      <Stack direction="row" flexWrap="wrap" gap={1}>
-                        {ACCENTS.map((accent) => (
-                          <motion.div key={accent.key} whileHover={reduceMotion ? undefined : { scale: 1.04 }}>
-                            <Chip
-                              onClick={() => setAccentColor(accent.key)}
-                              clickable
-                              label={accent.label}
-                              color={accentColor === accent.key ? 'primary' : 'default'}
-                              sx={{
-                                borderWidth: 1,
-                                borderStyle: 'solid',
-                                borderColor: accent.color,
-                                backgroundColor: accentColor === accent.key ? `${accent.color}22` : 'transparent',
-                              }}
-                            />
-                          </motion.div>
-                        ))}
-                      </Stack>
-                    </Box>
-
-                    <Divider />
-
-                    <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight={700}>
-                          Density
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Compact gives tighter lists and controls. Comfortable uses roomier spacing.
-                        </Typography>
-                      </Box>
-                      <Button
-                        variant={uiDensity === 'compact' ? 'contained' : 'outlined'}
-                        startIcon={uiDensity === 'compact' ? <ViewCompactAltIcon /> : <ViewComfyAltIcon />}
-                        onClick={() => setUiDensity(uiDensity === 'compact' ? 'comfortable' : 'compact')}
-                      >
-                        {uiDensity === 'compact' ? 'Compact' : 'Comfortable'}
-                      </Button>
-                    </Box>
-
-                    <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
-                      <Box>
-                        <Typography variant="subtitle2" fontWeight={700}>
-                          Motion
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          Use expressive transitions across pages, or reduce for minimal movement.
-                        </Typography>
-                      </Box>
-                      <Button
-                        variant={motionPreference === 'reduced' ? 'outlined' : 'contained'}
-                        startIcon={
-                          motionPreference === 'reduced' ? <ReduceCapacityIcon /> : <MotionPhotosAutoIcon />
-                        }
-                        onClick={() => setMotionPreference(motionPreference === 'full' ? 'reduced' : 'full')}
-                      >
-                        {motionPreference === 'full' ? 'Full motion' : 'Reduced motion'}
-                      </Button>
-                    </Box>
-                  </Stack>
                 </CardContent>
               </Card>
             </motion.div>

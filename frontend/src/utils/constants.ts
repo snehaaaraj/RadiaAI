@@ -10,6 +10,7 @@ export const SIDEBAR_COLLAPSED_WIDTH = 76;
 
 export const ROUTES = {
   LANDING: '/',
+  RADIA_AI_RESOURCES: '/radia-ai',
   HOME: '/workspace',
   REVIEW_REQUIREMENT: '/review/requirement',
   REVIEW_DELTA: '/review/delta',
@@ -23,6 +24,7 @@ export const ROUTES = {
 
 export const ROUTE_TITLES: Record<string, string> = {
   [ROUTES.LANDING]: 'Launchpad',
+  [ROUTES.RADIA_AI_RESOURCES]: 'Radia AI Resources',
   [ROUTES.HOME]: 'Workspace Home',
   [ROUTES.REVIEW_REQUIREMENT]: 'Individual Requirement Review',
   [ROUTES.REVIEW_DELTA]: 'Delta Review',
