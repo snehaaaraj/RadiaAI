@@ -19,7 +19,7 @@ import { useMemo, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RadiaMark } from './RadiaMark';
 import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
-import { HEADER_HEIGHT, ROUTES, ROUTE_TITLES } from '@/utils/constants';
+import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 
 type HeaderSearchOption = {
   label: string;
@@ -54,6 +54,19 @@ const LANDING_NAV_ITEMS: LandingNavItem[] = [
   { label: 'Jama Requirement Review', path: ROUTES.REVIEW_REQUIREMENT },
   { label: 'Jama Roundtrip', path: `${ROUTES.RADIA_AI_RESOURCES}?tool=jama-roundtrip` },
 ];
+const TOOL_RESOURCE_NAME = 'Jama Requirement Reviewer';
+const TOOL_WORKSPACE_ROUTE = ROUTES.HOME;
+const WORKSPACE_SUBPAGE_LABELS: Record<string, string> = {
+  [ROUTES.HOME]: 'Home',
+  [ROUTES.REVIEW_REQUIREMENT]: 'Single Review',
+  [ROUTES.REVIEW_DELTA]: 'Delta Review',
+  [ROUTES.REVIEW_HISTORY]: 'Review History',
+  [ROUTES.STANDARDS]: 'Standards',
+  [ROUTES.CHAT]: 'Chat',
+  [ROUTES.SEARCH]: 'Search',
+  [ROUTES.DOCUMENTS]: 'Documents',
+  [ROUTES.SETTINGS]: 'Settings',
+};
 
 type TopBarMode = 'workspace' | 'landing';
 
@@ -107,10 +120,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
 
   const openSupport = (event: MouseEvent<HTMLButtonElement>) => setSupportAnchor(event.currentTarget);
   const closeSupport = () => setSupportAnchor(null);
-  const currentWorkspaceLabel =
-    location.pathname === ROUTES.REVIEW_REQUIREMENT
-      ? 'Jama Requirement Review'
-      : (ROUTE_TITLES[location.pathname] ?? 'Workspace');
+  const currentSubpageLabel = WORKSPACE_SUBPAGE_LABELS[location.pathname] ?? 'Workspace';
 
   return (
     <AppBar
@@ -279,12 +289,38 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             <Typography component="span" sx={{ color: headerForegroundColor, opacity: 0.65, fontWeight: 700 }}>
               |
             </Typography>
+            <Link
+              component="button"
+              type="button"
+              underline="none"
+              color={brandWordmarkColor}
+              variant="subtitle1"
+              fontWeight={700}
+              onClick={() => guardedNavigate(TOOL_WORKSPACE_ROUTE)}
+              sx={{
+                px: 0.35,
+                py: 0.2,
+                borderRadius: 1,
+                fontSize: { xs: '0.86rem', md: '0.95rem' },
+                transition: 'transform 160ms ease, background-color 160ms ease',
+                '&:hover': {
+                  textDecoration: 'none',
+                  backgroundColor: hoverHighlight,
+                  transform: 'scale(1.03)',
+                },
+              }}
+            >
+              {TOOL_RESOURCE_NAME}
+            </Link>
+            <Typography component="span" sx={{ color: headerForegroundColor, opacity: 0.65, fontWeight: 700 }}>
+              |
+            </Typography>
             <Typography
               component="span"
               variant="subtitle1"
               sx={{ color: brandWordmarkColor, fontWeight: 600, fontSize: { xs: '0.84rem', md: '0.93rem' } }}
             >
-              {currentWorkspaceLabel}
+              {currentSubpageLabel}
             </Typography>
           </Stack>
         )}
