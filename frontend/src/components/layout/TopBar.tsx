@@ -47,6 +47,7 @@ export function TopBar({ showSearch = true }: TopBarProps) {
   const theme = useTheme();
   const flightColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000';
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
+  const brandWordmarkColor = '#0F172A';
   const hoverHighlight = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(47,70,89,0.10)';
   const headerSurface = theme.palette.mode === 'dark' ? alpha('#0E1728', 0.62) : alpha('#F7FAFD', 0.78);
   const headerBorder = theme.palette.mode === 'dark' ? alpha('#E2E8F0', 0.16) : alpha('#2F4659', 0.16);
@@ -177,7 +178,7 @@ export function TopBar({ showSearch = true }: TopBarProps) {
             <FlightTakeoffIcon className="radia-hover-plane" />
           </Box>
           <RadiaMark size={32} />
-          <Typography component="span" variant="h5" fontWeight={900} color={headerForegroundColor}>
+          <Typography component="span" variant="h5" fontWeight={900} color={brandWordmarkColor}>
             RADIA
           </Typography>
         </Link>
@@ -186,7 +187,7 @@ export function TopBar({ showSearch = true }: TopBarProps) {
           component="button"
           type="button"
           underline="none"
-          color={headerForegroundColor}
+          color={brandWordmarkColor}
           variant="h6"
           fontWeight={800}
           onClick={() => guardedNavigate(ROUTES.HOME)}
