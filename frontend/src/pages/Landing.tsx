@@ -6,7 +6,6 @@ import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid2';
-import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -48,8 +47,6 @@ export default function Landing() {
     ? 'linear-gradient(126deg, rgba(26, 37, 60, 0.82) 0%, rgba(22, 34, 55, 0.78) 46%, rgba(18, 31, 50, 0.80) 100%)'
     : 'linear-gradient(126deg, rgba(255, 255, 255, 0.90) 0%, rgba(247, 251, 255, 0.92) 54%, rgba(240, 246, 252, 0.90) 100%)';
 
-  const footerBackground = isDark ? alpha('#0A1322', 0.86) : alpha('#F7FBFF', 0.92);
-
   return (
     <NavigationGuardProvider>
       <TopBar showSearch={false} />
@@ -74,39 +71,20 @@ export default function Landing() {
             sx={{
               position: 'absolute',
               inset: 0,
+              backgroundImage: `url(${windrunnerLanding})`,
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: 'cover',
+              opacity: isDark ? 0.82 : 0.78,
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              inset: 0,
               background: isDark
-                ? 'linear-gradient(90deg, rgba(10,16,28,0.92) 0%, rgba(10,16,28,0.80) 40%, rgba(10,16,28,0.32) 100%)'
-                : 'linear-gradient(90deg, rgba(247,250,254,0.97) 0%, rgba(247,250,254,0.88) 40%, rgba(247,250,254,0.40) 100%)',
-            }}
-          />
-          <Box
-            component="img"
-            src={windrunnerLanding}
-            alt=""
-            aria-hidden
-            sx={{
-              position: 'absolute',
-              right: { xs: -300, md: -260, lg: -160 },
-              top: { xs: 160, md: 78 },
-              width: { xs: 760, md: 1120, lg: 1260 },
-              maxWidth: 'none',
-              opacity: { xs: 0.2, md: 0.36 },
-              transform: 'rotate(-4deg)',
-              filter: isDark ? 'brightness(1.08) contrast(1.02)' : 'saturate(0.9)',
-              mixBlendMode: isDark ? 'screen' : 'multiply',
-              maskImage:
-                'linear-gradient(92deg, transparent 0%, rgba(0,0,0,0.88) 28%, rgba(0,0,0,0.96) 100%)',
-            }}
-          />
-          <Box
-            sx={{
-              position: 'absolute',
-              right: { xs: -190, md: -140 },
-              top: { xs: 170, md: 120 },
-              width: { xs: 380, md: 620 },
-              height: { xs: 380, md: 620 },
-              borderRadius: '50%',
-              background: `radial-gradient(circle, ${alpha('#A8BDD2', isDark ? 0.11 : 0.14)} 0%, ${alpha('#A8BDD2', 0)} 70%)`,
+                ? 'linear-gradient(90deg, rgba(10,16,28,0.72) 0%, rgba(10,16,28,0.68) 36%, rgba(10,16,28,0.58) 100%)'
+                : 'linear-gradient(90deg, rgba(247,250,254,0.84) 0%, rgba(247,250,254,0.70) 36%, rgba(247,250,254,0.56) 100%)',
             }}
           />
         </Box>
@@ -196,42 +174,6 @@ export default function Landing() {
             </Grid>
           </Stack>
         </Container>
-        <Box
-          component="footer"
-          sx={{
-            position: 'relative',
-            zIndex: 1,
-            borderTop: '1px solid',
-            borderColor: alpha(theme.palette.divider, isDark ? 0.6 : 0.9),
-            backgroundColor: footerBackground,
-            backdropFilter: 'blur(14px)',
-          }}
-        >
-          <Container maxWidth="lg">
-            <Stack
-              direction={{ xs: 'column', md: 'row' }}
-              justifyContent="space-between"
-              alignItems={{ xs: 'flex-start', md: 'center' }}
-              spacing={1.5}
-              py={2.25}
-            >
-              <Stack spacing={0.25}>
-                <Typography variant="overline" sx={{ letterSpacing: 1.6, color: 'text.secondary' }}>
-                  RADIA AI 2.0
-                </Typography>
-                <Typography variant="h6" fontWeight={700}>
-                  Get started with Radia AI
-                </Typography>
-              </Stack>
-              <Typography variant="body2" color="text.secondary">
-                Contact:{' '}
-                <Link href="mailto:contact@radia.com" underline="hover" color="inherit">
-                  contact@radia.com
-                </Link>
-              </Typography>
-            </Stack>
-          </Container>
-        </Box>
       </Box>
     </NavigationGuardProvider>
   );
