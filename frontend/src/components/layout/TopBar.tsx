@@ -9,7 +9,7 @@ import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Autocomplete from '@mui/material/Autocomplete';
 import InputAdornment from '@mui/material/InputAdornment';
-import { useTheme } from '@mui/material/styles';
+import { alpha, useTheme } from '@mui/material/styles';
 import SearchIcon from '@mui/icons-material/Search';
 import FlightTakeoffIcon from '@mui/icons-material/FlightTakeoff';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
@@ -48,6 +48,8 @@ export function TopBar({ showSearch = true }: TopBarProps) {
   const flightColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000';
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
   const hoverHighlight = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(47,70,89,0.10)';
+  const headerSurface = theme.palette.mode === 'dark' ? alpha('#0E1728', 0.62) : alpha('#F7FAFD', 0.78);
+  const headerBorder = theme.palette.mode === 'dark' ? alpha('#E2E8F0', 0.16) : alpha('#2F4659', 0.16);
   const { guardedNavigate } = useNavigationGuardContext();
   const [searchValue, setSearchValue] = useState<HeaderSearchOption | null>(null);
   const [searchInputValue, setSearchInputValue] = useState('');
@@ -92,8 +94,24 @@ export function TopBar({ showSearch = true }: TopBarProps) {
         width: '100%',
         zIndex: (theme) => theme.zIndex.drawer + 1,
         borderBottom: '1px solid',
-        borderColor: 'divider',
-        boxShadow: 'none',
+        borderColor: headerBorder,
+        borderBottomLeftRadius: 16,
+        borderBottomRightRadius: 16,
+        overflow: 'hidden',
+        backgroundColor: headerSurface,
+        backdropFilter: 'blur(18px) saturate(150%)',
+        WebkitBackdropFilter: 'blur(18px) saturate(150%)',
+        boxShadow: theme.palette.mode === 'dark' ? '0 12px 34px rgba(2, 8, 20, 0.36)' : '0 10px 30px rgba(47, 70, 89, 0.18)',
+        '&::after': {
+          content: '""',
+          position: 'absolute',
+          inset: 0,
+          pointerEvents: 'none',
+          background:
+            theme.palette.mode === 'dark'
+              ? 'linear-gradient(180deg, rgba(255,255,255,0.14) 0%, rgba(255,255,255,0.02) 62%)'
+              : 'linear-gradient(180deg, rgba(255,255,255,0.82) 0%, rgba(255,255,255,0.15) 62%)',
+        },
       }}
     >
       <Toolbar sx={{ gap: 1.5, color: headerForegroundColor, minHeight: `${HEADER_HEIGHT}px !important` }}>
