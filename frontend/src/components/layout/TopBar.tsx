@@ -174,10 +174,12 @@ export function TopBar() {
           target="_blank"
           rel="noopener noreferrer"
           underline="none"
+          color={headerForegroundColor}
           sx={{
             ...radiaFlightHoverSx,
-            px: 0.45,
+            px: 0.65,
             py: 0.25,
+            gap: 1,
           }}
         >
           <Box className="radia-hover-flight" aria-hidden>
@@ -185,26 +187,9 @@ export function TopBar() {
             <Box className="radia-hover-trail" />
           </Box>
           <RadiaMark size={32} />
-        </Link>
-        <Link
-          href="https://radia.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-          underline="none"
-          color={headerForegroundColor}
-          variant="h5"
-          fontWeight={900}
-          sx={{
-            ...radiaFlightHoverSx,
-            px: 1.3,
-            py: 0.25,
-          }}
-        >
-          <Box className="radia-hover-flight" aria-hidden>
-            <FlightTakeoffIcon className="radia-hover-plane" />
-            <Box className="radia-hover-trail" />
-          </Box>
-          RADIA
+          <Typography component="span" variant="h5" fontWeight={900} color={headerForegroundColor}>
+            RADIA
+          </Typography>
         </Link>
         <Box sx={{ width: 3, height: 24, bgcolor: headerForegroundColor, borderRadius: 1 }} />
         <Link
