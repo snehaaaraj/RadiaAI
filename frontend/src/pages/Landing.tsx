@@ -9,12 +9,15 @@ import CardContent from '@mui/material/CardContent';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
+import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { motion } from 'framer-motion';
+import { TopBar } from '@/components/layout/TopBar';
 import { useNavigate } from 'react-router-dom';
 import { RadiaMark } from '@/components/layout/RadiaMark';
 import { useAppContext } from '@/context/AppContext';
-import { APP_NAME, ROUTES } from '@/utils/constants';
+import { NavigationGuardProvider } from '@/context/NavigationGuardContext';
+import { APP_NAME, HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 
 const highlights = [
   {
@@ -40,8 +43,11 @@ export default function Landing() {
   const reduceMotion = motionPreference === 'reduced';
 
   return (
-    <Container maxWidth="lg" sx={{ minHeight: '100vh', py: { xs: 6, md: 10 } }}>
-      <Stack spacing={5}>
+    <NavigationGuardProvider>
+      <TopBar />
+      <Container maxWidth="lg" sx={{ minHeight: '100vh', py: { xs: 6, md: 10 } }}>
+        <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important` }} />
+        <Stack spacing={5}>
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 24 }}
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
@@ -120,7 +126,8 @@ export default function Landing() {
             </Typography>
           </Box>
         </motion.div>
-      </Stack>
-    </Container>
+        </Stack>
+      </Container>
+    </NavigationGuardProvider>
   );
 }

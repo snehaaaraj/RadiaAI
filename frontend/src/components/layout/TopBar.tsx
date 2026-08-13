@@ -166,7 +166,7 @@ export function TopBar() {
           color={headerForegroundColor}
           variant="h6"
           fontWeight={800}
-          onClick={() => guardedNavigate(ROUTES.LANDING)}
+          onClick={() => guardedNavigate(ROUTES.HOME)}
           sx={{
             px: 0.75,
             py: 0.25,
