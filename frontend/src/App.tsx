@@ -6,6 +6,7 @@ import { useMemo, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
 import { AppProvider, useAppContext } from '@/context/AppContext';
 import Landing from '@/pages/Landing';
+import RadiaResources from '@/pages/RadiaResources';
 import Home from '@/pages/Home';
 import RequirementReview from '@/pages/RequirementReview';
 import DeltaReview from '@/pages/DeltaReview';
@@ -39,6 +40,7 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path={ROUTES.LANDING} element={<Landing />} />
+              <Route path={ROUTES.RADIA_AI_RESOURCES} element={<RadiaResources />} />
               <Route element={<AppLayout />}>
                 <Route path={ROUTES.HOME} element={<Home />} />
                 <Route path={ROUTES.REVIEW_REQUIREMENT} element={<RequirementReview />} />

@@ -26,8 +26,18 @@ type HeaderSearchOption = {
   keywords: string[];
 };
 
+type LandingNavItem = {
+  label: string;
+  path: string;
+};
+
 const HEADER_SEARCH_OPTIONS: HeaderSearchOption[] = [
   { label: 'Launchpad', path: ROUTES.LANDING, keywords: ['launchpad', 'landing', 'start', 'radia ai 2.0'] },
+  {
+    label: 'Radia AI Resources',
+    path: ROUTES.RADIA_AI_RESOURCES,
+    keywords: ['radia ai', 'resources', 'tools', 'jama requirement review', 'jama roundtrip'],
+  },
   { label: 'Home', path: ROUTES.HOME, keywords: ['home', 'workspace'] },
   { label: 'Single Review', path: ROUTES.REVIEW_REQUIREMENT, keywords: ['single review', 'requirement'] },
   { label: 'Delta Review', path: ROUTES.REVIEW_DELTA, keywords: ['delta review', 'delta'] },
@@ -38,13 +48,22 @@ const HEADER_SEARCH_OPTIONS: HeaderSearchOption[] = [
 
 const SUPPORT_EMAIL = 'sneha.nagaraju@radia.com';
 const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
+const LANDING_NAV_ITEMS: LandingNavItem[] = [
+  { label: 'RADIA AI', path: ROUTES.RADIA_AI_RESOURCES },
+  { label: 'Jama Requirement Review', path: ROUTES.REVIEW_REQUIREMENT },
+  { label: 'Jama Roundtrip', path: `${ROUTES.RADIA_AI_RESOURCES}?tool=jama-roundtrip` },
+];
+
+type TopBarMode = 'workspace' | 'landing';
 
 interface TopBarProps {
   showSearch?: boolean;
+  mode?: TopBarMode;
 }
 
-export function TopBar({ showSearch = true }: TopBarProps) {
+export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
   const theme = useTheme();
+  const isLandingMode = mode === 'landing';
   const flightColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000';
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
   const brandWordmarkColor = '#0F172A';
@@ -178,33 +197,72 @@ export function TopBar({ showSearch = true }: TopBarProps) {
             <FlightTakeoffIcon className="radia-hover-plane" />
           </Box>
           <RadiaMark size={32} />
-          <Typography component="span" variant="h5" fontWeight={900} color={brandWordmarkColor}>
+          <Typography component="span" variant={isLandingMode ? 'h4' : 'h5'} fontWeight={900} color={brandWordmarkColor}>
             RADIA
           </Typography>
         </Link>
-        <Box sx={{ width: 3, height: 24, bgcolor: headerForegroundColor, borderRadius: 1 }} />
-        <Link
-          component="button"
-          type="button"
-          underline="none"
-          color={brandWordmarkColor}
-          variant="h6"
-          fontWeight={800}
-          onClick={() => guardedNavigate(ROUTES.HOME)}
-          sx={{
-            px: 0.75,
-            py: 0.25,
-            borderRadius: 1,
-            transition: 'transform 160ms ease, background-color 160ms ease',
-            '&:hover': {
-              textDecoration: 'none',
-              backgroundColor: hoverHighlight,
-              transform: 'scale(1.04)',
-            },
-          }}
-        >
-          Radia AI 2.0
-        </Link>
+        <Typography component="span" sx={{ color: headerForegroundColor, opacity: 0.65, fontWeight: 700 }}>
+          |
+        </Typography>
+        {isLandingMode ? (
+          <Stack direction="row" alignItems="center" spacing={1.25}>
+            {LANDING_NAV_ITEMS.map((item, index) => (
+              <Stack key={item.label} direction="row" alignItems="center" spacing={1.25}>
+                <Link
+                  component="button"
+                  type="button"
+                  underline="none"
+                  color={brandWordmarkColor}
+                  variant="subtitle1"
+                  fontWeight={700}
+                  onClick={() => guardedNavigate(item.path)}
+                  sx={{
+                    px: 0.35,
+                    py: 0.2,
+                    borderRadius: 1,
+                    fontSize: { xs: '0.86rem', md: '0.95rem' },
+                    transition: 'transform 160ms ease, background-color 160ms ease',
+                    '&:hover': {
+                      textDecoration: 'none',
+                      backgroundColor: hoverHighlight,
+                      transform: 'scale(1.03)',
+                    },
+                  }}
+                >
+                  {item.label}
+                </Link>
+                {index < LANDING_NAV_ITEMS.length - 1 && (
+                  <Typography component="span" sx={{ color: headerForegroundColor, opacity: 0.65, fontWeight: 700 }}>
+                    |
+                  </Typography>
+                )}
+              </Stack>
+            ))}
+          </Stack>
+        ) : (
+          <Link
+            component="button"
+            type="button"
+            underline="none"
+            color={brandWordmarkColor}
+            variant="h6"
+            fontWeight={800}
+            onClick={() => guardedNavigate(ROUTES.HOME)}
+            sx={{
+              px: 0.75,
+              py: 0.25,
+              borderRadius: 1,
+              transition: 'transform 160ms ease, background-color 160ms ease',
+              '&:hover': {
+                textDecoration: 'none',
+                backgroundColor: hoverHighlight,
+                transform: 'scale(1.04)',
+              },
+            }}
+          >
+            Radia AI 2.0
+          </Link>
+        )}
         <Box sx={{ flexGrow: 1 }} />
 
         {showSearch && (
