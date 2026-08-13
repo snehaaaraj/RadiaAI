@@ -35,7 +35,7 @@ const highlights = [
 export default function Landing() {
   const theme = useTheme();
   const navigate = useNavigate();
-  const { defaultWorkspaceRoute, motionPreference } = useAppContext();
+  const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
   const isDark = theme.palette.mode === 'dark';
 
@@ -127,7 +127,7 @@ export default function Landing() {
                       Intelligent requirements quality review, built for modern engineering teams.
                     </Typography>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                      <Button variant="contained" size="large" onClick={() => navigate(defaultWorkspaceRoute)}>
+                      <Button variant="contained" size="large" onClick={() => navigate(ROUTES.RADIA_AI_RESOURCES)}>
                         Enter workspace
                       </Button>
                       <Button variant="outlined" size="large" onClick={() => navigate(ROUTES.SETTINGS)}>
