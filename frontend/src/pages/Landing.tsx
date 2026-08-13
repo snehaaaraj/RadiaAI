@@ -1,13 +1,12 @@
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 import BuildCircleIcon from '@mui/icons-material/BuildCircle';
 import InsightsIcon from '@mui/icons-material/Insights';
-import SecurityIcon from '@mui/icons-material/Security';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
 import CardContent from '@mui/material/CardContent';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid2';
+import Link from '@mui/material/Link';
 import Stack from '@mui/material/Stack';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
@@ -31,11 +30,6 @@ const highlights = [
     description: 'Track quality findings, deltas, and requirement history with clarity.',
     icon: <InsightsIcon color="secondary" />,
   },
-  {
-    title: 'Governance First',
-    description: 'Built for engineering workflows where quality and compliance both matter.',
-    icon: <SecurityIcon sx={{ color: 'warning.main' }} />,
-  },
 ] as const;
 
 export default function Landing() {
@@ -55,8 +49,43 @@ export default function Landing() {
 
   return (
     <NavigationGuardProvider>
-      <TopBar />
-      <Box sx={{ minHeight: '100vh', background: pageGradient }}>
+      <TopBar showSearch={false} />
+      <Box sx={{ minHeight: '100vh', background: pageGradient, position: 'relative' }}>
+        <Box
+          sx={{
+            position: 'absolute',
+            inset: 0,
+            pointerEvents: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          <Typography
+            sx={{
+              position: 'absolute',
+              right: { xs: -28, md: 28 },
+              bottom: { xs: 78, md: 42 },
+              fontSize: { xs: '2.8rem', md: '6rem' },
+              fontWeight: 900,
+              letterSpacing: 5,
+              color: alpha(isDark ? '#D8E5F3' : '#2F4659', isDark ? 0.06 : 0.08),
+              transform: 'rotate(-8deg)',
+            }}
+          >
+            WINDRUNNER
+          </Typography>
+          <Box
+            sx={{
+              position: 'absolute',
+              right: { xs: -150, md: -110 },
+              top: { xs: 180, md: 150 },
+              width: { xs: 320, md: 520 },
+              height: { xs: 320, md: 520 },
+              borderRadius: '50%',
+              background: `conic-gradient(from 120deg, ${alpha('#9AB2CB', 0)} 0deg, ${alpha('#9AB2CB', isDark ? 0.08 : 0.1)} 120deg, ${alpha('#9AB2CB', 0)} 280deg)`,
+              filter: 'blur(2px)',
+            }}
+          />
+        </Box>
         <Container maxWidth="lg" sx={{ minHeight: '100vh', py: { xs: 6, md: 10 } }}>
           <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important` }} />
           <Stack spacing={5}>
@@ -84,10 +113,6 @@ export default function Landing() {
                     </Box>
                     <Typography variant="h3" fontWeight={800} maxWidth={840}>
                       Intelligent requirements quality review, built for modern engineering teams.
-                    </Typography>
-                    <Typography variant="body1" color="text.secondary" maxWidth={780}>
-                      Start from a polished workspace tailored to your preferences, then run requirement
-                      set, single, and delta workflows with consistent output quality.
                     </Typography>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                       <Button variant="contained" size="large" onClick={() => navigate(defaultWorkspaceRoute)}>
@@ -136,19 +161,33 @@ export default function Landing() {
               ))}
             </Grid>
 
-            <motion.div
-              initial={reduceMotion ? false : { opacity: 0 }}
-              animate={reduceMotion ? {} : { opacity: 1 }}
-              transition={{ duration: 0.45, delay: 0.22 }}
+            <Box
+              component="footer"
+              sx={{
+                mt: 1,
+                pt: 3,
+                pb: 2,
+                borderTop: '1px solid',
+                borderColor: alpha(theme.palette.divider, isDark ? 0.45 : 0.8),
+              }}
             >
-              <Box display="flex" alignItems="center" gap={1} color="text.secondary">
-                <AutoAwesomeIcon fontSize="small" />
-                <Typography variant="body2">
-                  Tip: set your preferred default workspace page in Settings so “Enter workspace” takes
-                  you exactly where you want to start.
+              <Stack
+                direction={{ xs: 'column', md: 'row' }}
+                justifyContent="space-between"
+                alignItems={{ xs: 'flex-start', md: 'center' }}
+                spacing={1}
+              >
+                <Typography variant="h6" fontWeight={700}>
+                  Get started with Radia AI
                 </Typography>
-              </Box>
-            </motion.div>
+                <Typography variant="body2" color="text.secondary">
+                  Contact:{' '}
+                  <Link href="mailto:contact@radia.com" underline="hover" color="inherit">
+                    contact@radia.com
+                  </Link>
+                </Typography>
+              </Stack>
+            </Box>
           </Stack>
         </Container>
       </Box>

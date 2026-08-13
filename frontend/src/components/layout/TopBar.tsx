@@ -39,7 +39,11 @@ const HEADER_SEARCH_OPTIONS: HeaderSearchOption[] = [
 const SUPPORT_EMAIL = 'sneha.nagaraju@radia.com';
 const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
 
-export function TopBar() {
+interface TopBarProps {
+  showSearch?: boolean;
+}
+
+export function TopBar({ showSearch = true }: TopBarProps) {
   const theme = useTheme();
   const flightColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000';
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
@@ -184,47 +188,49 @@ export function TopBar() {
         </Link>
         <Box sx={{ flexGrow: 1 }} />
 
-        <Autocomplete
-          value={searchValue}
-          onChange={(_event, option) => {
-            setSearchValue(option);
-            navigateToSearchOption(option);
-          }}
-          inputValue={searchInputValue}
-          onInputChange={(_event, value) => setSearchInputValue(value)}
-          options={uniqueSearchOptions}
-          getOptionLabel={(option) => option.label}
-          size="small"
-          sx={{
-            width: 320,
-            '& .MuiInputBase-root': {
-              color: headerForegroundColor,
-              transition: 'transform 160ms ease, background-color 160ms ease',
-              '&:hover': {
-                backgroundColor: hoverHighlight,
-                transform: 'scale(1.01)',
+        {showSearch && (
+          <Autocomplete
+            value={searchValue}
+            onChange={(_event, option) => {
+              setSearchValue(option);
+              navigateToSearchOption(option);
+            }}
+            inputValue={searchInputValue}
+            onInputChange={(_event, value) => setSearchInputValue(value)}
+            options={uniqueSearchOptions}
+            getOptionLabel={(option) => option.label}
+            size="small"
+            sx={{
+              width: 320,
+              '& .MuiInputBase-root': {
+                color: headerForegroundColor,
+                transition: 'transform 160ms ease, background-color 160ms ease',
+                '&:hover': {
+                  backgroundColor: hoverHighlight,
+                  transform: 'scale(1.01)',
+                },
               },
-            },
-            '& .MuiOutlinedInput-notchedOutline': {
-              borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(47,70,89,0.35)',
-            },
-          }}
-          renderInput={(params) => (
-            <TextField
-              {...params}
-              placeholder="Search tabs..."
-              onKeyDown={handleSearchEnter}
-              InputProps={{
-                ...params.InputProps,
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchIcon fontSize="small" sx={{ color: headerForegroundColor }} />
-                  </InputAdornment>
-                ),
-              }}
-            />
-          )}
-        />
+              '& .MuiOutlinedInput-notchedOutline': {
+                borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(47,70,89,0.35)',
+              },
+            }}
+            renderInput={(params) => (
+              <TextField
+                {...params}
+                placeholder="Search tabs..."
+                onKeyDown={handleSearchEnter}
+                InputProps={{
+                  ...params.InputProps,
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon fontSize="small" sx={{ color: headerForegroundColor }} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            )}
+          />
+        )}
 
         <Button
           color="inherit"
