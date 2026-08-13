@@ -170,21 +170,6 @@ export function FindingCard({
                 </Typography>
               </Box>
 
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 2,
-                  bgcolor: 'action.hover',
-                }}
-              >
-                <Typography variant="overline" color="text.secondary">
-                  What do we do about it
-                </Typography>
-                <Typography variant="body2" mt={0.5}>
-                  {finding.recommendation}
-                </Typography>
-              </Box>
-
               {/* Changeset — AI-assisted rephrased requirement */}
               {finding.suggested_rewrite && (
                 <>

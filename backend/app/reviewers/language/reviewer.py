@@ -93,7 +93,9 @@ class LanguageReviewer(RequirementReviewer):
                 )
             )
 
-        if re.search(r"\b(is|are|was|were|be|been|being)\s+\w+ed\b", lower_text):
+        passive_match = re.search(r"\b(is|are|was|were|be|been|being)\s+(\w+ed)\b", lower_text)
+        if passive_match:
+            passive_phrase = passive_match.group(0)
             findings.append(
                 ReviewFinding(
                     category="Passive Voice",
@@ -103,13 +105,14 @@ class LanguageReviewer(RequirementReviewer):
                     status=ReviewStatus.REVISION_RECOMMENDED,
                     rule="Requirement should prefer active voice.",
                     explanation="Passive voice can hide actor responsibility.",
-                    evidence=text,
+                    evidence=f"Passive construction detected: '{passive_phrase}'",
                     recommendation=(
                         "Rewrite sentence in active voice with a clear responsible subject."
                     ),
                     reference="INCOSE",
                     suggested_rewrite=(
-                        f"[Rewrite in active voice] {text}"
+                        "Identify the responsible system/actor and rewrite using active voice, e.g.:\n"
+                        f"  The [system] shall [active verb] … (replacing '{passive_phrase}')"
                     ),
                 )
             )

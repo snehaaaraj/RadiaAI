@@ -88,18 +88,26 @@ def _reference_aliases(reference_text: str, category: str, reviewer: str) -> set
     if "ears" in tokens or "ears" in reference_text:
         aliases.update({"ears", "requirement syntax"})
     if "style" in tokens or "guide" in tokens:
-        aliases.update({"style guide", "company style guide", "engineering standards"})
+        aliases.update({"style guide", "company style guide", "engineering standards",
+                         "company-style-guide"})
+    if "internal" in tokens or "engineering" in tokens:
+        aliases.update({"company-style-guide", "style guide", "engineering standards"})
     if "traceability" in tokens or "trace" in tokens:
         aliases.update({"traceability", "trace guide"})
     if "verification" in tokens or "verifiability" in tokens:
         aliases.update({"verification", "verifiability", "test", "analysis"})
     if "certification" in tokens or "cert" in tokens:
-        aliases.update({"certification", "cert", "approval"})
+        aliases.update({"certification", "cert", "approval", "cert-guidance"})
 
     return {alias for alias in aliases if alias}
 
 
 def _score_standard(standard: StandardReference, aliases: set[str]) -> int:
+    # Exact key match — highest priority, prevents cross-standard bleed
+    normalized_aliases = {_normalize(a) for a in aliases}
+    if _normalize(standard.key) in normalized_aliases:
+        return 100
+
     searchable = " ".join(
         [
             standard.key,

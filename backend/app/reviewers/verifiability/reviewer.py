@@ -59,10 +59,13 @@ class VerifiabilityReviewer(RequirementReviewer):
                     status=ReviewStatus.REVISION_RECOMMENDED,
                     rule="Requirement should identify operating conditions or context.",
                     explanation="No operating condition cue words were detected.",
-                    evidence=text,
+                    evidence="No EARS condition cue (e.g. 'when', 'while', 'where', 'if') found in requirement text.",
                     recommendation="Add context such as environmental/mission condition bounds.",
                     reference="EARS",
-                    suggested_rewrite=f"When [operating condition], {text}",
+                    suggested_rewrite=(
+                        "Prefix the requirement with an operating condition clause, e.g.:\n"
+                        "  When [operating condition], the [system] shall [behaviour]."
+                    ),
                 )
             )
 
@@ -76,12 +79,15 @@ class VerifiabilityReviewer(RequirementReviewer):
                     status=ReviewStatus.REVISION_RECOMMENDED,
                     rule="Requirement should be directly testable and verifiable.",
                     explanation="No numeric test threshold was detected.",
-                    evidence=text,
+                    evidence="No numeric value or tolerance found in requirement text.",
                     recommendation=(
                         "Add measurable values, tolerances, or explicit pass/fail criteria."
                     ),
                     reference="INCOSE",
-                    suggested_rewrite=f"{text.rstrip('.')} within [VALUE ± TOLERANCE] [UNIT].",
+                    suggested_rewrite=(
+                        "Append a quantitative acceptance criterion, e.g.:\n"
+                        "  … shall [behaviour] within [VALUE ± TOLERANCE] [UNIT]."
+                    ),
                 )
             )
 
