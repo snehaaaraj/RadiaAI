@@ -17,6 +17,7 @@ import { useNavigate } from 'react-router-dom';
 import { RadiaMark } from '@/components/layout/RadiaMark';
 import { useAppContext } from '@/context/AppContext';
 import { NavigationGuardProvider } from '@/context/NavigationGuardContext';
+import windrunnerLanding from '@/assets/windrunner-landing.png';
 import { APP_NAME, HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 
 const highlights = [
@@ -47,10 +48,20 @@ export default function Landing() {
     ? 'linear-gradient(126deg, rgba(26, 37, 60, 0.82) 0%, rgba(22, 34, 55, 0.78) 46%, rgba(18, 31, 50, 0.80) 100%)'
     : 'linear-gradient(126deg, rgba(255, 255, 255, 0.90) 0%, rgba(247, 251, 255, 0.92) 54%, rgba(240, 246, 252, 0.90) 100%)';
 
+  const footerBackground = isDark ? alpha('#0A1322', 0.86) : alpha('#F7FBFF', 0.92);
+
   return (
     <NavigationGuardProvider>
       <TopBar showSearch={false} />
-      <Box sx={{ minHeight: '100vh', background: pageGradient, position: 'relative' }}>
+      <Box
+        sx={{
+          minHeight: '100vh',
+          background: pageGradient,
+          position: 'relative',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
         <Box
           sx={{
             position: 'absolute',
@@ -59,36 +70,59 @@ export default function Landing() {
             overflow: 'hidden',
           }}
         >
-          <Typography
-            sx={{
-              position: 'absolute',
-              right: { xs: -28, md: 28 },
-              bottom: { xs: 78, md: 42 },
-              fontSize: { xs: '2.8rem', md: '6rem' },
-              fontWeight: 900,
-              letterSpacing: 5,
-              color: alpha(isDark ? '#D8E5F3' : '#2F4659', isDark ? 0.06 : 0.08),
-              transform: 'rotate(-8deg)',
-            }}
-          >
-            WINDRUNNER
-          </Typography>
           <Box
             sx={{
               position: 'absolute',
-              right: { xs: -150, md: -110 },
-              top: { xs: 180, md: 150 },
-              width: { xs: 320, md: 520 },
-              height: { xs: 320, md: 520 },
+              inset: 0,
+              background: isDark
+                ? 'linear-gradient(90deg, rgba(10,16,28,0.92) 0%, rgba(10,16,28,0.80) 40%, rgba(10,16,28,0.32) 100%)'
+                : 'linear-gradient(90deg, rgba(247,250,254,0.97) 0%, rgba(247,250,254,0.88) 40%, rgba(247,250,254,0.40) 100%)',
+            }}
+          />
+          <Box
+            component="img"
+            src={windrunnerLanding}
+            alt=""
+            aria-hidden
+            sx={{
+              position: 'absolute',
+              right: { xs: -300, md: -260, lg: -160 },
+              top: { xs: 160, md: 78 },
+              width: { xs: 760, md: 1120, lg: 1260 },
+              maxWidth: 'none',
+              opacity: { xs: 0.2, md: 0.36 },
+              transform: 'rotate(-4deg)',
+              filter: isDark ? 'brightness(1.08) contrast(1.02)' : 'saturate(0.9)',
+              mixBlendMode: isDark ? 'screen' : 'multiply',
+              maskImage:
+                'linear-gradient(92deg, transparent 0%, rgba(0,0,0,0.88) 28%, rgba(0,0,0,0.96) 100%)',
+            }}
+          />
+          <Box
+            sx={{
+              position: 'absolute',
+              right: { xs: -190, md: -140 },
+              top: { xs: 170, md: 120 },
+              width: { xs: 380, md: 620 },
+              height: { xs: 380, md: 620 },
               borderRadius: '50%',
-              background: `conic-gradient(from 120deg, ${alpha('#9AB2CB', 0)} 0deg, ${alpha('#9AB2CB', isDark ? 0.08 : 0.1)} 120deg, ${alpha('#9AB2CB', 0)} 280deg)`,
-              filter: 'blur(2px)',
+              background: `radial-gradient(circle, ${alpha('#A8BDD2', isDark ? 0.11 : 0.14)} 0%, ${alpha('#A8BDD2', 0)} 70%)`,
             }}
           />
         </Box>
-        <Container maxWidth="lg" sx={{ minHeight: '100vh', py: { xs: 6, md: 10 } }}>
+        <Container
+          maxWidth="lg"
+          sx={{
+            position: 'relative',
+            zIndex: 1,
+            flexGrow: 1,
+            py: { xs: 6, md: 10 },
+            display: 'flex',
+            flexDirection: 'column',
+          }}
+        >
           <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important` }} />
-          <Stack spacing={5}>
+          <Stack spacing={5} sx={{ pb: { xs: 5, md: 7 } }}>
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 24 }}
               animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
@@ -129,7 +163,7 @@ export default function Landing() {
 
             <Grid container spacing={2}>
               {highlights.map((highlight, index) => (
-                <Grid key={highlight.title} size={{ xs: 12, md: 4 }}>
+                <Grid key={highlight.title} size={{ xs: 12, md: 6 }}>
                   <motion.div
                     initial={reduceMotion ? false : { opacity: 0, y: 16 }}
                     animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
@@ -160,36 +194,44 @@ export default function Landing() {
                 </Grid>
               ))}
             </Grid>
-
-            <Box
-              component="footer"
-              sx={{
-                mt: 1,
-                pt: 3,
-                pb: 2,
-                borderTop: '1px solid',
-                borderColor: alpha(theme.palette.divider, isDark ? 0.45 : 0.8),
-              }}
+          </Stack>
+        </Container>
+        <Box
+          component="footer"
+          sx={{
+            position: 'relative',
+            zIndex: 1,
+            borderTop: '1px solid',
+            borderColor: alpha(theme.palette.divider, isDark ? 0.6 : 0.9),
+            backgroundColor: footerBackground,
+            backdropFilter: 'blur(14px)',
+          }}
+        >
+          <Container maxWidth="lg">
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              justifyContent="space-between"
+              alignItems={{ xs: 'flex-start', md: 'center' }}
+              spacing={1.5}
+              py={2.25}
             >
-              <Stack
-                direction={{ xs: 'column', md: 'row' }}
-                justifyContent="space-between"
-                alignItems={{ xs: 'flex-start', md: 'center' }}
-                spacing={1}
-              >
+              <Stack spacing={0.25}>
+                <Typography variant="overline" sx={{ letterSpacing: 1.6, color: 'text.secondary' }}>
+                  RADIA AI 2.0
+                </Typography>
                 <Typography variant="h6" fontWeight={700}>
                   Get started with Radia AI
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Contact:{' '}
-                  <Link href="mailto:contact@radia.com" underline="hover" color="inherit">
-                    contact@radia.com
-                  </Link>
-                </Typography>
               </Stack>
-            </Box>
-          </Stack>
-        </Container>
+              <Typography variant="body2" color="text.secondary">
+                Contact:{' '}
+                <Link href="mailto:contact@radia.com" underline="hover" color="inherit">
+                  contact@radia.com
+                </Link>
+              </Typography>
+            </Stack>
+          </Container>
+        </Box>
       </Box>
     </NavigationGuardProvider>
   );
