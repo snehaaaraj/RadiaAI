@@ -139,7 +139,7 @@ export function TopBar() {
             },
             '& .radia-hover-flight': {
               position: 'absolute',
-              left: -26,
+              left: 20,
               top: -8,
               display: 'inline-flex',
               alignItems: 'center',
@@ -151,6 +151,7 @@ export function TopBar() {
             },
             '& .radia-hover-plane': {
               fontSize: 20,
+              color: '#FFFFFF',
             },
             '& .radia-hover-trail': {
               position: 'absolute',
@@ -159,7 +160,7 @@ export function TopBar() {
               width: 24,
               height: 2,
               borderRadius: 999,
-              bgcolor: headerForegroundColor,
+              bgcolor: '#FFFFFF',
               opacity: 0,
               transformOrigin: 'left center',
               pointerEvents: 'none',
