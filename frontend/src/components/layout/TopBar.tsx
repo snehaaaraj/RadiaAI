@@ -81,7 +81,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
   const isLandingMode = mode === 'landing';
   const flightColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#000000';
   const headerForegroundColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#2F4659';
-  const brandWordmarkColor = '#0F172A';
+  const brandWordmarkColor = theme.palette.mode === 'dark' ? '#FFFFFF' : '#0F172A';
   const hoverHighlight = theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.12)' : 'rgba(47,70,89,0.10)';
   const headerSurface = theme.palette.mode === 'dark' ? alpha('#0E1728', 0.62) : alpha('#F7FAFD', 0.78);
   const headerBorder = theme.palette.mode === 'dark' ? alpha('#E2E8F0', 0.16) : alpha('#2F4659', 0.16);
