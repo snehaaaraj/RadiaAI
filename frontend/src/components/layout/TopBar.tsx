@@ -317,8 +317,14 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             </Typography>
             <Typography
               component="span"
-              variant="subtitle1"
-              sx={{ color: brandWordmarkColor, fontWeight: 600, fontSize: { xs: '0.84rem', md: '0.93rem' } }}
+              variant="body2"
+              sx={{
+                color: alpha(brandWordmarkColor, 0.88),
+                fontWeight: 500,
+                fontSize: { xs: '0.78rem', md: '0.84rem' },
+                fontStyle: 'italic',
+                letterSpacing: '0.01em',
+              }}
             >
               {currentSubpageLabel}
             </Typography>
