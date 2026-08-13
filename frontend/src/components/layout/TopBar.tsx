@@ -215,7 +215,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
           <RadiaMark size={32} />
           <Typography
             component="span"
-            variant={isLandingMode ? 'h4' : 'h5'}
+            variant="h4"
             fontWeight={900}
             color={brandWordmarkColor}
             sx={{ letterSpacing: '-0.02em', lineHeight: 1.05 }}
