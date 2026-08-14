@@ -8,12 +8,14 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import type {
   ApplyFindingDispositionRequest,
@@ -55,6 +57,15 @@ export function FindingCard({
   );
   const [comment, setComment] = useState(disposition?.reviewer_comment ?? '');
   const [saved, setSaved] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyRewrite = () => {
+    if (!finding.suggested_rewrite) return;
+    void navigator.clipboard.writeText(finding.suggested_rewrite).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    });
+  };
 
   const canSubmitDisposition = useMemo(
     () => Boolean(reviewId && selectedDisposition && onApplyDisposition),
@@ -159,20 +170,50 @@ export function FindingCard({
                 </Typography>
               </Box>
 
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 2,
-                  bgcolor: 'action.hover',
-                }}
-              >
-                <Typography variant="overline" color="text.secondary">
-                  What do we do about it
-                </Typography>
-                <Typography variant="body2" mt={0.5}>
-                  {finding.recommendation}
-                </Typography>
-              </Box>
+              {/* Changeset — AI-assisted rephrased requirement */}
+              {finding.suggested_rewrite && (
+                <>
+                  <Divider />
+                  <Box>
+                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.75}>
+                      <Typography variant="overline" color="primary" fontWeight={700}>
+                        Changeset
+                      </Typography>
+                      <Tooltip title={copied ? 'Copied!' : 'Copy to clipboard'} placement="top">
+                        <Button
+                          size="small"
+                          variant="outlined"
+                          color="primary"
+                          startIcon={<ContentCopyIcon fontSize="small" />}
+                          onClick={handleCopyRewrite}
+                          sx={{ minWidth: 0, py: 0.25, px: 1 }}
+                        >
+                          {copied ? 'Copied' : 'Copy'}
+                        </Button>
+                      </Tooltip>
+                    </Box>
+                    <Box
+                      sx={{
+                        p: 1.25,
+                        borderRadius: 2,
+                        border: '1px solid',
+                        borderColor: 'primary.main',
+                        bgcolor: 'primary.50',
+                        fontFamily: 'monospace',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word',
+                      }}
+                    >
+                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                        {finding.suggested_rewrite}
+                      </Typography>
+                    </Box>
+                    <Typography variant="caption" color="text.secondary" mt={0.5} display="block">
+                      Applying this suggestion and re-running the review should result in this finding passing.
+                    </Typography>
+                  </Box>
+                </>
+              )}
 
               {/* Read-only disposition tag (Review History view) */}
               {readOnly && disposition && (

@@ -102,9 +102,9 @@ RadiaAi-2.0/
 - Main app workspace now starts at `/workspace`
 - Theme-aware branding with separate light and dark logo assets
 - Landing/resources header navigation:
-  - `RADIA | RADIA AI | Jama Requirement Review | Jama Roundtrip`
+  - `RADIA | RADIA AI | Jama Requirement Reviewer | Jama Roundtrip`
 - Workspace header breadcrumb:
-  - `RADIA | Radia AI | Jama Requirement Reviewer | <current sub-page>`
+  - `RADIA | Radia AI | <current resource> | <current sub-page>`
 - Resource-based workspace launch:
   - selecting **Open workspace** launches the resource at `/workspace` (resource home)
 - Personalization controls for:

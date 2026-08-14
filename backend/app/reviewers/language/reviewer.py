@@ -33,6 +33,7 @@ class LanguageReviewer(RequirementReviewer):
             token in f" {lower_text} " for token in (" should ", " will ", " may ")
         )
         if not has_shall and has_nonmandatory:
+            rewrite = _replace_modal_with_shall(text)
             findings.append(
                 ReviewFinding(
                     category="Requirement Language",
@@ -48,11 +49,13 @@ class LanguageReviewer(RequirementReviewer):
                     evidence=text,
                     recommendation="Rewrite requirement using 'shall' for mandatory behavior.",
                     reference="INCOSE",
+                    suggested_rewrite=rewrite,
                 )
             )
 
         found_banned = sorted({word for word in BANNED_WORDS if word in lower_text})
         if found_banned:
+            rewrite = _remove_banned_words(text, found_banned)
             findings.append(
                 ReviewFinding(
                     category="Banned Words",
@@ -67,11 +70,13 @@ class LanguageReviewer(RequirementReviewer):
                     evidence=f"Found banned words: {', '.join(found_banned)}",
                     recommendation="Replace banned terms with explicit, measurable wording.",
                     reference="Company Style Guide",
+                    suggested_rewrite=rewrite,
                 )
             )
 
         found_ambiguous = sorted({word for word in AMBIGUOUS_WORDS if word in lower_text})
         if found_ambiguous:
+            rewrite = _flag_ambiguous_words(text, found_ambiguous)
             findings.append(
                 ReviewFinding(
                     category="Ambiguous Wording",
@@ -84,10 +89,13 @@ class LanguageReviewer(RequirementReviewer):
                     evidence=f"Found ambiguous wording: {', '.join(found_ambiguous)}",
                     recommendation="Replace ambiguous words with objective measurable criteria.",
                     reference="EARS",
+                    suggested_rewrite=rewrite,
                 )
             )
 
-        if re.search(r"\b(is|are|was|were|be|been|being)\s+\w+ed\b", lower_text):
+        passive_match = re.search(r"\b(is|are|was|were|be|been|being)\s+(\w+ed)\b", lower_text)
+        if passive_match:
+            passive_phrase = passive_match.group(0)
             findings.append(
                 ReviewFinding(
                     category="Passive Voice",
@@ -97,11 +105,15 @@ class LanguageReviewer(RequirementReviewer):
                     status=ReviewStatus.REVISION_RECOMMENDED,
                     rule="Requirement should prefer active voice.",
                     explanation="Passive voice can hide actor responsibility.",
-                    evidence=text,
+                    evidence=f"Passive construction detected: '{passive_phrase}'",
                     recommendation=(
                         "Rewrite sentence in active voice with a clear responsible subject."
                     ),
                     reference="INCOSE",
+                    suggested_rewrite=(
+                        "Identify the responsible system/actor and rewrite using active voice, e.g.:\n"
+                        f"  The [system] shall [active verb] … (replacing '{passive_phrase}')"
+                    ),
                 )
             )
 
@@ -122,3 +134,37 @@ def _overall_from_findings(findings: list[ReviewFinding]) -> ReviewStatus:
     if any(f.status == ReviewStatus.REVISION_RECOMMENDED for f in findings):
         return ReviewStatus.REVISION_RECOMMENDED
     return ReviewStatus.ACCEPTABLE
+
+
+def _replace_modal_with_shall(text: str) -> str:
+    """Replace the first non-mandatory modal with 'shall'."""
+    result = re.sub(r'\bshould\b', 'shall', text, count=1, flags=re.IGNORECASE)
+    result = re.sub(r'\bwill\b', 'shall', result, count=1, flags=re.IGNORECASE)
+    result = re.sub(r'\bmay\b', 'shall', result, count=1, flags=re.IGNORECASE)
+    return result
+
+
+def _remove_banned_words(text: str, banned: list[str]) -> str:
+    """Annotate each banned word with a placeholder indicating it needs replacement."""
+    result = text
+    for word in banned:
+        result = re.sub(
+            rf'\b{re.escape(word)}\b',
+            f'[REPLACE: {word}]',
+            result,
+            flags=re.IGNORECASE,
+        )
+    return result
+
+
+def _flag_ambiguous_words(text: str, ambiguous: list[str]) -> str:
+    """Annotate each ambiguous word with a placeholder indicating it needs a measurable value."""
+    result = text
+    for word in ambiguous:
+        result = re.sub(
+            rf'\b{re.escape(word)}\b',
+            f'[SPECIFY: {word}]',
+            result,
+            flags=re.IGNORECASE,
+        )
+    return result

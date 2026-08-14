@@ -31,6 +31,7 @@ class VerifiabilityReviewer(RequirementReviewer):
         has_number = bool(re.search(r"\b\d+(\.\d+)?\b", text))
         found_unmeasurable = sorted({term for term in UNMEASURABLE_TERMS if term in lower_text})
         if not has_number and found_unmeasurable:
+            rewrite = _flag_unmeasurable_terms(text, found_unmeasurable)
             findings.append(
                 ReviewFinding(
                     category="Missing Quantitative Limits",
@@ -43,6 +44,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     evidence=f"Unmeasurable terms: {', '.join(found_unmeasurable)}",
                     recommendation="Replace qualitative terms with numeric acceptance thresholds.",
                     reference="INCOSE",
+                    suggested_rewrite=rewrite,
                 )
             )
 
@@ -57,9 +59,13 @@ class VerifiabilityReviewer(RequirementReviewer):
                     status=ReviewStatus.REVISION_RECOMMENDED,
                     rule="Requirement should identify operating conditions or context.",
                     explanation="No operating condition cue words were detected.",
-                    evidence=text,
+                    evidence="No EARS condition cue (e.g. 'when', 'while', 'where', 'if') found in requirement text.",
                     recommendation="Add context such as environmental/mission condition bounds.",
                     reference="EARS",
+                    suggested_rewrite=(
+                        "Prefix the requirement with an operating condition clause, e.g.:\n"
+                        "  When [operating condition], the [system] shall [behaviour]."
+                    ),
                 )
             )
 
@@ -73,11 +79,15 @@ class VerifiabilityReviewer(RequirementReviewer):
                     status=ReviewStatus.REVISION_RECOMMENDED,
                     rule="Requirement should be directly testable and verifiable.",
                     explanation="No numeric test threshold was detected.",
-                    evidence=text,
+                    evidence="No numeric value or tolerance found in requirement text.",
                     recommendation=(
                         "Add measurable values, tolerances, or explicit pass/fail criteria."
                     ),
                     reference="INCOSE",
+                    suggested_rewrite=(
+                        "Append a quantitative acceptance criterion, e.g.:\n"
+                        "  … shall [behaviour] within [VALUE ± TOLERANCE] [UNIT]."
+                    ),
                 )
             )
 
@@ -98,3 +108,16 @@ def _overall_from_findings(findings: list[ReviewFinding]) -> ReviewStatus:
     if any(f.status == ReviewStatus.REVISION_RECOMMENDED for f in findings):
         return ReviewStatus.REVISION_RECOMMENDED
     return ReviewStatus.ACCEPTABLE
+
+
+def _flag_unmeasurable_terms(text: str, terms: list[str]) -> str:
+    """Annotate unmeasurable terms with a numeric threshold placeholder."""
+    result = text
+    for term in terms:
+        result = re.sub(
+            rf'\b{re.escape(term)}\b',
+            f'[QUANTIFY: {term} → specify numeric threshold]',
+            result,
+            flags=re.IGNORECASE,
+        )
+    return result

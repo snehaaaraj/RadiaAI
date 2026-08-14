@@ -184,6 +184,7 @@ export interface ReviewFinding {
   reference: string;
   reference_title: string | null;
   reference_url: string | null;
+  suggested_rewrite: string | null;
 }
 
 export interface RequirementReviewInput {

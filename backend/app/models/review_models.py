@@ -85,6 +85,13 @@ class ReviewFinding(BaseModel):
         default=None,
         description="SharePoint or document URL for the reference source.",
     )
+    suggested_rewrite: str | None = Field(
+        default=None,
+        description=(
+            "AI-assisted rephrased version of the requirement text that applies this "
+            "finding's recommendation. Intended for use in the Changeset UI section."
+        ),
+    )
 
 
 class ReviewerResult(BaseModel):

@@ -46,11 +46,13 @@ class StructureReviewer(RequirementReviewer):
                         "Split the statement into independent requirements, one behavior each."
                     ),
                     reference="INCOSE",
+                    suggested_rewrite=_split_compound_requirement(text),
                 )
             )
 
         found_subjective = sorted({word for word in SUBJECTIVE_WORDS if word in lower_text})
         if found_subjective:
+            rewrite = _flag_subjective_words(text, found_subjective)
             findings.append(
                 ReviewFinding(
                     category="Human Judgment Language",
@@ -63,6 +65,7 @@ class StructureReviewer(RequirementReviewer):
                     evidence=f"Subjective terms: {', '.join(found_subjective)}",
                     recommendation="Replace subjective terms with objective measurable criteria.",
                     reference="Company Style Guide",
+                    suggested_rewrite=rewrite,
                 )
             )
 
@@ -119,3 +122,27 @@ def _overall_from_findings(findings: list[ReviewFinding]) -> ReviewStatus:
     if any(f.status == ReviewStatus.REVISION_RECOMMENDED for f in findings):
         return ReviewStatus.REVISION_RECOMMENDED
     return ReviewStatus.ACCEPTABLE
+
+
+def _split_compound_requirement(text: str) -> str:
+    """Annotate a compound requirement to indicate each 'shall' clause should become its own requirement."""
+    import re
+    parts = re.split(r'(?<=\w)\s+and\s+(?=\w)', text, flags=re.IGNORECASE)
+    if len(parts) > 1:
+        numbered = "\n".join(f"REQ-X{i + 1}: {p.strip()}" for i, p in enumerate(parts))
+        return f"[Split into separate requirements]\n{numbered}"
+    return f"[Split into separate requirements — manually divide at each 'shall' clause]\n{text}"
+
+
+def _flag_subjective_words(text: str, subjective: list[str]) -> str:
+    """Annotate each subjective word with a placeholder for a measurable replacement."""
+    import re
+    result = text
+    for word in subjective:
+        result = re.sub(
+            rf'\b{re.escape(word)}\b',
+            f'[MEASURE: {word}]',
+            result,
+            flags=re.IGNORECASE,
+        )
+    return result
