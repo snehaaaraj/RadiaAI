@@ -36,7 +36,8 @@ export const ROUTE_TITLES: Record<string, string> = {
   [ROUTES.SETTINGS]: 'Settings',
 };
 
-export const API_BASE = '/api/v1';
+export const APP_VERSION = import.meta.env.VITE_APP_VERSION ?? '0.1.0';
+export const API_BASE = import.meta.env.VITE_API_BASE_URL ?? '/api/v1';
 
 /** Default number of document chunks to retrieve per query */
 export const DEFAULT_TOP_K = 5;
