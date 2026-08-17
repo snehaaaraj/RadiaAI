@@ -16,6 +16,7 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAppContext, type ThemePreference, type WorkspaceStartPage } from '@/context/AppContext';
 import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
@@ -73,6 +74,22 @@ export default function Settings() {
   } = useAppContext();
 
   const reduceMotion = motionPreference === 'reduced';
+
+  // On mount, scroll to the section indicated by the URL hash.
+  // Wait for the page entrance animation to finish before scrolling
+  // so getBoundingClientRect() returns the final painted position.
+  useEffect(() => {
+    const id = window.location.hash.replace('#', '');
+    if (!id) return;
+    // Entrance animation is 280ms (delay 0.18s + duration 0.28s max).
+    // A 350ms wait covers both motion-full and motion-reduced paths.
+    const timer = setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: reduceMotion ? 'instant' : 'smooth', block: 'start' });
+    }, reduceMotion ? 0 : 350);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once on mount only
 
   return (
     <Stack spacing={3}>
