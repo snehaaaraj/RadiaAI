@@ -154,14 +154,17 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
       }}
     >
       <Toolbar sx={{ gap: 1.5, color: headerForegroundColor, minHeight: `${HEADER_HEIGHT}px !important` }}>
-        {/* Brand group — hovering either the logo or the wordmark triggers the plane animation */}
+        {/* Brand group — single hover zone: scales as unit, one plane animation */}
         <Box
           sx={{
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 0.75,
+            gap: 1.5,                    // increased gap between logo and wordmark
             position: 'relative',
             overflow: 'visible',
+            cursor: 'default',
+            transition: 'transform 180ms ease',
+            '&:hover': { transform: 'scale(1.04)' },
             '@keyframes radiaPlaneFly': {
               '0%':   { opacity: 0, transform: 'translate(-18px, 12px) rotate(-18deg) scale(0.9)' },
               '20%':  { opacity: 0.95 },
@@ -170,7 +173,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             '& .radia-hover-flight': {
               position: 'absolute',
               left: 20,
-              top: -8,
+              top: -10,
               display: 'inline-flex',
               alignItems: 'center',
               fontSize: 20,
@@ -183,11 +186,13 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
               animation: 'radiaPlaneFly 2850ms cubic-bezier(0.22, 1, 0.36, 1)',
             },
             '@media (prefers-reduced-motion: reduce)': {
+              transition: 'none',
+              '&:hover': { transform: 'none' },
               '&:hover .radia-hover-flight': { animation: 'none', opacity: 0 },
             },
           }}
         >
-          {/* Plane flies out of the group on any hover */}
+          {/* Single plane — positioned over the logo, flies on parent hover */}
           <Box className="radia-hover-flight" aria-hidden>
             <FlightTakeoffIcon className="radia-hover-plane" />
           </Box>
@@ -198,17 +203,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             target="_blank"
             rel="noopener noreferrer"
             underline="none"
-            sx={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              borderRadius: 1,
-              transition: 'transform 180ms ease',
-              '&:hover': { transform: 'scale(1.08)' },
-              '@media (prefers-reduced-motion: reduce)': {
-                transition: 'none',
-                '&:hover': { transform: 'none' },
-              },
-            }}
+            sx={{ display: 'inline-flex', alignItems: 'center' }}
           >
             <RadiaMark size={32} />
           </Link>
@@ -222,16 +217,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             sx={{
               display: 'inline-flex',
               alignItems: 'center',
-              borderRadius: 1,
-              transition: 'transform 180ms ease',
-              '&:hover': {
-                textDecoration: 'none',
-                transform: 'scale(1.05)',
-              },
-              '@media (prefers-reduced-motion: reduce)': {
-                transition: 'none',
-                '&:hover': { transform: 'none' },
-              },
+              '&:hover': { textDecoration: 'none' },
             }}
           >
             <Typography
