@@ -154,54 +154,34 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
       }}
     >
       <Toolbar sx={{ gap: 1.5, color: headerForegroundColor, minHeight: `${HEADER_HEIGHT}px !important` }}>
-        <Link
-          href="https://radia.com/"
-          target="_blank"
-          rel="noopener noreferrer"
-          underline="none"
+        {/* Brand group — single hover zone: scales as unit, one plane animation */}
+        <Box
           sx={{
-            px: 0.65,
-            py: 0.25,
-            borderRadius: 1,
-            position: 'relative',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 1,
+            gap: 1.5,                    // increased gap between logo and wordmark
+            position: 'relative',
             overflow: 'visible',
+            cursor: 'default',
             transition: 'transform 180ms ease',
-            '&:hover': {
-              textDecoration: 'none',
-              transform: 'scale(1.05)',
-            },
+            '&:hover': { transform: 'scale(1.04)' },
             '@keyframes radiaPlaneFly': {
-              '0%': {
-                opacity: 0,
-                transform: 'translate(-18px, 12px) rotate(-18deg) scale(0.9)',
-              },
-              '20%': {
-                opacity: 0.95,
-              },
-              '100%': {
-                opacity: 0,
-                transform: 'translate(26px, -14px) rotate(4deg) scale(1)',
-              },
+              '0%':   { opacity: 0, transform: 'translate(-18px, 12px) rotate(-18deg) scale(0.9)' },
+              '20%':  { opacity: 0.95 },
+              '100%': { opacity: 0, transform: 'translate(26px, -14px) rotate(4deg) scale(1)' },
             },
             '& .radia-hover-flight': {
               position: 'absolute',
               left: 20,
-              top: -8,
+              top: -10,
               display: 'inline-flex',
               alignItems: 'center',
-              justifyContent: 'center',
               fontSize: 20,
               opacity: 0,
               pointerEvents: 'none',
               willChange: 'transform, opacity',
             },
-            '& .radia-hover-plane': {
-              fontSize: 20,
-              color: flightColor,
-            },
+            '& .radia-hover-plane': { fontSize: 20, color: flightColor },
             '&:hover .radia-hover-flight': {
               animation: 'radiaPlaneFly 2850ms cubic-bezier(0.22, 1, 0.36, 1)',
             },
@@ -212,20 +192,45 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             },
           }}
         >
+          {/* Single plane — positioned over the logo, flies on parent hover */}
           <Box className="radia-hover-flight" aria-hidden>
             <FlightTakeoffIcon className="radia-hover-plane" />
           </Box>
-          <RadiaMark size={32} />
-          <Typography
-            component="span"
-            variant="h4"
-            fontWeight={900}
-            color={brandWordmarkColor}
-            sx={{ letterSpacing: '-0.02em', lineHeight: 1.05 }}
+
+          {/* Logo mark → opens radia.com in a new tab */}
+          <Link
+            href="https://radia.com/"
+            target="_blank"
+            rel="noopener noreferrer"
+            underline="none"
+            sx={{ display: 'inline-flex', alignItems: 'center' }}
           >
-            RADIA
-          </Typography>
-        </Link>
+            <RadiaMark size={32} />
+          </Link>
+
+          {/* "RADIA" wordmark → navigates to the Launchpad */}
+          <Link
+            component="button"
+            type="button"
+            underline="none"
+            onClick={() => guardedNavigate(ROUTES.LANDING)}
+            sx={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              '&:hover': { textDecoration: 'none' },
+            }}
+          >
+            <Typography
+              component="span"
+              variant="h4"
+              fontWeight={900}
+              color={brandWordmarkColor}
+              sx={{ letterSpacing: '-0.02em', lineHeight: 1.05 }}
+            >
+              RADIA
+            </Typography>
+          </Link>
+        </Box>
         <Typography component="span" sx={{ color: headerForegroundColor, opacity: 0.65, fontWeight: 700 }}>
           |
         </Typography>
