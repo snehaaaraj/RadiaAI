@@ -154,19 +154,42 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
       }}
     >
       <Toolbar sx={{ gap: 1.5, color: headerForegroundColor, minHeight: `${HEADER_HEIGHT}px !important` }}>
+        {/* Radia logo mark → opens radia.com in a new tab */}
         <Link
           href="https://radia.com/"
           target="_blank"
           rel="noopener noreferrer"
           underline="none"
           sx={{
-            px: 0.65,
+            px: 0.5,
+            py: 0.25,
+            borderRadius: 1,
+            display: 'inline-flex',
+            alignItems: 'center',
+            transition: 'transform 180ms ease',
+            '&:hover': { transform: 'scale(1.08)' },
+            '@media (prefers-reduced-motion: reduce)': {
+              transition: 'none',
+              '&:hover': { transform: 'none' },
+            },
+          }}
+        >
+          <RadiaMark size={32} />
+        </Link>
+
+        {/* "RADIA" wordmark → navigates to the Launchpad */}
+        <Link
+          component="button"
+          type="button"
+          underline="none"
+          onClick={() => guardedNavigate(ROUTES.LANDING)}
+          sx={{
+            px: 0.5,
             py: 0.25,
             borderRadius: 1,
             position: 'relative',
             display: 'inline-flex',
             alignItems: 'center',
-            gap: 1,
             overflow: 'visible',
             transition: 'transform 180ms ease',
             '&:hover': {
@@ -178,9 +201,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
                 opacity: 0,
                 transform: 'translate(-18px, 12px) rotate(-18deg) scale(0.9)',
               },
-              '20%': {
-                opacity: 0.95,
-              },
+              '20%': { opacity: 0.95 },
               '100%': {
                 opacity: 0,
                 transform: 'translate(26px, -14px) rotate(4deg) scale(1)',
@@ -188,7 +209,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
             },
             '& .radia-hover-flight': {
               position: 'absolute',
-              left: 20,
+              left: 0,
               top: -8,
               display: 'inline-flex',
               alignItems: 'center',
@@ -198,10 +219,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
               pointerEvents: 'none',
               willChange: 'transform, opacity',
             },
-            '& .radia-hover-plane': {
-              fontSize: 20,
-              color: flightColor,
-            },
+            '& .radia-hover-plane': { fontSize: 20, color: flightColor },
             '&:hover .radia-hover-flight': {
               animation: 'radiaPlaneFly 2850ms cubic-bezier(0.22, 1, 0.36, 1)',
             },
@@ -215,7 +233,6 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
           <Box className="radia-hover-flight" aria-hidden>
             <FlightTakeoffIcon className="radia-hover-plane" />
           </Box>
-          <RadiaMark size={32} />
           <Typography
             component="span"
             variant="h4"

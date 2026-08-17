@@ -4,7 +4,6 @@ import ListItem from '@mui/material/ListItem';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
-import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
@@ -18,7 +17,6 @@ import PaletteIcon from '@mui/icons-material/Palette';
 import TuneIcon from '@mui/icons-material/Tune';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
-import RocketLaunchIcon from '@mui/icons-material/RocketLaunch';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
@@ -34,10 +32,6 @@ const NAV_ITEMS = [
   { label: 'Delta Review', icon: <CompareArrowsIcon />, path: ROUTES.REVIEW_DELTA },
   { label: 'Review History', icon: <HistoryIcon />, path: ROUTES.REVIEW_HISTORY },
   { label: 'Standards', icon: <MenuBookIcon />, path: ROUTES.STANDARDS },
-] as const;
-
-const BOTTOM_ITEMS = [
-  { label: 'Launchpad', icon: <RocketLaunchIcon />, path: ROUTES.LANDING },
 ] as const;
 
 const LABEL_ANIMATION_MS = 220;
@@ -231,71 +225,6 @@ export function Sidebar() {
               </ListItem>
             ))}
       </List>
-
-      {!isSettingsPage && (
-        <>
-          <Divider />
-
-          <List>
-            {BOTTOM_ITEMS.map(({ label, icon, path }) => (
-              <ListItem key={path} disablePadding>
-                <Tooltip title={sidebarOpen ? '' : label} placement="right">
-                  <ListItemButton
-                    selected={location.pathname === path}
-                    onClick={() => guardedNavigate(path)}
-                    sx={{
-                      mx: 1,
-                      my: 0.5,
-                      px: sidebarOpen ? 1.5 : 1.25,
-                      justifyContent: sidebarOpen ? 'flex-start' : 'center',
-                      borderRadius: 1.5,
-                      overflow: 'hidden',
-                      transition: (theme) =>
-                        theme.transitions.create(['padding'], {
-                          duration: LABEL_ANIMATION_MS,
-                          easing: theme.transitions.easing.easeInOut,
-                        }),
-                    }}
-                  >
-                    <ListItemIcon
-                      sx={(theme) => ({
-                        minWidth: sidebarOpen ? 36 : 0,
-                        mr: sidebarOpen ? 1 : 0,
-                        justifyContent: 'center',
-                        transition: theme.transitions.create(['min-width', 'margin-right'], {
-                          duration: LABEL_ANIMATION_MS,
-                          easing: theme.transitions.easing.easeInOut,
-                        }),
-                      })}
-                    >
-                      {icon}
-                    </ListItemIcon>
-                    <ListItemText
-                      primary={label}
-                      primaryTypographyProps={{ noWrap: true }}
-                      sx={(theme) => ({
-                        m: 0,
-                        whiteSpace: 'nowrap',
-                        overflow: 'hidden',
-                        maxWidth: sidebarOpen ? 200 : 0,
-                        opacity: sidebarOpen ? 1 : 0,
-                        transform: sidebarOpen ? 'translateX(0)' : 'translateX(-6px)',
-                        transition: theme.transitions.create(
-                          ['max-width', 'opacity', 'transform'],
-                          {
-                            duration: LABEL_ANIMATION_MS,
-                            easing: theme.transitions.easing.easeInOut,
-                          }
-                        ),
-                      })}
-                    />
-                  </ListItemButton>
-                </Tooltip>
-              </ListItem>
-            ))}
-          </List>
-        </>
-      )}
 
       <Box
         px={2}
