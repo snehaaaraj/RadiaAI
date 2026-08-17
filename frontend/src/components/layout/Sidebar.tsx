@@ -50,18 +50,14 @@ export function Sidebar() {
   const currentWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
 
   const SECTION_IDS = SETTINGS_SECTION_ITEMS.map((s) => s.id) as readonly string[];
-  const activeSettingsSection = useActiveScrollSection(
+  const [activeSettingsSection, setSettingsTarget] = useActiveScrollSection(
     SECTION_IDS,
     isSettingsPage,
     SETTINGS_SECTION_ITEMS[0].id,
   );
 
   const scrollToSettingsSection = (sectionId: string) => {
-    // Update hash immediately so the sidebar highlight responds on click
-    // without waiting for the scroll event to fire.
-    if (window.location.hash !== `#${sectionId}`) {
-      window.history.replaceState(null, '', `#${sectionId}`);
-    }
+    setSettingsTarget(sectionId); // lock the highlight immediately, suppress scroll events
     const section = document.getElementById(sectionId);
     if (!section) return;
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
