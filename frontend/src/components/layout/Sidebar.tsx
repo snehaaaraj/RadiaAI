@@ -26,6 +26,7 @@ import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
 import { HEADER_HEIGHT, ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 import { SETTINGS_SECTION_ITEMS } from '@/utils/settingsSections';
+import { useEffect, useRef, useState } from 'react';
 
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
@@ -47,15 +48,61 @@ export function Sidebar() {
   const location = useLocation();
   const isSettingsPage = location.pathname === ROUTES.SETTINGS;
   const currentWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
-  const activeSettingsSection = location.hash.replace('#', '') || SETTINGS_SECTION_ITEMS[0].id;
+
+  // Track the active settings section via IntersectionObserver so the sidebar
+  // highlight follows the user's scroll position, not just sidebar clicks.
+  const [activeSettingsSection, setActiveSettingsSection] = useState<string>(
+    () => window.location.hash.replace('#', '') || SETTINGS_SECTION_ITEMS[0].id
+  );
+  const observerRef = useRef<IntersectionObserver | null>(null);
+
+  useEffect(() => {
+    if (!isSettingsPage) return;
+
+    // Seed from URL hash on initial mount / navigation to settings
+    const hashId = window.location.hash.replace('#', '');
+    if (hashId) setActiveSettingsSection(hashId);
+
+    const sectionIds = SETTINGS_SECTION_ITEMS.map((s) => s.id);
+
+    observerRef.current?.disconnect();
+    observerRef.current = new IntersectionObserver(
+      (entries) => {
+        // Pick the topmost section that is currently intersecting
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible.length > 0) {
+          const id = visible[0].target.id;
+          setActiveSettingsSection(id);
+          if (window.location.hash !== `#${id}`) {
+            window.history.replaceState(null, '', `#${id}`);
+          }
+        }
+      },
+      {
+        // Trigger when a section crosses ~20% from the top of the viewport
+        rootMargin: `-${HEADER_HEIGHT + 16}px 0px -60% 0px`,
+        threshold: 0,
+      }
+    );
+
+    sectionIds.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) observerRef.current!.observe(el);
+    });
+
+    return () => observerRef.current?.disconnect();
+  }, [isSettingsPage]);
 
   const scrollToSettingsSection = (sectionId: string) => {
-    const section = document.getElementById(sectionId);
-    if (!section) return;
-    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setActiveSettingsSection(sectionId);
     if (window.location.hash !== `#${sectionId}`) {
       window.history.replaceState(null, '', `#${sectionId}`);
     }
+    const section = document.getElementById(sectionId);
+    if (!section) return;
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
   const settingsSectionIcons: Record<string, JSX.Element> = {

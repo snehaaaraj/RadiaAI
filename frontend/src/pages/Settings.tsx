@@ -18,7 +18,7 @@ import Typography from '@mui/material/Typography';
 import type { ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { useAppContext, type ThemePreference, type WorkspaceStartPage } from '@/context/AppContext';
-import { ROUTES } from '@/utils/constants';
+import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 import { SETTINGS_SECTION_IDS } from '@/utils/settingsSections';
 
 const THEMES: Array<{
@@ -97,7 +97,7 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.05 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.THEME_MODE} sx={{ scrollMarginTop: 108 }}>
+          <Card id={SETTINGS_SECTION_IDS.THEME_MODE} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
             <CardContent>
               <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
                 <PaletteIcon color="primary" />
@@ -142,7 +142,7 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.1 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.STARTUP_BEHAVIOR} sx={{ scrollMarginTop: 108 }}>
+          <Card id={SETTINGS_SECTION_IDS.STARTUP_BEHAVIOR} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
             <CardContent>
               <Typography variant="h6" fontWeight={700} gutterBottom>
                 Startup behavior
@@ -197,7 +197,7 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.14 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.REVIEW_NOTIFICATIONS} sx={{ scrollMarginTop: 108 }}>
+          <Card id={SETTINGS_SECTION_IDS.REVIEW_NOTIFICATIONS} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
             <CardContent>
               <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
                 <NotificationsActiveIcon color="primary" />
@@ -233,7 +233,7 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.18 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.RESET_PERSONALIZATION} sx={{ scrollMarginTop: 108 }}>
+          <Card id={SETTINGS_SECTION_IDS.RESET_PERSONALIZATION} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
             <CardContent>
               <Typography variant="h6" fontWeight={700} gutterBottom>
                 Reset personalization
