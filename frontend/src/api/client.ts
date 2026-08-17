@@ -12,6 +12,7 @@
 
 import axios, { AxiosError, type AxiosResponse } from 'axios';
 import type { ErrorResponse } from '@/types/api';
+import { API_BASE } from '@/utils/constants';
 
 /** Generate a UUID v4 for request tracing */
 function generateRequestId(): string {
@@ -19,7 +20,7 @@ function generateRequestId(): string {
 }
 
 const apiClient = axios.create({
-  baseURL: '/api/v1',
+  baseURL: API_BASE,
   headers: {
     'Content-Type': 'application/json',
   },

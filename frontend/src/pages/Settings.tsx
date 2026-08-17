@@ -16,9 +16,10 @@ import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
 import Typography from '@mui/material/Typography';
 import type { ReactNode } from 'react';
+import { useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAppContext, type ThemePreference, type WorkspaceStartPage } from '@/context/AppContext';
-import { ROUTES } from '@/utils/constants';
+import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 import { SETTINGS_SECTION_IDS } from '@/utils/settingsSections';
 
 const THEMES: Array<{
@@ -74,6 +75,22 @@ export default function Settings() {
 
   const reduceMotion = motionPreference === 'reduced';
 
+  // On mount, scroll to the section indicated by the URL hash.
+  // Wait for the page entrance animation to finish before scrolling
+  // so getBoundingClientRect() returns the final painted position.
+  useEffect(() => {
+    const id = window.location.hash.replace('#', '');
+    if (!id) return;
+    // Entrance animation is 280ms (delay 0.18s + duration 0.28s max).
+    // A 350ms wait covers both motion-full and motion-reduced paths.
+    const timer = setTimeout(() => {
+      const el = document.getElementById(id);
+      if (el) el.scrollIntoView({ behavior: reduceMotion ? 'instant' : 'smooth', block: 'start' });
+    }, reduceMotion ? 0 : 350);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // intentionally run once on mount only
+
   return (
     <Stack spacing={3}>
       <motion.div
@@ -97,7 +114,7 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.05 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.THEME_MODE} sx={{ scrollMarginTop: 108 }}>
+          <Card id={SETTINGS_SECTION_IDS.THEME_MODE} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
             <CardContent>
               <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
                 <PaletteIcon color="primary" />
@@ -142,7 +159,7 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.1 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.STARTUP_BEHAVIOR} sx={{ scrollMarginTop: 108 }}>
+          <Card id={SETTINGS_SECTION_IDS.STARTUP_BEHAVIOR} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
             <CardContent>
               <Typography variant="h6" fontWeight={700} gutterBottom>
                 Startup behavior
@@ -197,7 +214,7 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.14 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.REVIEW_NOTIFICATIONS} sx={{ scrollMarginTop: 108 }}>
+          <Card id={SETTINGS_SECTION_IDS.REVIEW_NOTIFICATIONS} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
             <CardContent>
               <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
                 <NotificationsActiveIcon color="primary" />
@@ -233,7 +250,7 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.18 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.RESET_PERSONALIZATION} sx={{ scrollMarginTop: 108 }}>
+          <Card id={SETTINGS_SECTION_IDS.RESET_PERSONALIZATION} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
             <CardContent>
               <Typography variant="h6" fontWeight={700} gutterBottom>
                 Reset personalization

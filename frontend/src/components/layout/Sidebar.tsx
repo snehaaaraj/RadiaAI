@@ -26,6 +26,7 @@ import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/AppContext';
 import { HEADER_HEIGHT, ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 import { SETTINGS_SECTION_ITEMS } from '@/utils/settingsSections';
+import { useActiveScrollSection } from '@/hooks/useActiveScrollSection';
 
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
@@ -47,15 +48,19 @@ export function Sidebar() {
   const location = useLocation();
   const isSettingsPage = location.pathname === ROUTES.SETTINGS;
   const currentWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
-  const activeSettingsSection = location.hash.replace('#', '') || SETTINGS_SECTION_ITEMS[0].id;
+
+  const SECTION_IDS = SETTINGS_SECTION_ITEMS.map((s) => s.id) as readonly string[];
+  const [activeSettingsSection, setSettingsTarget] = useActiveScrollSection(
+    SECTION_IDS,
+    isSettingsPage,
+    SETTINGS_SECTION_ITEMS[0].id,
+  );
 
   const scrollToSettingsSection = (sectionId: string) => {
+    setSettingsTarget(sectionId); // lock the highlight immediately, suppress scroll events
     const section = document.getElementById(sectionId);
     if (!section) return;
     section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    if (window.location.hash !== `#${sectionId}`) {
-      window.history.replaceState(null, '', `#${sectionId}`);
-    }
   };
 
   const settingsSectionIcons: Record<string, JSX.Element> = {
