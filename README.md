@@ -8,6 +8,8 @@ structured, explainable requirement quality workflows.
 
 ## Architecture
 
+For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.md).
+
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                       Frontend                          │
