@@ -2,50 +2,25 @@ import AppBar from '@mui/material/AppBar';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import TextField from '@mui/material/TextField';
 import Link from '@mui/material/Link';
 import Popover from '@mui/material/Popover';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
-import Autocomplete from '@mui/material/Autocomplete';
-import InputAdornment from '@mui/material/InputAdornment';
 import { alpha, useTheme } from '@mui/material/styles';
-import SearchIcon from '@mui/icons-material/Search';
 import FlightTakeoffIcon from '@mui/icons-material/FlightTakeoff';
 import SupportAgentIcon from '@mui/icons-material/SupportAgent';
 import BugReportIcon from '@mui/icons-material/BugReport';
-import type { KeyboardEvent, MouseEvent } from 'react';
-import { useMemo, useState } from 'react';
+import type { MouseEvent } from 'react';
+import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RadiaMark } from './RadiaMark';
 import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
 import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 
-type HeaderSearchOption = {
-  label: string;
-  path: string;
-  keywords: string[];
-};
-
 type LandingNavItem = {
   label: string;
   path: string;
 };
-
-const HEADER_SEARCH_OPTIONS: HeaderSearchOption[] = [
-  { label: 'Launchpad', path: ROUTES.LANDING, keywords: ['launchpad', 'landing', 'start', 'radia ai 2.0'] },
-  {
-    label: 'Radia AI Resources',
-    path: ROUTES.RADIA_AI_RESOURCES,
-    keywords: ['radia ai', 'resources', 'tools', 'jama requirement review', 'jama roundtrip'],
-  },
-  { label: 'Home', path: ROUTES.HOME, keywords: ['home', 'workspace'] },
-  { label: 'Single Review', path: ROUTES.REVIEW_REQUIREMENT, keywords: ['single review', 'requirement'] },
-  { label: 'Delta Review', path: ROUTES.REVIEW_DELTA, keywords: ['delta review', 'delta'] },
-  { label: 'Review History', path: ROUTES.REVIEW_HISTORY, keywords: ['history', 'review history'] },
-  { label: 'Standards', path: ROUTES.STANDARDS, keywords: ['standards', 'library'] },
-  { label: 'Settings', path: ROUTES.SETTINGS, keywords: ['settings', 'preferences'] },
-];
 
 const SUPPORT_EMAIL = 'sneha.nagaraju@radia.com';
 const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
@@ -71,11 +46,10 @@ const WORKSPACE_SUBPAGE_LABELS: Record<string, string> = {
 type TopBarMode = 'workspace' | 'landing';
 
 interface TopBarProps {
-  showSearch?: boolean;
   mode?: TopBarMode;
 }
 
-export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
+export function TopBar({ mode = 'workspace' }: TopBarProps) {
   const theme = useTheme();
   const location = useLocation();
   const isLandingMode = mode === 'landing';
@@ -86,44 +60,13 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
   const headerSurface = theme.palette.mode === 'dark' ? alpha('#0E1728', 0.62) : alpha('#F7FAFD', 0.78);
   const headerBorder = theme.palette.mode === 'dark' ? alpha('#E2E8F0', 0.16) : alpha('#2F4659', 0.16);
   const { guardedNavigate } = useNavigationGuardContext();
-  const [searchValue, setSearchValue] = useState<HeaderSearchOption | null>(null);
-  const [searchInputValue, setSearchInputValue] = useState('');
   const [supportAnchor, setSupportAnchor] = useState<HTMLButtonElement | null>(null);
-
-  const uniqueSearchOptions = useMemo(
-    () => HEADER_SEARCH_OPTIONS.filter((option, index, all) => all.findIndex((item) => item.path === option.path) === index),
-    []
-  );
-
-  const navigateToSearchOption = (option: HeaderSearchOption | null, rawInput?: string) => {
-    if (option) {
-      guardedNavigate(option.path);
-      return;
-    }
-
-    const normalized = (rawInput ?? '').trim().toLowerCase();
-    if (!normalized) return;
-
-    const matched = HEADER_SEARCH_OPTIONS.find((item) => {
-      if (item.label.toLowerCase().includes(normalized)) return true;
-      return item.keywords.some((keyword) => keyword.includes(normalized));
-    });
-
-    if (matched) guardedNavigate(matched.path);
-  };
-
-  const handleSearchEnter = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== 'Enter') return;
-    event.preventDefault();
-    navigateToSearchOption(searchValue, searchInputValue);
-  };
 
   const openSupport = (event: MouseEvent<HTMLButtonElement>) => setSupportAnchor(event.currentTarget);
   const closeSupport = () => setSupportAnchor(null);
   const isSettingsPage = location.pathname === ROUTES.SETTINGS;
   const currentSubpageLabel = WORKSPACE_SUBPAGE_LABELS[location.pathname] ?? 'Workspace';
   const showGlobalSettings = location.pathname !== ROUTES.LANDING && !isSettingsPage;
-  const showSearchTabs = showSearch && !isSettingsPage;
 
   return (
     <AppBar
@@ -134,8 +77,7 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
         zIndex: (theme) => theme.zIndex.drawer + 1,
         borderBottom: '1px solid',
         borderColor: headerBorder,
-        borderBottomLeftRadius: 16,
-        borderBottomRightRadius: 16,
+        borderRadius: 0,
         overflow: 'hidden',
         backgroundColor: headerSurface,
         backdropFilter: 'blur(18px) saturate(150%)',
@@ -375,50 +317,6 @@ export function TopBar({ showSearch = true, mode = 'workspace' }: TopBarProps) {
           </>
         )}
         <Box sx={{ flexGrow: 1 }} />
-
-        {showSearchTabs && (
-          <Autocomplete
-            value={searchValue}
-            onChange={(_event, option) => {
-              setSearchValue(option);
-              navigateToSearchOption(option);
-            }}
-            inputValue={searchInputValue}
-            onInputChange={(_event, value) => setSearchInputValue(value)}
-            options={uniqueSearchOptions}
-            getOptionLabel={(option) => option.label}
-            size="small"
-            sx={{
-              width: 320,
-              '& .MuiInputBase-root': {
-                color: headerForegroundColor,
-                transition: 'transform 160ms ease, background-color 160ms ease',
-                '&:hover': {
-                  backgroundColor: hoverHighlight,
-                  transform: 'scale(1.01)',
-                },
-              },
-              '& .MuiOutlinedInput-notchedOutline': {
-                borderColor: theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.35)' : 'rgba(47,70,89,0.35)',
-              },
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                placeholder="Search tabs..."
-                onKeyDown={handleSearchEnter}
-                InputProps={{
-                  ...params.InputProps,
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchIcon fontSize="small" sx={{ color: headerForegroundColor }} />
-                    </InputAdornment>
-                  ),
-                }}
-              />
-            )}
-          />
-        )}
 
         {showGlobalSettings && (
           <Button

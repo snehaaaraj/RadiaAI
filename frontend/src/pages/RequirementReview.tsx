@@ -41,6 +41,8 @@ const DEFAULT_FORM_STATE: RequirementReviewFormState = {
   uploadedFilename: '',
 };
 
+const DISPOSITION_SAVED_KEY = 'requirement-review-disposition-saved';
+
 export default function RequirementReview() {
   const { state: formState, setState: setFormState, clear: clearFormState } = usePersistentState<RequirementReviewFormState>({
     key: 'requirement-review-form-state',
@@ -69,8 +71,6 @@ export default function RequirementReview() {
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
   const playReviewCompleteSound = useReviewCompleteSound();
 
-  const DISPOSITION_SAVED_KEY = 'requirement-review-disposition-saved';
-
   // On mount: if disposition was saved last time, clear all review data
   useEffect(() => {
     if (sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true') {
@@ -96,6 +96,23 @@ export default function RequirementReview() {
   // Once the user saves a disposition, the result is considered acknowledged.
   const isDirty = (text.trim().length > 0 || !!activeResult || isPending) && !dispositionSavedThisSession;
   useNavigationGuard(isDirty);
+
+  // Track isDirty in a ref so the unmount cleanup can read the latest value.
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  // When the user discards (navigates away while dirty), clear persisted state
+  // so returning to this page starts fresh instead of restoring stale data.
+  useEffect(() => {
+    return () => {
+      if (isDirtyRef.current) {
+        localStorage.removeItem('requirement-review-form-state');
+        localStorage.removeItem('requirement-review-result');
+        sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const updateFormState = (next: Partial<RequirementReviewFormState>) => {
     setFormState((current) => ({ ...current, ...next }));

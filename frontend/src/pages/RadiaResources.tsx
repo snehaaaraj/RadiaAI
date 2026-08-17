@@ -64,7 +64,7 @@ export default function RadiaResources() {
 
   return (
     <NavigationGuardProvider>
-      <TopBar showSearch={false} mode="landing" />
+      <TopBar mode="landing" />
       <Box sx={{ minHeight: '100vh', background: pageGradient, position: 'relative' }}>
         <Box sx={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'hidden' }}>
           <Box

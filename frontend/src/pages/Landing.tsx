@@ -49,7 +49,7 @@ export default function Landing() {
 
   return (
     <NavigationGuardProvider>
-      <TopBar showSearch={false} mode="landing" />
+      <TopBar mode="landing" />
       <Box
         sx={{
           minHeight: '100vh',
