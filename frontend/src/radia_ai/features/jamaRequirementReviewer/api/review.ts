@@ -1,4 +1,4 @@
-import apiClient from './client';
+import apiClient from '@/api/client';
 import type {
   APIResponse,
   ApplyFindingDispositionRequest,
@@ -52,4 +52,3 @@ export async function applyFindingDisposition(
   );
   return data.data;
 }
-

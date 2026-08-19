@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { fetchStandards } from '@/api/review';
+import { fetchStandards } from '@/radia_ai/features/jamaRequirementReviewer/api/review';
 
 export const STANDARDS_QUERY_KEY = ['standards'] as const;
 
@@ -10,4 +10,3 @@ export function useStandards() {
     staleTime: 60_000,
   });
 }
-

@@ -7,7 +7,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useStandards } from '@/hooks/useStandards';
+import { useStandards } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useStandards';
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
@@ -96,4 +96,3 @@ export default function Standards() {
     </Stack>
   );
 }
-

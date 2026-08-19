@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { reviewRequirement } from '@/api/review';
+import { reviewRequirement } from '@/radia_ai/features/jamaRequirementReviewer/api/review';
 import type { RequirementReviewInput, RequirementReviewResponse } from '@/types/api';
 
 export function useRequirementReview() {
@@ -7,4 +7,3 @@ export function useRequirementReview() {
     mutationFn: reviewRequirement,
   });
 }
-

@@ -47,10 +47,10 @@ export default function Home() {
       >
         <Box>
           <Typography variant="h4" gutterBottom fontWeight={700}>
-            Home
+            Jama Requirement Reviewer
           </Typography>
           <Typography variant="body1" color="text.secondary" maxWidth={720}>
-            Deterministic review workflows for requirement quality, traceability, and revision control.
+            Feature workspace for deterministic requirement review, traceability, standards coverage, and revision-quality workflows.
           </Typography>
         </Box>
       </motion.div>

@@ -20,7 +20,8 @@ type ToolResource = {
   id: 'jama-requirement-review' | 'jama-roundtrip';
   label: string;
   description: string;
-  route: string | null;
+  route: string;
+  ctaLabel: string;
 };
 
 const TOOL_RESOURCES: ToolResource[] = [
@@ -30,13 +31,15 @@ const TOOL_RESOURCES: ToolResource[] = [
     description:
       'Run deterministic quality checks for Jama requirements with explainable findings/suggestions and resource traceability-ready outputs.',
     route: ROUTES.HOME,
+    ctaLabel: 'Open workspace',
   },
   {
     id: 'jama-roundtrip',
     label: 'Jama Roundtrip',
     description:
-      'Simplify Jama Roundtrip tasks with automated scripts. This tool is planned and will be added here when ready.',
-    route: null,
+      'Use the dedicated placeholder page to reserve structure for future Jama roundtrip automation, orchestration, and reporting flows.',
+    route: ROUTES.JAMA_ROUNDTRIP,
+    ctaLabel: 'Open placeholder',
   },
 ];
 
@@ -132,12 +135,9 @@ export default function RadiaResources() {
                       <Box>
                         <Button
                           variant="contained"
-                          disabled={!selectedTool.route}
-                          onClick={() => {
-                            if (selectedTool.route) navigate(selectedTool.route);
-                          }}
+                          onClick={() => navigate(selectedTool.route)}
                         >
-                          {selectedTool.route ? 'Open workspace' : 'Coming soon'}
+                          {selectedTool.ctaLabel}
                         </Button>
                       </Box>
                     </Stack>

@@ -8,11 +8,11 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
-import { FindingCard } from '@/components/review/FindingCard';
-import { ReviewQualityBand } from '@/components/review/ReviewQualityBand';
-import { ReviewStatusChip } from '@/components/review/ReviewStatusChip';
+import { FindingCard } from '@/radia_ai/features/jamaRequirementReviewer/components/FindingCard';
+import { ReviewQualityBand } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewQualityBand';
+import { ReviewStatusChip } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewStatusChip';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
-import { useReviewHistory } from '@/hooks/useReviewHistory';
+import { useReviewHistory } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import type { FindingDispositionStatus, ReviewWorkflow } from '@/types/api';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 

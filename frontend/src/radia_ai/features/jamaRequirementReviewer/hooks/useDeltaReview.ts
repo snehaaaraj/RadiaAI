@@ -1,5 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { reviewDelta } from '@/api/review';
+import { reviewDelta } from '@/radia_ai/features/jamaRequirementReviewer/api/review';
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
 
 export function useDeltaReview() {
@@ -7,4 +7,3 @@ export function useDeltaReview() {
     mutationFn: reviewDelta,
   });
 }
-

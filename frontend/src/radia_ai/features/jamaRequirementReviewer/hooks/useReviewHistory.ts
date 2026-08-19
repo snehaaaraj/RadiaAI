@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { applyFindingDisposition, fetchReviewHistory } from '@/api/review';
+import { applyFindingDisposition, fetchReviewHistory } from '@/radia_ai/features/jamaRequirementReviewer/api/review';
 import type { ApplyFindingDispositionRequest, ReviewWorkflow } from '@/types/api';
 
 export const REVIEW_HISTORY_QUERY_KEY = (workflow?: ReviewWorkflow, limit = 100) =>
@@ -28,4 +28,3 @@ export function useApplyFindingDisposition() {
     },
   });
 }
-
