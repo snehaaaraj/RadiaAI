@@ -25,8 +25,7 @@ def test_review_version_response_structure(client: TestClient) -> None:
     assert len(data["reviewers"]) >= 1
 
     determinism = data["determinism"]
-    assert determinism["reviewer_bundle_version"] == "1.0.0"
+    assert determinism["reviewer_bundle_version"] == "1.1.0"
     assert determinism["config_snapshot"]["temperature"] == 0.0
     assert isinstance(determinism["config_hash"], str)
     assert len(determinism["config_hash"]) == 64
-

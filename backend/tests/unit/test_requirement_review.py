@@ -52,3 +52,52 @@ def test_requirement_review_is_deterministic_for_identical_input(client: TestCli
     first_data["review_id"] = "<ignored>"
     second_data["review_id"] = "<ignored>"
     assert first_data == second_data
+
+
+@pytest.mark.unit
+def test_requirement_review_normalizes_fielded_document_text(client: TestClient) -> None:
+    structured_text = """
+    Project ID:
+    [WR-ACR-732](https://radia.jamacloud.com/perspective.req?docId=731619&projectId=46)
+
+    Title:
+    Semi-Prepared Runway Operations (SPRO)
+
+    Description:
+    The WindRunner Aircraft shall be designed for takeoff, landing, and taxi operations on
+    semi-prepared surfaces (e.g., compacted soil/gravel) with a California Bearing Ratio (CBR)
+    of 9 or greater, without requiring ground support equipment for maneuvering.
+
+    Requirement Volatility:
+    Low
+    """.strip()
+
+    canonical_text = (
+        "The WindRunner Aircraft shall be designed for takeoff, landing, and taxi operations on "
+        "semi-prepared surfaces (e.g., compacted soil/gravel) with a California Bearing Ratio (CBR) "
+        "of 9 or greater, without requiring ground support equipment for maneuvering."
+    )
+
+    structured = client.post(
+        "/api/v1/review/requirement",
+        json={
+            "text": structured_text,
+            "requirement_level": "system",
+        },
+    )
+    canonical = client.post(
+        "/api/v1/review/requirement",
+        json={
+            "text": canonical_text,
+            "requirement_level": "system",
+        },
+    )
+
+    assert structured.status_code == 200
+    assert canonical.status_code == 200
+
+    structured_data = structured.json()["data"]
+    canonical_data = canonical.json()["data"]
+    structured_data["review_id"] = "<ignored>"
+    canonical_data["review_id"] = "<ignored>"
+    assert structured_data == canonical_data

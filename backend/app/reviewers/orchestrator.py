@@ -17,6 +17,7 @@ from app.models.review_models import (
     ReviewVersionResponse,
 )
 from app.utils.review_utils import overall_from_statuses
+from app.utils.requirement_normalization import normalize_requirement_review_input
 
 if TYPE_CHECKING:
     from app.core.config import AppSettings
@@ -32,7 +33,7 @@ class ReviewOrchestrator:
         settings: AppSettings,
         reviewers: list[RequirementReviewer],
         standards_service: StandardsService | None = None,
-        reviewer_bundle_version: str = "1.0.0",
+        reviewer_bundle_version: str = "1.1.0",
     ) -> None:
         self._settings = settings
         self._reviewers = reviewers
@@ -41,8 +42,9 @@ class ReviewOrchestrator:
 
     def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
         """Run all reviewers that support individual requirement review."""
+        normalized_payload = normalize_requirement_review_input(payload)
         reviewer_results = [
-            reviewer.review_requirement(payload)
+            reviewer.review_requirement(normalized_payload)
             for reviewer in self._reviewers
             if reviewer.supports_individual_review
         ]

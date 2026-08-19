@@ -11,6 +11,7 @@ from app.models.review_models import (
     RequirementReviewInput,
     TraceLinkChange,
 )
+from app.utils.requirement_normalization import normalize_requirement_review_input
 
 
 @dataclass(frozen=True)
@@ -27,6 +28,13 @@ def compute_delta(
     changed_trace_links: list[TraceLinkChange],
 ) -> DeltaComputationResult:
     """Compute new/modified/deleted requirements and trace link deltas."""
+    baseline_requirements = [
+        normalize_requirement_review_input(requirement) for requirement in baseline_requirements
+    ]
+    updated_requirements = [
+        normalize_requirement_review_input(requirement) for requirement in updated_requirements
+    ]
+
     baseline_map = {_requirement_key(req): req for req in baseline_requirements}
     updated_map = {_requirement_key(req): req for req in updated_requirements}
 
