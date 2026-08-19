@@ -45,18 +45,18 @@ RadiaAi-2.0/
 │   ├── radia_ai/
 │   │   ├── main.py             # project-named FastAPI entrypoint
 │   │   └── features/
-│   │       ├── jama_requirement_reviewer/  # feature namespace
+│   │       ├── jama_requirement_reviewer/  # active reviewer implementation
 │   │       └── jama_roundtrip/             # placeholder namespace
-│   ├── app/                   # current implementation package (kept stable during migration)
-│   │   ├── api/v1/endpoints/  # HTTP endpoint handlers (thin — no logic)
+│   ├── app/                   # shared legacy package + compatibility wrappers
+│   │   ├── api/v1/endpoints/  # shared/non-review endpoints + wrapper modules
 │   │   ├── core/              # config, logging, exceptions, security
 │   │   ├── schemas/           # Pydantic v2 request/response models
-│   │   ├── services/          # business logic and orchestration
+│   │   ├── services/          # shared or compatibility service exports
 │   │   ├── rag/               # retrieval-augmented generation components
 │   │   ├── ingestion/         # document ingestion pipeline
 │   │   ├── connectors/        # source system adapters
-│   │   ├── dependencies/      # FastAPI DI container
-│   │   └── main.py            # implementation app factory
+│   │   ├── dependencies/      # shared DI + reviewer compatibility wrappers
+│   │   └── main.py            # compatibility entrypoint
 │   ├── tests/
 │   ├── Dockerfile
 │   ├── pyproject.toml

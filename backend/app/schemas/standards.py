@@ -1,6 +1,4 @@
-"""Schemas for standards endpoints."""
+﻿"""Compatibility wrapper for migrated Jama Requirement Reviewer module."""
 
-from app.models.standards_models import StandardsResponse
-
-__all__ = ["StandardsResponse"]
+from radia_ai.features.jama_requirement_reviewer.schemas.standards import *  # noqa: F403
 

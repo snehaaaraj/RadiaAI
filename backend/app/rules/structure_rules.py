@@ -1,6 +1,4 @@
-"""Rule constants for deterministic requirement structure review."""
+﻿"""Compatibility wrapper for migrated Jama Requirement Reviewer module."""
 
-REQUIREMENT_LEVELS = {"aircraft", "system", "subsystem", "component"}
-
-CONJUNCTION_MARKERS = {" and ", " or ", ";"}
+from radia_ai.features.jama_requirement_reviewer.rules.structure_rules import *  # noqa: F403
 

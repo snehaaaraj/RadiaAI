@@ -1,18 +1,4 @@
-"""Rule constants for deterministic verifiability review."""
+﻿"""Compatibility wrapper for migrated Jama Requirement Reviewer module."""
 
-OPERATING_CONDITION_HINTS = {
-    "under",
-    "during",
-    "within",
-    "at ",
-    "when",
-}
-
-UNMEASURABLE_TERMS = {
-    "fast",
-    "efficient",
-    "optimal",
-    "minimal",
-    "sufficient",
-}
+from radia_ai.features.jama_requirement_reviewer.rules.verifiability_rules import *  # noqa: F403
 

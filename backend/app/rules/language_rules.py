@@ -1,29 +1,4 @@
-"""Rule constants for deterministic language review."""
+﻿"""Compatibility wrapper for migrated Jama Requirement Reviewer module."""
 
-AMBIGUOUS_WORDS = {
-    "fast",
-    "quickly",
-    "adequate",
-    "sufficient",
-    "user-friendly",
-    "robust",
-    "as needed",
-    "as appropriate",
-    "etc",
-    "and/or",
-}
-
-BANNED_WORDS = {
-    "etc",
-    "and/or",
-    "user-friendly",
-    "best effort",
-}
-
-SUBJECTIVE_WORDS = {
-    "easy",
-    "intuitive",
-    "acceptable",
-    "normal",
-}
+from radia_ai.features.jama_requirement_reviewer.rules.language_rules import *  # noqa: F403
 
