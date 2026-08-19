@@ -12,4 +12,3 @@ class RequirementReviewService:
 
     def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
         return self._orchestrator.review_requirement(payload)
-

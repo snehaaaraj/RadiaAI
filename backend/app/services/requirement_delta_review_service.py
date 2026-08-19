@@ -52,4 +52,3 @@ class RequirementDeltaReviewService:
             reviewed_requirements=reviewed_requirements,
             determinism=determinism,
         )
-
