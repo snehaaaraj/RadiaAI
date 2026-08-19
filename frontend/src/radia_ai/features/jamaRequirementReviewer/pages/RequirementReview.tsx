@@ -35,7 +35,7 @@ type RequirementReviewFormState = {
 
 const DEFAULT_FORM_STATE: RequirementReviewFormState = {
   requirementId: '',
-  requirementLevel: 'System',
+  requirementLevel: 'Aircraft',
   text: '',
   inputMode: 'paste',
   uploadedFilename: '',

@@ -54,9 +54,6 @@ const START_PAGE_OPTIONS: Array<{ value: WorkspaceStartPage; label: string }> = 
   { value: ROUTES.REVIEW_DELTA, label: 'Delta Review' },
   { value: ROUTES.REVIEW_HISTORY, label: 'Review History' },
   { value: ROUTES.STANDARDS, label: 'Standards' },
-  { value: ROUTES.SEARCH, label: 'Search' },
-  { value: ROUTES.CHAT, label: 'Chat' },
-  { value: ROUTES.DOCUMENTS, label: 'Documents' },
 ];
 
 export default function Settings() {

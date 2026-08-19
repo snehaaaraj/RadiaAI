@@ -144,6 +144,10 @@ export default function ReviewHistory() {
                 <Stack spacing={1}>
                   {entry.findings.map((finding, index) => {
                     const disposition = entry.dispositions.find((item) => item.finding_index === index);
+                    // Filter findings based on disposition filter
+                    if (dispositionFilter !== 'all' && disposition?.disposition !== dispositionFilter) {
+                      return null;
+                    }
                     return (
                       <FindingCard
                         key={`${entry.review_id}-${index}`}
