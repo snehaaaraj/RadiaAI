@@ -12,7 +12,6 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     DeterminismContext,
     RequirementReviewInput,
     RequirementReviewResponse,
-    ReviewStatus,
     ReviewVersionEntry,
     ReviewVersionResponse,
 )
@@ -141,4 +140,3 @@ class ReviewOrchestrator:
                 )
             )
         return enriched
-

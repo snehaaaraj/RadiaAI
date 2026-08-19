@@ -9,8 +9,6 @@ the stub to real Entra validation requires changing only this file — no endpoi
 code needs to change.
 """
 
-from collections.abc import Callable
-
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -83,5 +81,4 @@ async def _entra_auth(
         )
     # Placeholder — will be replaced with real validation
     raise NotImplementedError("Entra ID token validation not yet implemented")
-
 
