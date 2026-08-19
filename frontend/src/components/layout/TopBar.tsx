@@ -27,7 +27,7 @@ const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
 const LANDING_NAV_ITEMS: LandingNavItem[] = [
   { label: 'RADIA AI', path: ROUTES.RADIA_AI_RESOURCES },
   { label: 'Jama Requirement Reviewer', path: ROUTES.HOME },
-  { label: 'Jama Roundtrip', path: `${ROUTES.RADIA_AI_RESOURCES}?tool=jama-roundtrip` },
+  { label: 'Jama Roundtrip', path: ROUTES.JAMA_ROUNDTRIP },
 ];
 const TOOL_RESOURCE_NAME = 'Jama Requirement Reviewer';
 const TOOL_WORKSPACE_ROUTE = ROUTES.HOME;

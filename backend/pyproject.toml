@@ -10,7 +10,7 @@ requires-python = ">=3.12"
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["app*"]
+include = ["app*", "radia_ai*"]
 
 # ---------------------------------------------------------------------------
 # Ruff — linter + formatter (replaces flake8 + isort + pyupgrade)
@@ -18,7 +18,7 @@ include = ["app*"]
 [tool.ruff]
 target-version = "py312"
 line-length = 100
-src = ["app", "tests"]
+src = ["app", "radia_ai", "tests"]
 
 [tool.ruff.lint]
 select = [
@@ -45,7 +45,7 @@ ignore = [
 "tests/**" = ["S", "ANN"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app"]
+known-first-party = ["app", "radia_ai"]
 
 # ---------------------------------------------------------------------------
 # Black — code formatter

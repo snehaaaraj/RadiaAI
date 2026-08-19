@@ -1,16 +1,4 @@
-"""Schemas for review history and dispositions endpoints."""
+﻿"""Compatibility wrapper for migrated Jama Requirement Reviewer module."""
 
-from app.models.review_history_models import (
-    ApplyFindingDispositionRequest,
-    ReviewHistoryEntry,
-    ReviewHistoryListResponse,
-    ReviewWorkflow,
-)
-
-__all__ = [
-    "ApplyFindingDispositionRequest",
-    "ReviewHistoryEntry",
-    "ReviewHistoryListResponse",
-    "ReviewWorkflow",
-]
+from radia_ai.features.jama_requirement_reviewer.schemas.review_history import *  # noqa: F403
 
