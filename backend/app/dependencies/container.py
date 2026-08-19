@@ -107,7 +107,7 @@ def _build_review_orchestrator(
             CertificationReviewer(),
         ],
         standards_service=standards_service,
-        reviewer_bundle_version="1.0.0",
+        reviewer_bundle_version="1.1.0",
     )
 
 
