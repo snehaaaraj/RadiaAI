@@ -86,7 +86,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     reference="INCOSE",
                     suggested_rewrite=(
                         "Append a quantitative acceptance criterion, e.g.:\n"
-                        "  â€¦ shall [behaviour] within [VALUE Â± TOLERANCE] [UNIT]."
+                        "  ... shall [behavior] within [VALUE +/- TOLERANCE] [UNIT]."
                     ),
                 )
             )
@@ -116,9 +116,8 @@ def _flag_unmeasurable_terms(text: str, terms: list[str]) -> str:
     for term in terms:
         result = re.sub(
             rf'\b{re.escape(term)}\b',
-            f'[QUANTIFY: {term} â†’ specify numeric threshold]',
+            f'[QUANTIFY: {term} -> specify numeric threshold]',
             result,
             flags=re.IGNORECASE,
         )
     return result
-
