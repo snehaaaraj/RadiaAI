@@ -11,7 +11,7 @@ Phase 1: Stubs only. Phase 2+ will wire in DocumentService and repository layer.
 from fastapi import APIRouter, Request, status
 
 from app.core.logging import get_logger
-from app.schemas.common import APIResponse, PaginatedResponse
+from app.schemas.common import PaginatedResponse
 from app.schemas.documents import DocumentSummary
 
 router = APIRouter()
