@@ -18,9 +18,9 @@ from radia_ai.features.jama_requirement_reviewer.rules.verifiability_rules impor
 
 class VerifiabilityReviewer(RequirementReviewer):
     name = "verifiability"
-    reviewer_version = "1.0.0"
-    prompt_version = "verifiability.v1"
-    standards_version = "incose.v1"
+    reviewer_version = "2.0.0"
+    prompt_version = "verifiability.v2"
+    standards_version = "rag-live"
     supports_individual_review = True
 
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
@@ -43,7 +43,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     explanation="Unmeasurable adjectives are present without quantitative limits.",
                     evidence=f"Unmeasurable terms: {', '.join(found_unmeasurable)}",
                     recommendation="Replace qualitative terms with numeric acceptance thresholds.",
-                    reference="INCOSE",
+                    reference="pending-rag-resolution",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -61,11 +61,8 @@ class VerifiabilityReviewer(RequirementReviewer):
                     explanation="No operating condition cue words were detected.",
                     evidence="No EARS condition cue (e.g. 'when', 'while', 'where', 'if') found in requirement text.",
                     recommendation="Add context such as environmental/mission condition bounds.",
-                    reference="EARS",
-                    suggested_rewrite=(
-                        "Prefix the requirement with an operating condition clause, e.g.:\n"
-                        "  When [operating condition], the [system] shall [behaviour]."
-                    ),
+                    reference="pending-rag-resolution",
+                    suggested_rewrite=None,
                 )
             )
 
@@ -83,13 +80,14 @@ class VerifiabilityReviewer(RequirementReviewer):
                     recommendation=(
                         "Add measurable values, tolerances, or explicit pass/fail criteria."
                     ),
-                    reference="INCOSE",
-                    suggested_rewrite=(
-                        "Append a quantitative acceptance criterion, e.g.:\n"
-                        "  ... shall [behavior] within [VALUE +/- TOLERANCE] [UNIT]."
-                    ),
+                    reference="pending-rag-resolution",
+                    suggested_rewrite=None,
                 )
             )
+
+        # Enhance with LLM+RAG
+        if self._llm_enhancer is not None:
+            findings = self._llm_enhancer.enhance_findings(self.name, payload, findings)
 
         overall = _overall_from_findings(findings)
         return ReviewerResult(

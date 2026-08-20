@@ -1,4 +1,4 @@
-﻿"""Reviewer orchestration and version catalog."""
+"""Reviewer orchestration and version catalog."""
 
 from __future__ import annotations
 

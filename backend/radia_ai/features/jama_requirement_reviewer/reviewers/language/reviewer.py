@@ -18,9 +18,9 @@ from radia_ai.features.jama_requirement_reviewer.rules.language_rules import AMB
 
 class LanguageReviewer(RequirementReviewer):
     name = "language"
-    reviewer_version = "1.0.0"
-    prompt_version = "language.v1"
-    standards_version = "incose.v1"
+    reviewer_version = "2.0.0"
+    prompt_version = "language.v2"
+    standards_version = "rag-live"
     supports_individual_review = True
 
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
@@ -48,7 +48,7 @@ class LanguageReviewer(RequirementReviewer):
                     ),
                     evidence=text,
                     recommendation="Rewrite requirement using 'shall' for mandatory behavior.",
-                    reference="INCOSE",
+                    reference="pending-rag-resolution",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -69,7 +69,7 @@ class LanguageReviewer(RequirementReviewer):
                     ),
                     evidence=f"Found banned words: {', '.join(found_banned)}",
                     recommendation="Replace banned terms with explicit, measurable wording.",
-                    reference="Company Style Guide",
+                    reference="pending-rag-resolution",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -88,7 +88,7 @@ class LanguageReviewer(RequirementReviewer):
                     explanation="Ambiguous terms make verification and certification harder.",
                     evidence=f"Found ambiguous wording: {', '.join(found_ambiguous)}",
                     recommendation="Replace ambiguous words with objective measurable criteria.",
-                    reference="EARS",
+                    reference="pending-rag-resolution",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -109,13 +109,14 @@ class LanguageReviewer(RequirementReviewer):
                     recommendation=(
                         "Rewrite sentence in active voice with a clear responsible subject."
                     ),
-                    reference="INCOSE",
-                    suggested_rewrite=(
-                        "Identify the responsible system/actor and rewrite using active voice, e.g.:\n"
-                        f"  The [system] shall [active verb] ... (replacing '{passive_phrase}')"
-                    ),
+                    reference="pending-rag-resolution",
+                    suggested_rewrite=None,
                 )
             )
+
+        # Enhance with LLM+RAG: replace placeholder rewrites and references
+        if self._llm_enhancer is not None:
+            findings = self._llm_enhancer.enhance_findings(self.name, payload, findings)
 
         overall = _overall_from_findings(findings)
         return ReviewerResult(

@@ -17,7 +17,7 @@ class SearchRequest(BaseModel):
     query: str = Field(min_length=1, max_length=1000)
     mode: SearchMode = Field(default=SearchMode.HYBRID)
     top_k: int = Field(default=10, ge=1, le=50)
-    filters: dict = Field(default_factory=dict, description="Metadata filters (Phase 3+)")
+    filters: dict = Field(default_factory=dict, description="Metadata filters for search")
 
 
 class SearchResult(BaseModel):

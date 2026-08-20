@@ -17,9 +17,9 @@ from radia_ai.features.jama_requirement_reviewer.rules.structure_rules import RE
 
 class StructureReviewer(RequirementReviewer):
     name = "structure"
-    reviewer_version = "1.0.0"
-    prompt_version = "structure.v1"
-    standards_version = "incose.v1"
+    reviewer_version = "2.0.0"
+    prompt_version = "structure.v2"
+    standards_version = "rag-live"
     supports_individual_review = True
 
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
@@ -45,7 +45,7 @@ class StructureReviewer(RequirementReviewer):
                     recommendation=(
                         "Split the statement into independent requirements, one behavior each."
                     ),
-                    reference="INCOSE",
+                    reference="pending-rag-resolution",
                     suggested_rewrite=_split_compound_requirement(text),
                 )
             )
@@ -64,7 +64,7 @@ class StructureReviewer(RequirementReviewer):
                     explanation="Subjective wording prevents deterministic verification.",
                     evidence=f"Subjective terms: {', '.join(found_subjective)}",
                     recommendation="Replace subjective terms with objective measurable criteria.",
-                    reference="Company Style Guide",
+                    reference="pending-rag-resolution",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -83,7 +83,7 @@ class StructureReviewer(RequirementReviewer):
                     recommendation=(
                         "Set requirement_level to aircraft, system, subsystem, or component."
                     ),
-                    reference="Internal Engineering Standards",
+                    reference="pending-rag-resolution",
                 )
             )
         elif payload.requirement_level.lower() not in REQUIREMENT_LEVELS:
@@ -101,9 +101,13 @@ class StructureReviewer(RequirementReviewer):
                     ),
                     evidence=f"Provided requirement_level: {payload.requirement_level}",
                     recommendation="Use one of: aircraft, system, subsystem, component.",
-                    reference="Internal Engineering Standards",
+                    reference="pending-rag-resolution",
                 )
             )
+
+        # Enhance with LLM+RAG
+        if self._llm_enhancer is not None:
+            findings = self._llm_enhancer.enhance_findings(self.name, payload, findings)
 
         overall = _overall_from_findings(findings)
         return ReviewerResult(
