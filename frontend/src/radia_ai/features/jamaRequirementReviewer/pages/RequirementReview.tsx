@@ -23,6 +23,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
+import { requirementReviewStyles } from './RequirementReview.styles';
 
 type InputMode = 'paste' | 'upload';
 type RequirementReviewFormState = {
@@ -158,7 +159,7 @@ export default function RequirementReview() {
         </Typography>
       </Box>
 
-      <Paper variant="outlined" sx={{ p: 2.5 }}>
+      <Paper variant="outlined" sx={requirementReviewStyles.sectionPaper}>
         <Stack spacing={2}>
           <Grid container spacing={1.5}>
             <Grid size={{ xs: 12, md: 4 }}>
@@ -198,17 +199,10 @@ export default function RequirementReview() {
           </Grid>
 
           <Box>
-            <Typography variant="caption" color="text.secondary" display="block" mb={0.75}>
+            <Typography variant="caption" color="text.secondary" sx={requirementReviewStyles.fieldLabel}>
               Requirement Text
             </Typography>
-            <Box
-              display="flex"
-              alignItems="center"
-              justifyContent="space-between"
-              gap={1}
-              flexWrap="wrap"
-              mb={1.5}
-            >
+            <Box sx={requirementReviewStyles.inputModeRow}>
               <ToggleButtonGroup
                 size="small"
                 value={inputMode}
@@ -257,12 +251,12 @@ export default function RequirementReview() {
           </Box>
 
           {uploadedFilename && text.trim() && (
-            <Alert severity="info" sx={{ py: 0.5 }}>
+            <Alert severity="info" sx={requirementReviewStyles.uploadAlert}>
               Loaded from <strong>{uploadedFilename}</strong> - review the text tab before submitting.
             </Alert>
           )}
 
-          <Box display="flex" gap={1} flexWrap="wrap">
+          <Box sx={requirementReviewStyles.actionRow}>
             <Button
               variant="contained"
               disabled={!canSubmit || isPending}
@@ -300,7 +294,7 @@ export default function RequirementReview() {
               { label: 'Level', value: requirementLevel },
             ]}
           />
-          <Paper variant="outlined" sx={{ p: 2.5 }}>
+          <Paper variant="outlined" sx={requirementReviewStyles.sectionPaper}>
             <Stack spacing={2}>
               <Box>
             <Typography variant="h6" fontWeight={800} gutterBottom>

@@ -177,6 +177,23 @@ export default function DeltaReview() {
   ) && !dispositionSavedThisSession;
   useNavigationGuard(isDirty);
 
+  // Track isDirty in a ref so the unmount cleanup can read the latest value.
+  const isDirtyRef = useRef(isDirty);
+  useEffect(() => { isDirtyRef.current = isDirty; }, [isDirty]);
+
+  // When the user discards (navigates away while dirty), clear persisted state
+  // so returning to this page starts fresh instead of restoring stale data.
+  useEffect(() => {
+    return () => {
+      if (isDirtyRef.current) {
+        localStorage.removeItem('delta-review-form-state');
+        localStorage.removeItem('delta-review-result');
+        sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
+      }
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
     setFormState((current) => ({ ...current, ...next }));
   };

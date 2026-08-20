@@ -15,6 +15,7 @@ import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useReviewHistory } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import type { FindingDispositionStatus, ReviewWorkflow } from '@/types/api';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
+import { reviewHistoryStyles } from './ReviewHistory.styles';
 
 const WORKFLOW_OPTIONS: Array<{ label: string; value: ReviewWorkflow | 'all' }> = [
   { label: 'All workflows', value: 'all' },
@@ -73,14 +74,14 @@ export default function ReviewHistory() {
         </Typography>
       </Box>
 
-      <Box display="flex" gap={2} flexWrap="wrap">
+      <Box sx={reviewHistoryStyles.filterRow}>
         <TextField
           select
           size="small"
           label="Workflow"
           value={workflow}
           onChange={(e) => handleWorkflowChange(e.target.value as ReviewWorkflow | 'all')}
-          sx={{ minWidth: 200 }}
+          sx={reviewHistoryStyles.filterSelect}
         >
           {WORKFLOW_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
@@ -95,7 +96,7 @@ export default function ReviewHistory() {
           label="Disposition"
           value={dispositionFilter}
           onChange={(e) => handleDispositionChange(e.target.value as FindingDispositionStatus | 'all')}
-          sx={{ minWidth: 200 }}
+          sx={reviewHistoryStyles.filterSelect}
         >
           {DISPOSITION_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
@@ -105,7 +106,7 @@ export default function ReviewHistory() {
         </TextField>
 
         {filteredEntries.length > 0 && (
-          <Typography variant="body2" color="text.secondary" alignSelf="center">
+          <Typography variant="body2" color="text.secondary" sx={reviewHistoryStyles.resultCount}>
             {filteredEntries.length} result{filteredEntries.length !== 1 ? 's' : ''}
           </Typography>
         )}
@@ -116,9 +117,9 @@ export default function ReviewHistory() {
           <Alert severity="info">No review history entries match the selected filters.</Alert>
         ) : (
           pagedEntries.map((entry) => (
-            <Paper key={entry.review_id} variant="outlined" sx={{ p: 2.5 }}>
+            <Paper key={entry.review_id} variant="outlined" sx={reviewHistoryStyles.entryPaper}>
               <Stack spacing={1.5}>
-                <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
+                <Box sx={reviewHistoryStyles.entryHeader}>
                   <Typography variant="subtitle1" fontWeight={700}>
                     {entry.review_id}
                   </Typography>
@@ -131,7 +132,7 @@ export default function ReviewHistory() {
                 <ReviewQualityBand
                   score={getReviewQualityScore(entry.overall, entry.findings)}
                 />
-                <Box display="flex" gap={1} flexWrap="wrap">
+                <Box sx={reviewHistoryStyles.categoryRow}>
                   {entry.category_results.map((category, index) => (
                     <Chip
                       key={`${entry.review_id}-${category.category}-${index}`}
@@ -167,7 +168,7 @@ export default function ReviewHistory() {
       </Stack>
 
       {totalPages > 1 && (
-        <Box display="flex" justifyContent="center" pt={1}>
+        <Box sx={reviewHistoryStyles.paginationRow}>
           <Pagination
             count={totalPages}
             page={page}

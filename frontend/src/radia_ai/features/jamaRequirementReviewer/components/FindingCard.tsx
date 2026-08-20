@@ -25,6 +25,7 @@ import type {
   ReviewFinding,
 } from '@/types/api';
 import { ReviewStatusChip } from './ReviewStatusChip';
+import { findingCardStyles, getDispositionChipColor } from './FindingCard.styles';
 
 const SEVERITY_COLOR: Record<FindingSeverity, 'error' | 'warning' | 'info'> = {
   Critical: 'error',
@@ -73,58 +74,42 @@ export function FindingCard({
   );
 
   return (
-    <Paper
-      variant="outlined"
-      sx={{
-        p: 1.5,
-        borderRadius: 3,
-        borderLeft: '5px solid',
-        borderLeftColor:
-          finding.severity === 'Critical' || finding.severity === 'High'
-            ? 'error.main'
-            : finding.severity === 'Medium'
-              ? 'warning.main'
-              : 'info.main',
-      }}
-    >
+    <Paper variant="outlined" sx={findingCardStyles.paper(finding.severity)}>
       <Stack spacing={1.25}>
-        <Box display="flex" alignItems="center" justifyContent="space-between" gap={1} flexWrap="wrap">
-          <Stack direction="row" gap={1} flexWrap="wrap" alignItems="center">
+        <Box sx={findingCardStyles.headerRow}>
+          <Stack
+            direction={findingCardStyles.headerMetaRow.direction}
+            gap={findingCardStyles.headerMetaRow.gap}
+            flexWrap={findingCardStyles.headerMetaRow.flexWrap}
+            alignItems={findingCardStyles.headerMetaRow.alignItems}
+          >
             <Chip label={finding.category} size="small" color="primary" variant="outlined" />
             <Chip label={finding.severity} size="small" color={SEVERITY_COLOR[finding.severity]} />
             <Typography variant="subtitle2" fontWeight={800}>
               Change {index + 1}
             </Typography>
           </Stack>
-          <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+          <Stack
+            direction={findingCardStyles.statusRow.direction}
+            spacing={findingCardStyles.statusRow.spacing}
+            alignItems={findingCardStyles.statusRow.alignItems}
+            flexWrap={findingCardStyles.statusRow.flexWrap}
+          >
             <Chip label={finding.pass_fail} size="small" variant="outlined" />
             <ReviewStatusChip status={finding.status} />
           </Stack>
         </Box>
 
-        <Box
-          sx={{
-            p: 1.25,
-            borderRadius: 2,
-            bgcolor: 'action.hover',
-          }}
-        >
+        <Box sx={findingCardStyles.recommendationBox}>
           <Typography variant="overline" color="text.secondary">
             What should change
           </Typography>
-          <Typography variant="body2" mt={0.5}>
+          <Typography variant="body2" sx={findingCardStyles.detailBodyText}>
             {finding.recommendation}
           </Typography>
         </Box>
 
-        <Box
-          sx={{
-            p: 1.25,
-            borderRadius: 2,
-            border: '1px solid',
-            borderColor: 'divider',
-          }}
-        >
+        <Box sx={findingCardStyles.sourceBox}>
           <Stack spacing={0.5}>
             <Typography variant="overline" color="text.secondary">
               Source of truth
@@ -145,14 +130,7 @@ export function FindingCard({
 
         <Accordion
           disableGutters
-          sx={{
-            boxShadow: 'none',
-            border: '1px solid',
-            borderColor: 'divider',
-            borderRadius: 2,
-            '&:before': { display: 'none' },
-            overflow: 'hidden',
-          }}
+          sx={findingCardStyles.accordion}
         >
           <AccordionSummary expandIcon={<ExpandMoreIcon />}>
             <Typography variant="subtitle2" fontWeight={700}>
@@ -165,7 +143,7 @@ export function FindingCard({
                 <Typography variant="overline" color="text.secondary">
                   Why was this flagged
                 </Typography>
-                <Typography variant="body2" mt={0.5}>
+                <Typography variant="body2" sx={findingCardStyles.detailBodyText}>
                   {finding.explanation}
                 </Typography>
               </Box>
@@ -175,7 +153,7 @@ export function FindingCard({
                 <>
                   <Divider />
                   <Box>
-                    <Box display="flex" alignItems="center" justifyContent="space-between" mb={0.75}>
+                    <Box sx={findingCardStyles.changesetHeaderRow}>
                       <Typography variant="overline" color="primary" fontWeight={700}>
                         Changeset
                       </Typography>
@@ -186,29 +164,18 @@ export function FindingCard({
                           color="primary"
                           startIcon={<ContentCopyIcon fontSize="small" />}
                           onClick={handleCopyRewrite}
-                          sx={{ minWidth: 0, py: 0.25, px: 1 }}
+                          sx={findingCardStyles.copyButton}
                         >
                           {copied ? 'Copied' : 'Copy'}
                         </Button>
                       </Tooltip>
                     </Box>
-                    <Box
-                      sx={{
-                        p: 1.25,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: 'primary.main',
-                        bgcolor: 'primary.50',
-                        fontFamily: 'monospace',
-                        whiteSpace: 'pre-wrap',
-                        wordBreak: 'break-word',
-                      }}
-                    >
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                    <Box sx={findingCardStyles.changesetBox}>
+                      <Typography variant="body2" sx={findingCardStyles.preWrapText}>
                         {finding.suggested_rewrite}
                       </Typography>
                     </Box>
-                    <Typography variant="caption" color="text.secondary" mt={0.5} display="block">
+                    <Typography variant="caption" color="text.secondary" sx={findingCardStyles.changesetCaption}>
                       Applying this suggestion and re-running the review should result in this finding passing.
                     </Typography>
                   </Box>
@@ -219,37 +186,23 @@ export function FindingCard({
               {readOnly && disposition && (
                 <>
                   <Divider />
-                  <Box display="flex" alignItems="center" gap={1.5} flexWrap="wrap">
+                  <Box sx={findingCardStyles.dispositionRow}>
                     <Typography variant="subtitle2" fontWeight={700}>
                       Reviewer disposition
                     </Typography>
                     <Chip
                       label={disposition.disposition}
                       size="small"
-                      color={
-                        disposition.disposition === 'Accepted'
-                          ? 'success'
-                          : disposition.disposition === 'Rejected'
-                            ? 'error'
-                            : 'warning'
-                      }
+                      color={getDispositionChipColor(disposition.disposition)}
                       variant="filled"
                     />
                   </Box>
                   {disposition.reviewer_comment && (
-                    <Box
-                      sx={{
-                        p: 1.25,
-                        borderRadius: 2,
-                        border: '1px solid',
-                        borderColor: 'divider',
-                        bgcolor: 'action.hover',
-                      }}
-                    >
+                    <Box sx={findingCardStyles.reviewerCommentBox}>
                       <Typography variant="overline" color="text.secondary">
                         Reviewer comment
                       </Typography>
-                      <Typography variant="body2" mt={0.5}>
+                      <Typography variant="body2" sx={findingCardStyles.detailBodyText}>
                         {disposition.reviewer_comment}
                       </Typography>
                     </Box>
@@ -282,7 +235,7 @@ export function FindingCard({
                     value={comment}
                     onChange={(event) => setComment(event.target.value)}
                   />
-                  <Box display="flex" alignItems="center" gap={1.5}>
+                  <Box sx={findingCardStyles.actionRow}>
                     <Button
                       variant="contained"
                       size="small"
@@ -301,7 +254,7 @@ export function FindingCard({
                       Save disposition
                     </Button>
                     {saved && (
-                      <Box display="flex" alignItems="center" gap={0.5} sx={{ color: 'success.main' }}>
+                      <Box sx={findingCardStyles.savedIndicator}>
                         <CheckCircleIcon fontSize="small" />
                         <Typography variant="caption" fontWeight={700} color="success.main">
                           Saved
