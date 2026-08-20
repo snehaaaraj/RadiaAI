@@ -1,14 +1,4 @@
-"""Service for single requirement deterministic reviews."""
+﻿"""Compatibility wrapper for migrated Jama Requirement Reviewer module."""
 
-from app.models.review_models import RequirementReviewInput, RequirementReviewResponse
-from app.reviewers.orchestrator import ReviewOrchestrator
+from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import *  # noqa: F403
 
-
-class RequirementReviewService:
-    """Executes individual requirement review workflow."""
-
-    def __init__(self, orchestrator: ReviewOrchestrator) -> None:
-        self._orchestrator = orchestrator
-
-    def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
-        return self._orchestrator.review_requirement(payload)

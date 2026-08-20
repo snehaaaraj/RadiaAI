@@ -12,7 +12,6 @@ It deliberately contains NO business logic — that lives in services/.
 """
 
 import time
-import uuid
 from collections.abc import Awaitable, Callable
 
 from fastapi import FastAPI, Request, Response, status

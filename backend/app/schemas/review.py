@@ -1,17 +1,4 @@
-"""Schemas for deterministic requirements review endpoints."""
+﻿"""Compatibility wrapper for migrated Jama Requirement Reviewer module."""
 
-from app.models.review_models import (
-    DeltaReviewInput,
-    DeltaReviewResponse,
-    RequirementReviewInput,
-    RequirementReviewResponse,
-    ReviewVersionResponse,
-)
+from radia_ai.features.jama_requirement_reviewer.schemas.review import *  # noqa: F403
 
-__all__ = [
-    "DeltaReviewInput",
-    "DeltaReviewResponse",
-    "RequirementReviewInput",
-    "RequirementReviewResponse",
-    "ReviewVersionResponse",
-]

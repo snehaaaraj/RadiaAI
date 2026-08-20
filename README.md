@@ -11,23 +11,31 @@ structured, explainable requirement quality workflows.
 For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.md).
 
 ```
-┌─────────────────────────────────────────────────────────┐
-│                       Frontend                          │
-│     React + TypeScript + Vite + MUI + Framer Motion     │
-│                  port 3000 (nginx)                      │
-└─────────────────────┬───────────────────────────────────┘
-                      │  /api/v1/*
-┌─────────────────────▼───────────────────────────────────┐
-│                      Backend                            │
-│          FastAPI + Python 3.12 + Pydantic v2            │
-│                     port 8000                           │
-│                                                         │
-│  api/v1/       ← routes + request validation only       │
-│  reviewers/    ← modular deterministic review engines    │
-│  services/     ← orchestration + business logic          │
-│  ingestion/    ← document ingestion pipeline             │
-│  connectors/   ← source adapters                         │
-└──────────┬──────────┬────────────────┬──────────────────┘
+┌────────────────────────────────────────────────────────────┐
+│                         Frontend                           │
+│      React + TypeScript + Vite + MUI + Framer Motion      │
+│                    port 3000 (nginx)                       │
+│                                                            │
+│  src/pages/                         ← shared app pages     │
+│  src/radia_ai/features/resources/   ← resource hub         │
+│  src/radia_ai/features/jamaRequirementReviewer/            │
+│                                   ← reviewer feature UI    │
+│  src/radia_ai/features/jamaRoundtrip/                      │
+│                                   ← roundtrip placeholder  │
+└──────────────────────┬─────────────────────────────────────┘
+                       │  /api/v1/*
+┌──────────────────────▼─────────────────────────────────────┐
+│                          Backend                           │
+│            FastAPI + Python 3.12 + Pydantic v2             │
+│                       port 8000                            │
+│                                                            │
+│  radia_ai/main.py                  ← primary entrypoint    │
+│  radia_ai/features/jama_requirement_reviewer/              │
+│                                   ← active reviewer logic  │
+│  radia_ai/features/jama_roundtrip/                         │
+│                                   ← future feature slot    │
+│  app/                              ← shared + compat layer │
+└──────────┬──────────┬────────────────┬─────────────────────┘
            │          │                │
     ┌──────▼──┐ ┌─────▼──────┐ ┌──────▼──────┐
     │  Azure  │ │  Azure AI  │ │   Azure     │
@@ -42,16 +50,21 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 ```
 RadiaAi-2.0/
 ├── backend/
-│   ├── app/
-│   │   ├── api/v1/endpoints/   # HTTP endpoint handlers (thin — no logic)
-│   │   ├── core/               # config, logging, exceptions, security
-│   │   ├── schemas/            # Pydantic v2 request/response models
-│   │   ├── services/           # business logic and orchestration
-│   │   ├── rag/                # retrieval-augmented generation components
-│   │   ├── ingestion/          # document ingestion pipeline
-│   │   ├── connectors/         # source system adapters
-│   │   ├── dependencies/       # FastAPI DI container
-│   │   └── main.py             # app factory
+│   ├── radia_ai/
+│   │   ├── main.py             # project-named FastAPI entrypoint
+│   │   └── features/
+│   │       ├── jama_requirement_reviewer/  # active reviewer implementation
+│   │       └── jama_roundtrip/             # placeholder namespace
+│   ├── app/                   # shared legacy package + compatibility wrappers
+│   │   ├── api/v1/endpoints/  # shared/non-review endpoints + wrapper modules
+│   │   ├── core/              # config, logging, exceptions, security
+│   │   ├── schemas/           # Pydantic v2 request/response models
+│   │   ├── services/          # shared or compatibility service exports
+│   │   ├── rag/               # retrieval-augmented generation components
+│   │   ├── ingestion/         # document ingestion pipeline
+│   │   ├── connectors/        # source system adapters
+│   │   ├── dependencies/      # shared DI + reviewer compatibility wrappers
+│   │   └── main.py            # compatibility entrypoint
 │   ├── tests/
 │   ├── Dockerfile
 │   ├── pyproject.toml
@@ -59,12 +72,22 @@ RadiaAi-2.0/
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── api/        # typed Axios functions
 │   │   ├── assets/     # logos and static UI assets
 │   │   ├── components/ # reusable UI components
 │   │   ├── hooks/      # React Query hooks
-│   │   ├── pages/      # route-level page components
+│   │   ├── pages/      # shared route-level page components
 │   │   ├── context/    # global app state
+│   │   ├── radia_ai/
+│   │   │   └── features/
+│   │   │       ├── jamaRequirementReviewer/
+│   │   │       │   ├── api/
+│   │   │       │   ├── components/
+│   │   │       │   ├── hooks/
+│   │   │       │   └── pages/
+│   │   │       ├── jamaRoundtrip/
+│   │   │       │   └── pages/
+│   │   │       └── resources/
+│   │   │           └── pages/
 │   │   └── types/      # TypeScript API interfaces
 │   ├── Dockerfile
 │   └── package.json
@@ -102,6 +125,7 @@ RadiaAi-2.0/
 - Dedicated **Launchpad** landing page at `/`
 - Dedicated **Radia AI Resources** page at `/radia-ai`
 - Main app workspace now starts at `/workspace`
+- Dedicated **Jama Roundtrip** placeholder page at `/jama-roundtrip`
 - Theme-aware branding with separate light and dark logo assets
 - Landing/resources header navigation:
   - `RADIA | RADIA AI | Jama Requirement Reviewer | Jama Roundtrip`
@@ -160,6 +184,7 @@ The Dockerized frontend serves:
 
 - Launchpad: `/`
 - Radia AI Resources: `/radia-ai`
+- Jama Roundtrip placeholder: `/jama-roundtrip`
 - Main workspace: `/workspace`
 
 ### 3. Local backend development (without Docker)
@@ -169,7 +194,7 @@ cd backend
 python -m venv .venv
 source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
+uvicorn radia_ai.main:app --reload --port 8000
 ```
 
 ### 4. Local frontend development (without Docker)
@@ -177,7 +202,7 @@ uvicorn app.main:app --reload --port 8000
 ```bash
 cd frontend
 npm install
-npm run dev
+npm run start
       # starts Vite dev server on :5173, proxies /api to :8000
 ```
 
@@ -185,6 +210,7 @@ Local frontend URLs:
 
 - Launchpad: http://localhost:5173/
 - Radia AI Resources: http://localhost:5173/radia-ai
+- Jama Roundtrip placeholder: http://localhost:5173/jama-roundtrip
 - Workspace: http://localhost:5173/workspace
 
 ---
@@ -196,7 +222,7 @@ cd backend
 pytest                          # all tests
 pytest -m unit                  # unit tests only
 pytest -m integration           # integration tests only (requires Azure)
-pytest --cov=app                # with coverage report
+pytest --cov=app --cov=radia_ai # with coverage report during migration
 ```
 
 ---

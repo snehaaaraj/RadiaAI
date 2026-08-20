@@ -35,6 +35,15 @@ def _test_settings() -> AppSettings:
         azure_blob={
             "connection_string": "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test;",
         },
+        sharepoint={
+            "tenant_id": "",
+            "client_id": "",
+            "client_secret": "",
+            "site_url": "",
+            "drive_name": "Requirements Management",
+            "standards_folder": "0. Reference Material/AI Reference Material",
+            "cache_ttl_seconds": 300,
+        },
     )
 
 
@@ -42,8 +51,10 @@ def _test_settings() -> AppSettings:
 def test_app():
     """Create a test FastAPI application instance."""
     get_settings.cache_clear()
+    test_settings = _test_settings()
     app = create_app()
-    app.dependency_overrides[get_settings] = _test_settings
+    app.state.settings = test_settings
+    app.dependency_overrides[get_settings] = lambda: test_settings
     return app
 
 
