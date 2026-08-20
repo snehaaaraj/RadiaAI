@@ -1,4 +1,4 @@
-﻿"""Verifiability reviewer with deterministic rule checks."""
+"""Verifiability reviewer with deterministic rule checks."""
 
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     explanation="Unmeasurable adjectives are present without quantitative limits.",
                     evidence=f"Unmeasurable terms: {', '.join(found_unmeasurable)}",
                     recommendation="Replace qualitative terms with numeric acceptance thresholds.",
-                    reference="pending-rag-resolution",
+                    reference="INCOSE",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -61,7 +61,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     explanation="No operating condition cue words were detected.",
                     evidence="No EARS condition cue (e.g. 'when', 'while', 'where', 'if') found in requirement text.",
                     recommendation="Add context such as environmental/mission condition bounds.",
-                    reference="pending-rag-resolution",
+                    reference="EARS",
                     suggested_rewrite=None,
                 )
             )
@@ -80,7 +80,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     recommendation=(
                         "Add measurable values, tolerances, or explicit pass/fail criteria."
                     ),
-                    reference="pending-rag-resolution",
+                    reference="INCOSE",
                     suggested_rewrite=None,
                 )
             )

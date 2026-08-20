@@ -63,8 +63,10 @@ class OpenAIClient:
         """Generate embedding vectors for a batch of texts."""
         if not texts:
             return []
+        # Truncate to stay within the 8192 token limit
+        truncated = [t[:30000] for t in texts]
         response = self._client.embeddings.create(
-            input=texts,
+            input=truncated,
             model=self._settings.embedding_deployment,
             dimensions=self._settings.embedding_dimensions,
         )
@@ -82,7 +84,7 @@ class OpenAIClient:
             model=self._settings.chat_deployment,
             messages=messages,
             temperature=temperature if temperature is not None else self._settings.temperature,
-            max_tokens=max_tokens or self._settings.max_tokens,
+            max_completion_tokens=max_tokens or self._settings.max_tokens,
         )
         return response.choices[0].message.content or ""
 
@@ -144,7 +146,9 @@ class SearchService:
         semantic_config = SemanticConfiguration(
             name=self._settings.semantic_config_name,
             prioritized_fields=SemanticPrioritizedFields(
-                content_field=SemanticField(field_name="content"),
+                title_field=SemanticField(field_name="filename"),
+                content_fields=[SemanticField(field_name="content")],
+                keywords_fields=[SemanticField(field_name="document_type")],
             ),
         )
 
@@ -155,7 +159,17 @@ class SearchService:
             semantic_search=SemanticSearch(configurations=[semantic_config]),
         )
 
-        self._index_client.create_or_update_index(index)
+        try:
+            self._index_client.create_or_update_index(index)
+        except Exception:
+            # Incompatible existing index — delete and recreate
+            logger.warning("index_schema_incompatible_recreating", index_name=self._settings.index_name)
+            try:
+                self._index_client.delete_index(self._settings.index_name)
+            except Exception:
+                pass
+            self._index_client.create_or_update_index(index)
+
         logger.info("search_index_ensured", index_name=self._settings.index_name)
 
     # -- Document operations --
@@ -229,19 +243,24 @@ class SearchService:
                 "document_type": r.get("document_type", ""),
                 "section": r.get("section", ""),
                 "page_number": r.get("page_number"),
-                "highlights": list(r.get("@search.highlights", {}).get("content", [])),
+                "highlights": list((r.get("@search.highlights") or {}).get("content", [])),
             }
             for r in results
         ]
 
     def get_indexed_file_hashes(self) -> set[str]:
         """Return all distinct file_hash values currently in the index."""
-        results = self._search_client.search(
-            search_text="*",
-            select=["file_hash"],
-            top=5000,
-        )
-        return {r["file_hash"] for r in results if r.get("file_hash")}
+        try:
+            results = self._search_client.search(
+                search_text="*",
+                select=["file_hash"],
+                top=5000,
+            )
+            return {r["file_hash"] for r in results if r.get("file_hash")}
+        except Exception:
+            # Index may not exist yet or may not have the file_hash field
+            logger.warning("get_indexed_file_hashes_failed_returning_empty")
+            return set()
 
 
 # ---------------------------------------------------------------------------

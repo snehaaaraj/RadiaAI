@@ -1,4 +1,4 @@
-﻿"""Language reviewer with deterministic rule checks."""
+"""Language reviewer with deterministic rule checks."""
 
 from __future__ import annotations
 
@@ -48,7 +48,7 @@ class LanguageReviewer(RequirementReviewer):
                     ),
                     evidence=text,
                     recommendation="Rewrite requirement using 'shall' for mandatory behavior.",
-                    reference="pending-rag-resolution",
+                    reference="INCOSE",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -69,7 +69,7 @@ class LanguageReviewer(RequirementReviewer):
                     ),
                     evidence=f"Found banned words: {', '.join(found_banned)}",
                     recommendation="Replace banned terms with explicit, measurable wording.",
-                    reference="pending-rag-resolution",
+                    reference="Company Style Guide",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -88,7 +88,7 @@ class LanguageReviewer(RequirementReviewer):
                     explanation="Ambiguous terms make verification and certification harder.",
                     evidence=f"Found ambiguous wording: {', '.join(found_ambiguous)}",
                     recommendation="Replace ambiguous words with objective measurable criteria.",
-                    reference="pending-rag-resolution",
+                    reference="EARS",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -109,7 +109,7 @@ class LanguageReviewer(RequirementReviewer):
                     recommendation=(
                         "Rewrite sentence in active voice with a clear responsible subject."
                     ),
-                    reference="pending-rag-resolution",
+                    reference="INCOSE",
                     suggested_rewrite=None,
                 )
             )

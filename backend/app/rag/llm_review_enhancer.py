@@ -88,18 +88,17 @@ class LLMReviewEnhancer:
         if not system_prompt:
             return deterministic_findings
 
-        # Retrieve relevant standards context
-        context = self._retrieve_context(reviewer_name, payload.text)
-
-        if not context.has_context:
-            # No indexed documents — return deterministic findings as-is
-            logger.warning("no_rag_context_available", reviewer=reviewer_name)
-            return deterministic_findings
-
-        # Build the user message including the requirement and existing findings
-        user_message = self._build_enhancement_prompt(payload, deterministic_findings)
-
         try:
+            # Retrieve relevant standards context
+            context = self._retrieve_context(reviewer_name, payload.text)
+
+            if not context.has_context:
+                logger.warning("no_rag_context_available", reviewer=reviewer_name)
+                return deterministic_findings
+
+            # Build the user message including the requirement and existing findings
+            user_message = self._build_enhancement_prompt(payload, deterministic_findings)
+
             raw_response = self._rag.generate_with_context(
                 system_prompt=system_prompt,
                 user_message=user_message,
@@ -126,18 +125,18 @@ class LLMReviewEnhancer:
         if not system_prompt:
             return []
 
-        context = self._retrieve_context(reviewer_name, payload.text)
-
-        user_message = (
-            f"## Requirement to Review\n\n"
-            f"**Requirement ID:** {payload.requirement_id or 'N/A'}\n"
-            f"**Requirement Level:** {payload.requirement_level or 'not specified'}\n"
-            f"**Text:** {payload.text}\n"
-        )
-        if payload.metadata:
-            user_message += f"**Metadata:** {json.dumps(payload.metadata)}\n"
-
         try:
+            context = self._retrieve_context(reviewer_name, payload.text)
+
+            user_message = (
+                f"## Requirement to Review\n\n"
+                f"**Requirement ID:** {payload.requirement_id or 'N/A'}\n"
+                f"**Requirement Level:** {payload.requirement_level or 'not specified'}\n"
+                f"**Text:** {payload.text}\n"
+            )
+            if payload.metadata:
+                user_message += f"**Metadata:** {json.dumps(payload.metadata)}\n"
+
             raw_response = self._rag.generate_with_context(
                 system_prompt=system_prompt,
                 user_message=user_message,

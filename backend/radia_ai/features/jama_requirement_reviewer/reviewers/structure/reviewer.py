@@ -1,4 +1,4 @@
-﻿"""Requirement structure reviewer with deterministic rule checks."""
+"""Requirement structure reviewer with deterministic rule checks."""
 
 from __future__ import annotations
 
@@ -45,7 +45,7 @@ class StructureReviewer(RequirementReviewer):
                     recommendation=(
                         "Split the statement into independent requirements, one behavior each."
                     ),
-                    reference="pending-rag-resolution",
+                    reference="INCOSE",
                     suggested_rewrite=_split_compound_requirement(text),
                 )
             )
@@ -64,7 +64,7 @@ class StructureReviewer(RequirementReviewer):
                     explanation="Subjective wording prevents deterministic verification.",
                     evidence=f"Subjective terms: {', '.join(found_subjective)}",
                     recommendation="Replace subjective terms with objective measurable criteria.",
-                    reference="pending-rag-resolution",
+                    reference="Company Style Guide",
                     suggested_rewrite=rewrite,
                 )
             )
@@ -83,7 +83,7 @@ class StructureReviewer(RequirementReviewer):
                     recommendation=(
                         "Set requirement_level to aircraft, system, subsystem, or component."
                     ),
-                    reference="pending-rag-resolution",
+                    reference="Internal Engineering Standards",
                 )
             )
         elif payload.requirement_level.lower() not in REQUIREMENT_LEVELS:
@@ -101,7 +101,7 @@ class StructureReviewer(RequirementReviewer):
                     ),
                     evidence=f"Provided requirement_level: {payload.requirement_level}",
                     recommendation="Use one of: aircraft, system, subsystem, component.",
-                    reference="pending-rag-resolution",
+                    reference="Internal Engineering Standards",
                 )
             )
 
