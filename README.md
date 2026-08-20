@@ -215,6 +215,14 @@ Local frontend URLs:
 
 ---
 
+## Frontend Styling Convention
+
+- Prefer MUI theme overrides and sidecar `*.styles.ts` files over large inline `sx` objects in page/component JSX.
+- Keep styling next to the component it belongs to (for example, `Settings.tsx` + `Settings.styles.ts`) instead of introducing global CSS.
+- Use raw `.css` or CSS modules only when a component is mostly static and does not need MUI theme tokens, responsive objects, or component-state styling.
+
+---
+
 ## Running Tests
 
 ```bash

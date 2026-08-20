@@ -21,6 +21,7 @@ import { motion } from 'framer-motion';
 import { useAppContext, type ThemePreference, type WorkspaceStartPage } from '@/context/AppContext';
 import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 import { SETTINGS_SECTION_IDS } from '@/utils/settingsSections';
+import { getSettingsSectionCardSx, settingsStyles } from './Settings.styles';
 
 const THEMES: Array<{
   key: ThemePreference;
@@ -111,9 +112,9 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.05 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.THEME_MODE} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
+          <Card id={SETTINGS_SECTION_IDS.THEME_MODE} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
             <CardContent>
-              <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
+              <Box sx={settingsStyles.sectionHeader}>
                 <PaletteIcon color="primary" />
                 <Typography variant="h6" fontWeight={700}>
                   Theme mode
@@ -121,18 +122,18 @@ export default function Settings() {
               </Box>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={1.5}>
                 {THEMES.map((theme) => (
-                  <motion.div key={theme.key} whileHover={reduceMotion ? undefined : { y: -3 }} style={{ flex: 1 }}>
+                  <motion.div
+                    key={theme.key}
+                    whileHover={reduceMotion ? undefined : { y: -3 }}
+                    style={settingsStyles.themeOptionWrapper}
+                  >
                     <Card
                       variant={themePreference === theme.key ? 'elevation' : 'outlined'}
-                      sx={{
-                        height: '100%',
-                        borderColor: themePreference === theme.key ? 'primary.main' : 'divider',
-                        boxShadow: themePreference === theme.key ? 3 : undefined,
-                      }}
+                      sx={settingsStyles.themeOptionCard(themePreference === theme.key)}
                     >
-                      <CardActionArea onClick={() => setThemePreference(theme.key)} sx={{ height: '100%' }}>
+                      <CardActionArea onClick={() => setThemePreference(theme.key)} sx={settingsStyles.fullHeight}>
                         <CardContent>
-                          <Box display="flex" alignItems="center" gap={1} mb={1}>
+                          <Box sx={settingsStyles.themeOptionHeader}>
                             {theme.icon}
                             <Typography variant="subtitle1" fontWeight={700}>
                               {theme.title}
@@ -156,13 +157,13 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.1 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.STARTUP_BEHAVIOR} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
+          <Card id={SETTINGS_SECTION_IDS.STARTUP_BEHAVIOR} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
             <CardContent>
               <Typography variant="h6" fontWeight={700} gutterBottom>
                 Startup behavior
               </Typography>
               <Stack spacing={2}>
-                <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
+                <Box sx={settingsStyles.settingRow}>
                   <Box>
                     <Typography variant="subtitle2" fontWeight={700}>
                       Sidebar
@@ -179,7 +180,7 @@ export default function Settings() {
 
                 <Divider />
 
-                <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
+                <Box sx={settingsStyles.settingRow}>
                   <Box>
                     <Typography variant="subtitle2" fontWeight={700}>
                       Default workspace page
@@ -192,7 +193,7 @@ export default function Settings() {
                     size="small"
                     value={defaultWorkspaceRoute}
                     onChange={(event) => setDefaultWorkspaceRoute(event.target.value as WorkspaceStartPage)}
-                    sx={{ minWidth: 260 }}
+                    sx={settingsStyles.workspacePageSelect}
                   >
                     {START_PAGE_OPTIONS.map((option) => (
                       <MenuItem key={option.value} value={option.value}>
@@ -211,15 +212,15 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.14 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.REVIEW_NOTIFICATIONS} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
+          <Card id={SETTINGS_SECTION_IDS.REVIEW_NOTIFICATIONS} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
             <CardContent>
-              <Box display="flex" alignItems="center" gap={1.25} mb={1.5}>
+              <Box sx={settingsStyles.sectionHeader}>
                 <NotificationsActiveIcon color="primary" />
                 <Typography variant="h6" fontWeight={700}>
                   Review notifications
                 </Typography>
               </Box>
-              <Box display="flex" alignItems="center" justifyContent="space-between" gap={2} flexWrap="wrap">
+              <Box sx={settingsStyles.settingRow}>
                 <Box>
                   <Typography variant="subtitle2" fontWeight={700}>
                     Sound on review complete
@@ -247,12 +248,12 @@ export default function Settings() {
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.18 }}
         >
-          <Card id={SETTINGS_SECTION_IDS.RESET_PERSONALIZATION} sx={{ scrollMarginTop: `${HEADER_HEIGHT + 24}px` }}>
+          <Card id={SETTINGS_SECTION_IDS.RESET_PERSONALIZATION} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
             <CardContent>
               <Typography variant="h6" fontWeight={700} gutterBottom>
                 Reset personalization
               </Typography>
-              <Typography variant="body2" color="text.secondary" mb={2}>
+              <Typography variant="body2" color="text.secondary" sx={settingsStyles.resetDescription}>
                 Return all workspace personalization settings to recommended defaults.
               </Typography>
               <Button variant="outlined" color="inherit" onClick={resetPersonalization}>
