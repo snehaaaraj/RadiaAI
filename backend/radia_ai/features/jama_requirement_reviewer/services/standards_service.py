@@ -13,8 +13,8 @@ class StandardsService:
     Returns standards metadata for the review engine.
 
     Priority:
-      1. SharePoint â€” live document listing from the configured folder.
-      2. Registry   â€” hardcoded fallback used when SharePoint is not
+      1. SharePoint - live document listing from the configured folder.
+      2. Registry   - hardcoded fallback used when SharePoint is not
                       configured or unavailable.
     """
 
@@ -32,7 +32,7 @@ class StandardsService:
             standards = self._sharepoint.fetch_standards()
             if standards:
                 return StandardsResponse(standards=standards, source="sharepoint")
-            # fetch_standards already logged the failure â€” fall through
+            # fetch_standards already logged the failure - fall through
             logger.warning("sharepoint_returned_empty_falling_back_to_registry")
 
         # Fallback: hardcoded registry
@@ -103,7 +103,7 @@ def _reference_aliases(reference_text: str, category: str, reviewer: str) -> set
 
 
 def _score_standard(standard: StandardReference, aliases: set[str]) -> int:
-    # Exact key match â€” highest priority, prevents cross-standard bleed
+    # Exact key match - highest priority, prevents cross-standard bleed
     normalized_aliases = {_normalize(a) for a in aliases}
     if _normalize(standard.key) in normalized_aliases:
         return 100
@@ -128,4 +128,3 @@ def _score_standard(standard: StandardReference, aliases: set[str]) -> int:
     score += category_hits * 2
 
     return score
-

@@ -112,7 +112,7 @@ class LanguageReviewer(RequirementReviewer):
                     reference="INCOSE",
                     suggested_rewrite=(
                         "Identify the responsible system/actor and rewrite using active voice, e.g.:\n"
-                        f"  The [system] shall [active verb] â€¦ (replacing '{passive_phrase}')"
+                        f"  The [system] shall [active verb] ... (replacing '{passive_phrase}')"
                     ),
                 )
             )
@@ -168,4 +168,3 @@ def _flag_ambiguous_words(text: str, ambiguous: list[str]) -> str:
             flags=re.IGNORECASE,
         )
     return result
-

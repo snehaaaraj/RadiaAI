@@ -131,7 +131,7 @@ def _split_compound_requirement(text: str) -> str:
     if len(parts) > 1:
         numbered = "\n".join(f"REQ-X{i + 1}: {p.strip()}" for i, p in enumerate(parts))
         return f"[Split into separate requirements]\n{numbered}"
-    return f"[Split into separate requirements â€” manually divide at each 'shall' clause]\n{text}"
+    return f"[Split into separate requirements - manually divide at each 'shall' clause]\n{text}"
 
 
 def _flag_subjective_words(text: str, subjective: list[str]) -> str:
@@ -146,4 +146,3 @@ def _flag_subjective_words(text: str, subjective: list[str]) -> str:
             flags=re.IGNORECASE,
         )
     return result
-

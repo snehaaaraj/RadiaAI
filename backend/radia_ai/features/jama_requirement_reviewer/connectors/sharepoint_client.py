@@ -3,7 +3,7 @@ SharePoint document library client using Microsoft Graph API.
 
 Fetches the list of standard reference documents from the configured SharePoint
 folder. Authentication uses the client-credentials (app-only) OAuth 2.0 flow via
-azure-identity â€” no user login required.
+azure-identity - no user login required.
 
 The file listing is cached in-memory for `cache_ttl_seconds` to avoid hammering
 the Graph API on every request to GET /standards.
@@ -24,7 +24,7 @@ logger = get_logger(__name__)
 # Graph API base URL
 _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
-# Maps file extension â†’ requirement review category tags
+# Maps file extension -> requirement review category tags
 _EXT_CATEGORY_MAP: dict[str, list[str]] = {
     ".pdf":  ["reference"],
     ".docx": ["reference"],
@@ -214,4 +214,3 @@ class SharePointStandardsClient:
             logger.exception("sharepoint_fetch_failed")
             # Return stale cache if available, otherwise empty list
             return self._cached_standards
-

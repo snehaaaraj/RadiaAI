@@ -42,7 +42,7 @@ def _resolve_settings(app: FastAPI) -> AppSettings:
     return getattr(app.state, "settings", None) or get_settings()
 
 # ---------------------------------------------------------------------------
-# Lifespan â€” startup and shutdown hooks
+# Lifespan - startup and shutdown hooks
 # ---------------------------------------------------------------------------
 
 
