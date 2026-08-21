@@ -155,7 +155,7 @@ export default function RequirementReview() {
           Individual Requirement Review
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Deterministic review across syntax, correctness, and verifiability categories.
+          AI-powered review across language, structure, verifiability, traceability, and certification.
         </Typography>
       </Box>
 
@@ -273,7 +273,7 @@ export default function RequirementReview() {
                 })
               }
             >
-              Run deterministic review
+              Run AI review
             </Button>
           </Box>
         </Stack>

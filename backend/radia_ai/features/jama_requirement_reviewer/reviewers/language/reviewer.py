@@ -114,10 +114,6 @@ class LanguageReviewer(RequirementReviewer):
                 )
             )
 
-        # Enhance with LLM+RAG: replace placeholder rewrites and references
-        if self._llm_enhancer is not None:
-            findings = self._llm_enhancer.enhance_findings(self.name, payload, findings)
-
         overall = _overall_from_findings(findings)
         return ReviewerResult(
             reviewer=self.name,

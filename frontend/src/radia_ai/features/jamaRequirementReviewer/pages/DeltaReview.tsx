@@ -228,7 +228,7 @@ export default function DeltaReview() {
           Delta Review
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Incremental deterministic review for changed requirements only.
+          Incremental AI-powered review for changed requirements only.
         </Typography>
       </Box>
 

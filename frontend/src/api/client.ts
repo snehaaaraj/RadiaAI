@@ -24,7 +24,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30_000, // 30 seconds — LLM calls can be slow
+  timeout: 300_000, // 5 minutes — GPT-5 reasoning model calls can take several minutes
 });
 
 // ---------------------------------------------------------------------------

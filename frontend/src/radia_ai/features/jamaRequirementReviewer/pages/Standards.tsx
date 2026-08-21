@@ -37,8 +37,8 @@ export default function Standards() {
         </Typography>
         <Typography variant="body2" color="text.secondary">
           {fromSharePoint
-            ? 'Reference documents pulled from SharePoint — used by deterministic reviewer engines.'
-            : 'Versioned standards and references used by deterministic reviewer engines.'}
+            ? 'Reference documents pulled from SharePoint — used by AI-powered reviewer engines.'
+            : 'Versioned standards and references used by AI-powered reviewer engines.'}
         </Typography>
         {fromSharePoint && (
           <Chip label="Live from SharePoint" color="primary" size="small" sx={{ mt: 0.75 }} />
