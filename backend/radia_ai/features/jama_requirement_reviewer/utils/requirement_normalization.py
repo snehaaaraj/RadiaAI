@@ -32,6 +32,11 @@ _FIELD_LABELS: tuple[tuple[str, str], ...] = (
     ("last activity date", "last_activity_date"),
 )
 
+_CORE_FIELD_LABELS = {"title", "description", "rationale"}
+_TRAILING_METADATA_LABELS = tuple(
+    label for label, field in _FIELD_LABELS if field not in _CORE_FIELD_LABELS
+)
+
 
 def normalize_requirement_review_input(payload: RequirementReviewInput) -> RequirementReviewInput:
     """Return a canonicalized copy of a review input.
@@ -72,6 +77,7 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
     title_active = False
     rationale_active = False
     seen_fields = False
+    stop_parsing = False
 
     index = 0
     while index < len(cleaned_lines):
@@ -79,6 +85,8 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
         if not line:
             index += 1
             continue
+        if stop_parsing:
+            break
 
         label, span, value = _consume_label(cleaned_lines, index)
         if label is not None:
@@ -103,13 +111,17 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
 
         if seen_fields:
             if current_label is not None:
-                current_value_parts.append(line)
-                if description_active:
-                    description_parts.append(line)
-                elif title_active:
-                    title_parts.append(line)
-                elif rationale_active:
-                    rationale_parts.append(line)
+                content = _truncate_at_trailing_metadata(line)
+                if content:
+                    current_value_parts.append(content)
+                    if description_active:
+                        description_parts.append(content)
+                    elif title_active:
+                        title_parts.append(content)
+                    elif rationale_active:
+                        rationale_parts.append(content)
+                if _contains_trailing_metadata(line):
+                    stop_parsing = True
         else:
             body_parts.append(line)
         index += 1
@@ -180,3 +192,18 @@ def _store_field(extracted: dict[str, str], field: str, parts: list[str]) -> Non
     value = " ".join(" ".join(parts).split()).strip()
     if value:
         extracted[field] = value
+
+
+def _contains_trailing_metadata(line: str) -> bool:
+    lowered = line.lower()
+    return any(re.search(rf"\b{re.escape(label)}\b", lowered, flags=re.IGNORECASE) for label in _TRAILING_METADATA_LABELS)
+
+
+def _truncate_at_trailing_metadata(line: str) -> str:
+    lowered = line.lower()
+    cutoff = len(line)
+    for label in _TRAILING_METADATA_LABELS:
+        match = re.search(rf"\b{re.escape(label)}\b", lowered, flags=re.IGNORECASE)
+        if match and match.start() < cutoff:
+            cutoff = match.start()
+    return line[:cutoff].rstrip()

@@ -33,6 +33,9 @@ const FIELD_LABELS: [label: string, field: string][] = [
   ['rev', 'release'],
 ];
 
+const CORE_FIELD_LABELS = new Set(['title', 'description', 'rationale']);
+const TRAILING_METADATA_LABELS = FIELD_LABELS.map(([label]) => label).filter((label) => !CORE_FIELD_LABELS.has(label));
+
 function stripMarkdownLinks(line: string): string {
   return line.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 }
@@ -58,6 +61,23 @@ function matchFieldLabel(line: string): [string, string] | null {
   return null;
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function truncateAtTrailingMetadata(line: string): string {
+  const lowered = line.toLowerCase();
+  let cutoff = line.length;
+  for (const label of TRAILING_METADATA_LABELS) {
+    const regex = new RegExp(`\\b${escapeRegex(label)}\\b`, 'i');
+    const match = regex.exec(lowered);
+    if (match && match.index < cutoff) {
+      cutoff = match.index;
+    }
+  }
+  return line.slice(0, cutoff).trimEnd();
+}
+
 /** True if the line looks like a Jama section heading: "1 WR-ACR-732 Some Title" */
 function isSectionHeading(line: string): boolean {
   return /^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\b/.test(line);
@@ -79,9 +99,11 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
   const fields: Record<string, string[]> = {};
   let currentField: string | null = null;
   let seenFields = false;
+  let stopParsing = false;
 
   for (const line of lines) {
     if (!line) continue;
+    if (stopParsing) break;
     if (isSectionHeading(line)) continue;
 
     const match = matchFieldLabel(line);
@@ -97,8 +119,14 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
     if (!seenFields) {
       bodyParts.push(line);
     } else if (currentField !== null) {
-      if (!fields[currentField]) fields[currentField] = [];
-      fields[currentField].push(line);
+      const content = truncateAtTrailingMetadata(line);
+      if (content) {
+        if (!fields[currentField]) fields[currentField] = [];
+        fields[currentField].push(content);
+      }
+      if (TRAILING_METADATA_LABELS.some((label) => new RegExp(`\\b${escapeRegex(label)}\\b`, 'i').test(line))) {
+        stopParsing = true;
+      }
     }
   }
 
