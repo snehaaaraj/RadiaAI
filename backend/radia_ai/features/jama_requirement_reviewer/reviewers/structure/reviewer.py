@@ -105,10 +105,6 @@ class StructureReviewer(RequirementReviewer):
                 )
             )
 
-        # Enhance with LLM+RAG
-        if self._llm_enhancer is not None:
-            findings = self._llm_enhancer.enhance_findings(self.name, payload, findings)
-
         overall = _overall_from_findings(findings)
         return ReviewerResult(
             reviewer=self.name,

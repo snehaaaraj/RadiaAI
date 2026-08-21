@@ -19,7 +19,7 @@ from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchServic
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
 from app.ingestion.service import IngestionService
-from app.rag.llm_review_enhancer import LLMReviewEnhancer
+from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import ReviewHistoryRepository
 from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import CertificationReviewer
@@ -148,13 +148,14 @@ def _build_review_orchestrator(
     return ReviewOrchestrator(
         settings=settings,
         reviewers=[
-            LanguageReviewer(llm_enhancer=llm_enhancer),
-            StructureReviewer(llm_enhancer=llm_enhancer),
-            VerifiabilityReviewer(llm_enhancer=llm_enhancer),
-            TraceabilityReviewer(llm_enhancer=llm_enhancer),
-            CertificationReviewer(llm_enhancer=llm_enhancer),
+            LanguageReviewer(),
+            StructureReviewer(),
+            VerifiabilityReviewer(),
+            TraceabilityReviewer(),
+            CertificationReviewer(),
         ],
         standards_service=standards_service,
+        llm_enhancer=llm_enhancer,
         reviewer_bundle_version="2.0.0",
     )
 
