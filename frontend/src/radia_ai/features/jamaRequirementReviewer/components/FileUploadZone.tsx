@@ -7,6 +7,7 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { cleanExtractedText } from './fileUploadTextCleaner';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -22,48 +23,6 @@ interface FileUploadZoneProps {
   onClear?: () => void;
 }
 
-/**
- * Cleans raw text extracted from a PDF.
- * - Removes Jama export cover/TOC pages (header lines like "Radia Production Page N of M",
- *   "TABLE OF CONTENTS", "Produced by ...", dotted TOC lines)
- * - Strips page-number-only lines
- * - Collapses excessive blank lines
- */
-function cleanExtractedText(raw: string): string {
-  const lines = raw
-    .replace(/\r\n?/g, '\n')
-    .split('\n');
-
-  const cleaned = lines.filter((line) => {
-    const t = line.trim();
-    if (!t) return true; // keep blank lines for structure; collapse later
-    // Jama export header/footer boilerplate
-    if (/^Radia Production(\s+Page \d+ of \d+)?$/i.test(t)) return false;
-    if (/^Page \d+ of \d+$/i.test(t)) return false;
-    if (/^Produced by .+\d{4}/i.test(t)) return false;
-    // Cover page / breadcrumb lines
-    if (/^Radia WindRunner Aircraft Project/i.test(t)) return false;
-    if (/^Item:\s+/i.test(t)) return false;
-    // Jama breadcrumb paths like "Library of Archived Items, Radia Production Basis"
-    if (/,\s*Radia Production\b/i.test(t)) return false;
-    // TOC heading
-    if (/^T\s*A\s*B\s*L\s*E\s+O\s*F\s+C\s*O\s*N\s*T\s*E\s*N\s*T\s*S$/i.test(t)) return false;
-    // TOC entries (trailing dots + page number)
-    if (/\.{5,}\s*\d+\s*$/.test(t)) return false;
-    // Pure page numbers
-    if (/^\s*\d+\s*$/.test(t)) return false;
-    return true;
-  });
-
-  return cleaned
-    .join('\n')
-    // collapse 3+ blank lines to 2
-    .replace(/\n{3,}/g, '\n\n')
-    .split('\n')
-    .map((line) => line.trimEnd())
-    .join('\n')
-    .trim();
-}
 
 async function extractPdfText(arrayBuffer: ArrayBuffer) {
   const document = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
