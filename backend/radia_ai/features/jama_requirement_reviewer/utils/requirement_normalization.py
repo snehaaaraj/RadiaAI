@@ -99,13 +99,16 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
             title_active = label == "title"
             rationale_active = label == "rationale"
             if value:
-                current_value_parts.append(value)
+                content = _truncate_at_trailing_metadata(value)
+                current_value_parts.append(content)
                 if description_active:
-                    description_parts.append(value)
+                    description_parts.append(content)
                 elif title_active:
-                    title_parts.append(value)
+                    title_parts.append(content)
                 elif rationale_active:
-                    rationale_parts.append(value)
+                    rationale_parts.append(content)
+                if _contains_trailing_metadata(value):
+                    stop_parsing = True
             index += span
             continue
 

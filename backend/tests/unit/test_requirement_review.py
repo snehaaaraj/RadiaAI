@@ -122,3 +122,30 @@ def test_requirement_review_normalization_preserves_wrapped_field_lines() -> Non
         "or other materials that prevent corrosion or damage of the movable pin arrangement.\n\n"
         "Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of Permanent Sealing & Servicing."
     )
+
+
+@pytest.mark.unit
+def test_requirement_review_normalization_drops_trailing_metadata_on_rationale_line() -> None:
+    raw_text = """
+    Title: Lubrication, Movable Pin Arrangements
+
+    Description: Movable Pin Arrangements Unless permanently sealed by design, all movable pin arrangements
+    on the aircraft shall have a means to lubricate the joints with grease fittings or other materials that
+    prevent corrosion or damage of the movable pin arrangement. Note: design solution will be system and case specific.
+
+    Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of Permanent Sealing & Servicing.
+    Requirement Volatility Low Derived Requirement No Safety Requirement No Security Effectiveness Requirement No
+    Validation Method Engineering Review,Traceability Verification Method Undetermined,Inspection,Review
+    """.strip()
+
+    normalized = normalize_requirement_review_input(
+        RequirementReviewInput(text=raw_text, requirement_level="aircraft")
+    )
+
+    assert normalized.text == (
+        "Title: Lubrication, Movable Pin Arrangements\n\n"
+        "Description: Movable Pin Arrangements Unless permanently sealed by design, all movable pin arrangements "
+        "on the aircraft shall have a means to lubricate the joints with grease fittings or other materials that "
+        "prevent corrosion or damage of the movable pin arrangement. Note: design solution will be system and case specific.\n\n"
+        "Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of Permanent Sealing & Servicing."
+    )

@@ -78,6 +78,13 @@ function truncateAtTrailingMetadata(line: string): string {
   return line.slice(0, cutoff).trimEnd();
 }
 
+function containsTrailingMetadata(line: string): boolean {
+  return TRAILING_METADATA_LABELS.some((label) => {
+    const regex = new RegExp(`\\b${escapeRegex(label)}\\b`, 'i');
+    return regex.test(line);
+  });
+}
+
 /** True if the line looks like a Jama section heading: "1 WR-ACR-732 Some Title" */
 function isSectionHeading(line: string): boolean {
   return /^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\b/.test(line);
@@ -112,7 +119,9 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
       seenFields = true;
       currentField = fieldKey;
       if (!fields[fieldKey]) fields[fieldKey] = [];
-      if (inlineValue) fields[fieldKey].push(inlineValue);
+      const content = truncateAtTrailingMetadata(inlineValue);
+      if (content) fields[fieldKey].push(content);
+      if (containsTrailingMetadata(inlineValue)) stopParsing = true;
       continue;
     }
 
@@ -124,7 +133,7 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
         if (!fields[currentField]) fields[currentField] = [];
         fields[currentField].push(content);
       }
-      if (TRAILING_METADATA_LABELS.some((label) => new RegExp(`\\b${escapeRegex(label)}\\b`, 'i').test(line))) {
+      if (containsTrailingMetadata(line)) {
         stopParsing = true;
       }
     }
