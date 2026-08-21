@@ -1,1 +1,1 @@
-"""Prompt template management (Phase 4)."""
+"""Prompt templates for LLM-powered review enhancement."""

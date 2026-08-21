@@ -5,7 +5,6 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import mammoth from 'mammoth/mammoth.browser';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
 
@@ -23,11 +22,45 @@ interface FileUploadZoneProps {
   onClear?: () => void;
 }
 
-function normalizeText(content: string) {
-  return content
+/**
+ * Cleans raw text extracted from a PDF.
+ * - Removes Jama export cover/TOC pages (header lines like "Radia Production Page N of M",
+ *   "TABLE OF CONTENTS", "Produced by ...", dotted TOC lines)
+ * - Strips page-number-only lines
+ * - Collapses excessive blank lines
+ */
+function cleanExtractedText(raw: string): string {
+  const lines = raw
     .replace(/\r\n?/g, '\n')
+    .split('\n');
+
+  const cleaned = lines.filter((line) => {
+    const t = line.trim();
+    if (!t) return true; // keep blank lines for structure; collapse later
+    // Jama export header/footer boilerplate
+    if (/^Radia Production(\s+Page \d+ of \d+)?$/i.test(t)) return false;
+    if (/^Page \d+ of \d+$/i.test(t)) return false;
+    if (/^Produced by .+\d{4}/i.test(t)) return false;
+    // Cover page / breadcrumb lines
+    if (/^Radia WindRunner Aircraft Project/i.test(t)) return false;
+    if (/^Item:\s+/i.test(t)) return false;
+    // Jama breadcrumb paths like "Library of Archived Items, Radia Production Basis"
+    if (/,\s*Radia Production\b/i.test(t)) return false;
+    // TOC heading
+    if (/^T\s*A\s*B\s*L\s*E\s+O\s*F\s+C\s*O\s*N\s*T\s*E\s*N\s*T\s*S$/i.test(t)) return false;
+    // TOC entries (trailing dots + page number)
+    if (/\.{5,}\s*\d+\s*$/.test(t)) return false;
+    // Pure page numbers
+    if (/^\s*\d+\s*$/.test(t)) return false;
+    return true;
+  });
+
+  return cleaned
+    .join('\n')
+    // collapse 3+ blank lines to 2
+    .replace(/\n{3,}/g, '\n\n')
     .split('\n')
-    .map((line) => line.replace(/[ \t]+$/g, ''))
+    .map((line) => line.trimEnd())
     .join('\n')
     .trim();
 }
@@ -39,15 +72,21 @@ async function extractPdfText(arrayBuffer: ArrayBuffer) {
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
     const page = await document.getPage(pageNumber);
     const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (pageText) pageTexts.push(pageText);
+
+    // Preserve line breaks by checking the hasEOL flag on each item
+    let pageText = '';
+    for (const item of textContent.items) {
+      if (!('str' in item)) continue;
+      pageText += item.str;
+      if ((item as { hasEOL?: boolean }).hasEOL) pageText += '\n';
+      else pageText += ' ';
+    }
+    const trimmed = pageText.trim();
+    if (trimmed) pageTexts.push(trimmed);
   }
 
-  return normalizeText(pageTexts.join('\n\n'));
+  const fullText = pageTexts.join('\n\n');
+  return cleanExtractedText(fullText);
 }
 
 export function FileUploadZone({ accept, label, onFileContent, filename, onClear }: FileUploadZoneProps) {
@@ -59,24 +98,9 @@ export function FileUploadZone({ accept, label, onFileContent, filename, onClear
     async (file: File) => {
       setReadError('');
       const lowerName = file.name.toLowerCase();
-      const isDocx =
-        lowerName.endsWith('.docx') ||
-        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       const isPdf = lowerName.endsWith('.pdf') || file.type === 'application/pdf';
 
       try {
-        if (lowerName.endsWith('.doc')) {
-          setReadError('Legacy .doc files are not supported. Please upload a .docx, .pdf, or .txt file.');
-          return;
-        }
-
-        if (isDocx) {
-          const arrayBuffer = await file.arrayBuffer();
-          const result = await mammoth.extractRawText({ arrayBuffer });
-          onFileContent(normalizeText(result.value), file.name);
-          return;
-        }
-
         if (isPdf) {
           const arrayBuffer = await file.arrayBuffer();
           const content = await extractPdfText(arrayBuffer);
@@ -85,7 +109,7 @@ export function FileUploadZone({ accept, label, onFileContent, filename, onClear
         }
 
         const content = await file.text();
-        onFileContent(normalizeText(content), file.name);
+        onFileContent(cleanExtractedText(content), file.name);
       } catch {
         setReadError('Failed to read file.');
       }

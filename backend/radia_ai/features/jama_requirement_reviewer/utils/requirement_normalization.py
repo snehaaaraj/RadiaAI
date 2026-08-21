@@ -64,8 +64,15 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
 
     current_label: str | None = None
     current_value_parts: list[str] = []
+    body_parts: list[str] = []      # text before any field label (PDF body pattern)
     description_parts: list[str] = []
+    title_parts: list[str] = []
+    rationale_parts: list[str] = []
     description_active = False
+    title_active = False
+    rationale_active = False
+    seen_fields = False
+    current_label_has_inline_value = False  # True when label+value were on the same line
 
     index = 0
     while index < len(cleaned_lines):
@@ -78,28 +85,58 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
         if label is not None:
             if current_label is not None:
                 _store_field(extracted, current_label, current_value_parts)
+            seen_fields = True
             current_label = label
             current_value_parts = []
+            current_label_has_inline_value = bool(value)
             description_active = label == "description"
+            title_active = label == "title"
+            rationale_active = label == "rationale"
             if value:
                 current_value_parts.append(value)
                 if description_active:
                     description_parts.append(value)
+                elif title_active:
+                    title_parts.append(value)
+                elif rationale_active:
+                    rationale_parts.append(value)
             index += span
             continue
 
-        if current_label is not None:
-            current_value_parts.append(line)
-            if description_active:
-                description_parts.append(line)
+        if seen_fields:
+            # Only accumulate continuation lines when the label had no inline value.
+            # If the label already had its value on the same line, the next non-label
+            # line belongs to the following field (split label row in the PDF table).
+            if current_label is not None and not current_label_has_inline_value:
+                current_value_parts.append(line)
+                if description_active:
+                    description_parts.append(line)
+                elif title_active:
+                    title_parts.append(line)
+                elif rationale_active:
+                    rationale_parts.append(line)
+                current_label_has_inline_value = True  # satisfied after first continuation
+        else:
+            body_parts.append(line)
         index += 1
 
     if current_label is not None:
         _store_field(extracted, current_label, current_value_parts)
 
-    if description_parts:
-        canonical_text = " ".join(" ".join(description_parts).split())
-        return canonical_text, extracted
+    # Compose: prefer explicit description field, otherwise use pre-field body text
+    body = " ".join(" ".join(description_parts or body_parts).split()).strip()
+    title = " ".join(" ".join(title_parts).split()).strip()
+    rationale = " ".join(" ".join(rationale_parts).split()).strip()
+
+    if title or body or rationale:
+        parts = []
+        if title:
+            parts.append(f"Title: {title}")
+        if body:
+            parts.append(f"Description: {body}")
+        if rationale:
+            parts.append(f"Rationale: {rationale}")
+        return "\n\n".join(parts), extracted
 
     return " ".join(" ".join(cleaned_lines).split()), extracted
 

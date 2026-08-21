@@ -74,29 +74,29 @@ export function CategoryScoreGrid({
   });
 
   return (
-    <Grid container spacing={1.5}>
+    <Grid container spacing={1} columns={displayCategories.length}>
       {displayCategories.map((category) => {
         const score = category.status ? getCategoryStatusScore(category.status) : null;
         return (
-          <Grid key={`${category.key}-${category.status ?? 'missing'}`} size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Grid key={`${category.key}-${category.status ?? 'missing'}`} size={{ xs: displayCategories.length, sm: 1 }}>
             <Paper
               variant="outlined"
               sx={{
-                p: 1.5,
-                borderRadius: 3,
+                p: 1,
+                borderRadius: 2,
                 borderColor: score == null ? 'divider' : `${getReviewQualityColor(score)}55`,
                 background:
                   'linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.00))',
               }}
             >
-              <Stack spacing={0.75}>
-                <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2 }}>
+              <Stack spacing={0.25}>
+                <Typography variant="overline" color="text.secondary" sx={{ lineHeight: 1.2, fontSize: '0.6rem' }}>
                   {category.label}
                 </Typography>
-                <Typography variant="h5" fontWeight={800}>
+                <Typography variant="h6" fontWeight={800}>
                   {score == null ? '—' : score.toFixed(1)}
                 </Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
                   {category.status ?? 'Not evaluated'}
                 </Typography>
               </Stack>

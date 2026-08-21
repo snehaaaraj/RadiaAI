@@ -25,7 +25,7 @@ class AzureOpenAISettings(BaseSettings):
 
     endpoint: AnyHttpUrl = Field(..., description="Azure OpenAI resource endpoint")
     api_key: str = Field(..., description="Azure OpenAI API key")
-    api_version: str = Field(default="2024-08-01-preview", description="API version")
+    api_version: str = Field(default="2024-10-21", description="API version")
     chat_deployment: str = Field(..., description="Chat completion deployment name (e.g. gpt-4o)")
     embedding_deployment: str = Field(
         ..., description="Embedding deployment name (e.g. text-embedding-3-large)"

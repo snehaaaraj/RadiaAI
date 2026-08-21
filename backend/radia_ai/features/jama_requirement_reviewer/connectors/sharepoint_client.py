@@ -214,3 +214,53 @@ class SharePointStandardsClient:
             logger.exception("sharepoint_fetch_failed")
             # Return stale cache if available, otherwise empty list
             return self._cached_standards
+
+    def fetch_file_contents(self) -> list[dict]:
+        """
+        Download actual file bytes for every document in the standards folder.
+
+        Returns a list of dicts with keys: name, content (bytes), url, document_type.
+        Used by the ingestion pipeline to index standards into Azure AI Search.
+        """
+        if not self._settings.is_configured:
+            return []
+
+        try:
+            with httpx.Client() as client:
+                if self._site_id is None:
+                    self._site_id = self._resolve_site_id(client)
+                if self._drive_id is None:
+                    self._drive_id = self._resolve_drive_id(client, self._site_id)
+
+                items = self._list_folder_children(client, self._drive_id)
+                files = []
+                for item in items:
+                    if "folder" in item:
+                        continue
+                    name = item.get("name", "")
+                    download_url = item.get("@microsoft.graph.downloadUrl", "")
+                    if not download_url:
+                        # Build download URL from item id
+                        item_id = item.get("id", "")
+                        download_url = f"{_GRAPH_BASE}/drives/{self._drive_id}/items/{item_id}/content"
+
+                    resp = client.get(
+                        download_url,
+                        headers=self._headers(),
+                        timeout=60,
+                        follow_redirects=True,
+                    )
+                    resp.raise_for_status()
+                    files.append({
+                        "name": name,
+                        "content": resp.content,
+                        "url": item.get("webUrl", ""),
+                        "document_type": _categories_from_name(name)[0] if _categories_from_name(name) else "reference",
+                    })
+
+                logger.info("sharepoint_files_downloaded", count=len(files))
+                return files
+
+        except Exception:
+            logger.exception("sharepoint_file_download_failed")
+            return []
