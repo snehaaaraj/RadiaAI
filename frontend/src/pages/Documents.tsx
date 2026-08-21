@@ -11,6 +11,7 @@ import Chip from '@mui/material/Chip';
 import { useDocuments } from '@/hooks/useDocuments';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { DocumentStatus } from '@/types/api';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 
 const STATUS_COLOR: Record<DocumentStatus, 'default' | 'warning' | 'success' | 'error'> = {
   pending: 'default',
@@ -31,7 +32,7 @@ export default function Documents() {
       {isLoading && <LoadingSpinner message="Loading documents…" />}
 
       {isError && (
-        <Typography color="error">Failed to load documents: {(error as Error).message}</Typography>
+        <Typography color="error">Failed to load documents: {getApiErrorMessage(error)}</Typography>
       )}
 
       {data && (
