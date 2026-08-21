@@ -42,8 +42,10 @@ Respond with this JSON schema (keep each field SHORT — max 1-2 sentences):
       "evidence": "the specific problematic text",
       "recommendation": "one-sentence fix",
       "reference": "EXACT filename from context",
-      "suggested_rewrite": "improved requirement text or null"
+      "suggested_rewrite": "REQUIRED — the full improved requirement text that resolves this finding"
     }
   ]
-}"""
+}
+
+IMPORTANT: Every finding MUST include a "suggested_rewrite" with the complete rewritten requirement text. Never return null for this field."""
 
