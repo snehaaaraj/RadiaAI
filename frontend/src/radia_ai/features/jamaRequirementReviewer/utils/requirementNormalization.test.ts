@@ -36,4 +36,24 @@ describe('normalizeRequirementText', () => {
         + 'Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of Permanent Sealing & Servicing.'
     );
   });
+
+  it('drops the requirement heading from the description body', () => {
+    const rawText = [
+      '1 WR-ACR-732 Semi-Prepared Runway Operations (SPRO)',
+      'The WindRunner Aircraft shall be designed for takeoff, landing, and taxi operations on',
+      'semi-prepared surfaces (e.g., compacted soil/gravel) with a California Bearing Ratio (CBR)',
+      'of 9 or greater, without requiring ground support equipment for maneuvering.',
+      '',
+      'Project ID WR-ACR-732',
+      'Title Semi-Prepared Runway Operations (SPRO)',
+      'Rationale Ensures mission compatibility with SPRO sites',
+      'Requirement Volatility Low',
+    ].join('\n');
+
+    expect(normalizeRequirementText(rawText)).toBe(
+      'Title: Semi-Prepared Runway Operations (SPRO)\n\n'
+        + 'Description: The WindRunner Aircraft shall be designed for takeoff, landing, and taxi operations on semi-prepared surfaces (e.g., compacted soil/gravel) with a California Bearing Ratio (CBR) of 9 or greater, without requiring ground support equipment for maneuvering.\n\n'
+        + 'Rationale: Ensures mission compatibility with SPRO sites'
+    );
+  });
 });

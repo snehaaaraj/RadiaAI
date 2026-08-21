@@ -30,6 +30,7 @@ export function cleanExtractedText(raw: string): string {
     if (/^Produced by .+\d{4}/i.test(t)) return false;
     if (/^Radia WindRunner Aircraft Project/i.test(t)) return false;
     if (/^Item:\s+/i.test(t)) return false;
+    if (/^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\s+.+/i.test(t)) return false;
     if (/,\s*Radia Production\b/i.test(t)) return false;
     if (/^T\s*A\s*B\s*L\s*E\s+O\s*F\s+C\s*O\s*N\s*T\s*E\s*N\s*T\s*S$/i.test(t)) return false;
     if (/\.{5,}\s*\d+\s*$/.test(t)) return false;
