@@ -241,8 +241,8 @@ export default function RequirementReview() {
               />
             ) : (
               <FileUploadZone
-                accept=".txt,.docx,.pdf"
-                label="Upload a .txt, Word .docx, or .pdf document containing the requirement"
+                accept=".txt,.pdf"
+                label="Upload a .pdf or .txt document containing the requirement"
                 onFileContent={handleFileContent}
                 filename={uploadedFilename}
                 onClear={handleClearFile}
@@ -251,9 +251,17 @@ export default function RequirementReview() {
           </Box>
 
           {uploadedFilename && text.trim() && (
-            <Alert severity="info" sx={requirementReviewStyles.uploadAlert}>
-              Loaded from <strong>{uploadedFilename}</strong> - review the text tab before submitting.
-            </Alert>
+            <TextField
+              fullWidth
+              multiline
+              minRows={4}
+              maxRows={12}
+              value={text}
+              InputProps={{ readOnly: true }}
+              label="Extracted text (sent to AI)"
+              size="small"
+              helperText="This is the cleaned text extracted from your file."
+            />
           )}
 
           <Box sx={requirementReviewStyles.actionRow}>
