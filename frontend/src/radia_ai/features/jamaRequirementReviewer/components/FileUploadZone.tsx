@@ -41,9 +41,11 @@ function cleanExtractedText(raw: string): string {
     if (/^Radia Production(\s+Page \d+ of \d+)?$/i.test(t)) return false;
     if (/^Page \d+ of \d+$/i.test(t)) return false;
     if (/^Produced by .+\d{4}/i.test(t)) return false;
-    // Cover page lines mentioning the project/report title context
+    // Cover page / breadcrumb lines
     if (/^Radia WindRunner Aircraft Project/i.test(t)) return false;
     if (/^Item:\s+/i.test(t)) return false;
+    // Jama breadcrumb paths like "Library of Archived Items, Radia Production Basis"
+    if (/,\s*Radia Production\b/i.test(t)) return false;
     // TOC heading
     if (/^T\s*A\s*B\s*L\s*E\s+O\s*F\s+C\s*O\s*N\s*T\s*E\s*N\s*T\s*S$/i.test(t)) return false;
     // TOC entries (trailing dots + page number)

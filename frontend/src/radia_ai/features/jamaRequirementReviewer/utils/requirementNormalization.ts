@@ -78,6 +78,12 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
   const bodyParts: string[] = [];
   const fields: Record<string, string[]> = {};
   let currentField: string | null = null;
+  // Track whether the current field already received its value inline (label + value on
+  // same line). If so, the next non-label line is NOT a continuation — it belongs to
+  // the next field or is unrelated. This matches how Jama PDF tables work: each row
+  // has label | value on one line; multi-line labels (split across rows) have an empty
+  // value cell and the value appears on the next line.
+  let currentFieldHasInlineValue = false;
   let seenFields = false;
 
   for (const line of lines) {
@@ -89,6 +95,7 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
       const [fieldKey, inlineValue] = match;
       seenFields = true;
       currentField = fieldKey;
+      currentFieldHasInlineValue = inlineValue.length > 0;
       if (!fields[fieldKey]) fields[fieldKey] = [];
       if (inlineValue) fields[fieldKey].push(inlineValue);
       continue;
@@ -96,9 +103,13 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
 
     if (!seenFields) {
       bodyParts.push(line);
-    } else if (currentField !== null) {
+    } else if (currentField !== null && !currentFieldHasInlineValue) {
+      // Only accumulate continuation lines when the label was alone on its line
+      // (value-on-next-line pattern). Stop when we see a non-label line after an
+      // inline-value field — that line is likely the next field's label split across rows.
       if (!fields[currentField]) fields[currentField] = [];
       fields[currentField].push(line);
+      currentFieldHasInlineValue = true; // treat as satisfied after first continuation
     }
   }
 

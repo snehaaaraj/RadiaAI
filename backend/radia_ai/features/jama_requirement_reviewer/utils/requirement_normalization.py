@@ -72,6 +72,7 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
     title_active = False
     rationale_active = False
     seen_fields = False
+    current_label_has_inline_value = False  # True when label+value were on the same line
 
     index = 0
     while index < len(cleaned_lines):
@@ -87,6 +88,7 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
             seen_fields = True
             current_label = label
             current_value_parts = []
+            current_label_has_inline_value = bool(value)
             description_active = label == "description"
             title_active = label == "title"
             rationale_active = label == "rationale"
@@ -102,7 +104,10 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
             continue
 
         if seen_fields:
-            if current_label is not None:
+            # Only accumulate continuation lines when the label had no inline value.
+            # If the label already had its value on the same line, the next non-label
+            # line belongs to the following field (split label row in the PDF table).
+            if current_label is not None and not current_label_has_inline_value:
                 current_value_parts.append(line)
                 if description_active:
                     description_parts.append(line)
@@ -110,6 +115,7 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
                     title_parts.append(line)
                 elif rationale_active:
                     rationale_parts.append(line)
+                current_label_has_inline_value = True  # satisfied after first continuation
         else:
             body_parts.append(line)
         index += 1
