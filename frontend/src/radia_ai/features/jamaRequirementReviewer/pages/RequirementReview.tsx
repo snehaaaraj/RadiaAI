@@ -22,6 +22,7 @@ import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
+import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
@@ -125,9 +126,10 @@ export default function RequirementReview() {
   }, [activeResult]);
 
   const handleFileContent = (content: string, filename: string) => {
-    setText(content);
+    const normalized = normalizeRequirementText(content);
+    setText(normalized);
     setUploadedFilename(filename);
-    updateFormState({ text: content, uploadedFilename: filename });
+    updateFormState({ text: normalized, uploadedFilename: filename });
   };
 
   const handleClearFile = () => {
