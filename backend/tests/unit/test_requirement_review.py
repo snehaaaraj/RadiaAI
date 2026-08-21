@@ -3,6 +3,13 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from radia_ai.features.jama_requirement_reviewer.models.review_models import (
+    RequirementReviewInput,
+)
+from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import (
+    normalize_requirement_review_input,
+)
+
 
 @pytest.mark.unit
 def test_requirement_review_returns_200(client: TestClient) -> None:
@@ -89,3 +96,29 @@ def test_requirement_review_normalizes_fielded_document_text(client: TestClient)
     assert "overall" in data
     assert "category_results" in data
     assert "findings" in data
+
+
+@pytest.mark.unit
+def test_requirement_review_normalization_preserves_wrapped_field_lines() -> None:
+    raw_text = """
+    Title: Lubrication, Movable Pin Arrangements
+
+    Description: Movable Pin Arrangements Unless permanently sealed by design, all movable pin
+    arrangements on the aircraft shall have a means to lubricate the joints with grease fittings
+    or other materials that prevent corrosion or damage of the movable pin arrangement.
+
+    Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of
+    Permanent Sealing & Servicing.
+    """.strip()
+
+    normalized = normalize_requirement_review_input(
+        RequirementReviewInput(text=raw_text, requirement_level="aircraft")
+    )
+
+    assert normalized.text == (
+        "Title: Lubrication, Movable Pin Arrangements\n\n"
+        "Description: Movable Pin Arrangements Unless permanently sealed by design, all movable pin "
+        "arrangements on the aircraft shall have a means to lubricate the joints with grease fittings "
+        "or other materials that prevent corrosion or damage of the movable pin arrangement.\n\n"
+        "Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of Permanent Sealing & Servicing."
+    )

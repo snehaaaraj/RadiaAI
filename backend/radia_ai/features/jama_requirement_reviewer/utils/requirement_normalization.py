@@ -72,7 +72,6 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
     title_active = False
     rationale_active = False
     seen_fields = False
-    current_label_has_inline_value = False  # True when label+value were on the same line
 
     index = 0
     while index < len(cleaned_lines):
@@ -88,7 +87,6 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
             seen_fields = True
             current_label = label
             current_value_parts = []
-            current_label_has_inline_value = bool(value)
             description_active = label == "description"
             title_active = label == "title"
             rationale_active = label == "rationale"
@@ -104,10 +102,7 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
             continue
 
         if seen_fields:
-            # Only accumulate continuation lines when the label had no inline value.
-            # If the label already had its value on the same line, the next non-label
-            # line belongs to the following field (split label row in the PDF table).
-            if current_label is not None and not current_label_has_inline_value:
+            if current_label is not None:
                 current_value_parts.append(line)
                 if description_active:
                     description_parts.append(line)
@@ -115,7 +110,6 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
                     title_parts.append(line)
                 elif rationale_active:
                     rationale_parts.append(line)
-                current_label_has_inline_value = True  # satisfied after first continuation
         else:
             body_parts.append(line)
         index += 1
@@ -164,8 +158,8 @@ def _strip_markdown_links(line: str) -> str:
 def _consume_label(lines: list[str], index: int) -> tuple[str | None, int, str]:
     max_width = min(4, len(lines) - index)
     for width in range(max_width, 0, -1):
-        candidate_parts = [part for part in lines[index : index + width] if part]
-        if not candidate_parts:
+        candidate_parts = lines[index : index + width]
+        if any(not part for part in candidate_parts):
             continue
 
         candidate = " ".join(candidate_parts)
@@ -173,6 +167,9 @@ def _consume_label(lines: list[str], index: int) -> tuple[str | None, int, str]:
         for label, field in _FIELD_LABELS:
             if lowered == label:
                 return field, width, ""
+            if lowered.startswith(f"{label}:"):
+                remainder = candidate[len(label):].lstrip(" :\t-")
+                return field, width, remainder.strip()
             if lowered.startswith(f"{label} "):
                 remainder = candidate[len(label):].lstrip(" :\t-")
                 return field, width, remainder.strip()
@@ -183,4 +180,3 @@ def _store_field(extracted: dict[str, str], field: str, parts: list[str]) -> Non
     value = " ".join(" ".join(parts).split()).strip()
     if value:
         extracted[field] = value
-
