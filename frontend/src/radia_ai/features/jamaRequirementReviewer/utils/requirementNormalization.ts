@@ -2,52 +2,40 @@
  * Client-side port of the backend requirement normalization logic.
  *
  * Mirrors backend/radia_ai/features/jama_requirement_reviewer/utils/requirement_normalization.py
- * with an additional pre-processing step for PDF-extracted text where all content
- * is collapsed into a single line (pdfjs joins tokens with spaces).
  *
- * If the text looks like a fielded document, only the "Description" / requirement
- * body is returned. Otherwise the full text is returned as-is.
+ * Given PDF-extracted text from a Jama export, strips boilerplate (cover, TOC, section
+ * headings) and returns just the requirement statement (the "shall" text), with
+ * the metadata fields preserved for context but not sent to the AI.
  */
 
+/** Known Jama metadata field labels, longest first for greedy matching. */
 const FIELD_LABELS: [label: string, field: string][] = [
-  ['project id', 'project_id'],
-  ['global id', 'global_id'],
-  ['status', 'status'],
-  ['release', 'release'],
-  ['rev', 'release'],
-  ['assigned to', 'assigned_to'],
-  ['title', 'title'],
-  ['description', 'description'],
+  ['security effectiveness requirement', 'security_effectiveness_requirement'],
   ['requirement volatility', 'requirement_volatility'],
-  ['rationale', 'rationale'],
-  ['fdal', 'fdal'],
-  ['sal', 'sal'],
   ['derived requirement', 'derived_requirement'],
   ['safety requirement', 'safety_requirement'],
-  ['security effectiveness requirement', 'security_effectiveness_requirement'],
-  ['validation method', 'validation_method'],
+  ['last activity date', 'last_activity_date'],
   ['verification method', 'verification_method'],
+  ['validation method', 'validation_method'],
   ['reference information', 'reference_information'],
-  ['created by', 'created_by'],
+  ['modified date', 'modified_date'],
   ['created date', 'created_date'],
   ['modified by', 'modified_by'],
-  ['modified date', 'modified_date'],
-  ['last activity date', 'last_activity_date'],
+  ['created by', 'created_by'],
+  ['assigned to', 'assigned_to'],
+  ['global id', 'global_id'],
+  ['project id', 'project_id'],
+  ['description', 'description'],
+  ['rationale', 'rationale'],
+  ['release', 'release'],
+  ['status', 'status'],
+  ['title', 'title'],
+  ['fdal', 'fdal'],
+  ['sal', 'sal'],
+  ['rev', 'release'],
 ];
 
-/**
- * Build a regex that splits on any known field label (case-insensitive).
- * Sorted longest-first so multi-word labels match before their substrings.
- */
-function buildFieldSplitRegex(): RegExp {
-  const sorted = [...FIELD_LABELS]
-    .map(([label]) => label)
-    .sort((a, b) => b.length - a.length)
-    .map((l) => l.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')); // escape regex chars
-  return new RegExp(`(?=${sorted.join('|')})`, 'gi');
-}
-
-const FIELD_SPLIT_RE = buildFieldSplitRegex();
+const FIELD_LABEL_SET = new Set(FIELD_LABELS.map(([label]) => label));
 
 function stripMarkdownLinks(line: string): string {
   return line.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
@@ -61,91 +49,93 @@ function normalizeLine(line: string): string {
   return l.trim();
 }
 
-/**
- * Pre-process raw extracted text.
- * If the text is heavily collapsed (few newlines relative to length) this
- * inserts synthetic newlines before each field label so the parser can work.
- */
-function preProcess(raw: string): string {
-  const normalised = raw.replace(/\r\n?/g, '\n');
-  const lineCount = (normalised.match(/\n/g) ?? []).length;
-  const charCount = normalised.length;
-
-  // Heuristic: if fewer than 1 newline per 200 chars, treat as collapsed
-  if (charCount > 200 && lineCount < charCount / 200) {
-    return normalised.replace(FIELD_SPLIT_RE, '\n');
-  }
-  return normalised;
-}
-
-/** Try to match a known field label starting at `index` in `lines`. */
-function consumeLabel(
-  lines: string[],
-  index: number,
-): { field: string; span: number; remainder: string } | null {
-  const maxWidth = Math.min(4, lines.length - index);
-  for (let width = maxWidth; width >= 1; width--) {
-    const candidateParts = lines.slice(index, index + width).filter(Boolean);
-    if (!candidateParts.length) continue;
-    const candidate = candidateParts.join(' ');
-    const lowered = candidate.toLowerCase().replace(/:$/, '').trimEnd();
-    for (const [label, field] of FIELD_LABELS) {
-      if (lowered === label) {
-        return { field, span: width, remainder: '' };
-      }
-      if (lowered.startsWith(label + ' ') || lowered.startsWith(label + ':')) {
-        const remainder = candidate.slice(label.length).replace(/^[\s:\t-]+/, '').trim();
-        return { field, span: width, remainder };
-      }
-    }
+/** Returns the matching field key if this line is exactly a known field label. */
+function matchFieldLabel(line: string): string | null {
+  const lowered = line.toLowerCase().replace(/:$/, '').trim();
+  for (const [label, field] of FIELD_LABELS) {
+    if (lowered === label) return field;
+    // label + value on same line: "Project ID WR-ACR-732" or "Status Draft"
+    if (lowered.startsWith(label + ' ') || lowered.startsWith(label + ':')) return field;
   }
   return null;
 }
 
+/** True if the line looks like a Jama section heading: "1 WR-ACR-732 Some Title" */
+function isSectionHeading(line: string): boolean {
+  return /^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\b/.test(line);
+}
+
+/** True if this line starts with a known field label (label is inline prefix). */
+function startsWithFieldLabel(line: string): boolean {
+  const lowered = line.toLowerCase();
+  for (const label of FIELD_LABEL_SET) {
+    if (lowered.startsWith(label + ' ') || lowered.startsWith(label + ':')) return true;
+  }
+  return false;
+}
+
 /**
- * Canonicalize structured requirement text into the plain requirement statement.
+ * Canonicalize a Jama PDF export into just the requirement statement.
  *
- * Returns the description field value if the text is fielded Jama output,
- * otherwise returns the full cleaned text.
+ * Strategy:
+ * 1. Split into lines, discard section headings.
+ * 2. Parse field label / value pairs (label on its own line, value on next line(s)).
+ * 3. Return the `description` field if found, otherwise the text that appeared
+ *    before any metadata fields (the requirement body in Jama PDF exports).
  */
 export function normalizeRequirementText(raw: string): string {
-  const processed = preProcess(raw);
-  const lines = processed
+  const lines = raw
+    .replace(/\r\n?/g, '\n')
     .split('\n')
     .map(normalizeLine);
 
-  const descriptionParts: string[] = [];
-  const preFieldParts: string[] = []; // text before any field label is encountered
+  const bodyParts: string[] = [];       // text before any field label
+  const descriptionParts: string[] = []; // explicit Description field value
   let currentField: string | null = null;
-  let descriptionActive = false;
   let currentValueParts: string[] = [];
+  let descriptionActive = false;
+  let seenFields = false;
 
-  let i = 0;
-  while (i < lines.length) {
+  for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
-    if (!line) { i++; continue; }
+    if (!line) continue;
 
-    const match = consumeLabel(lines, i);
-    if (match !== null) {
-      currentField = match.field;
+    // Skip section headings like "1 WR-ACR-732 Semi-Prepared Runway Operations (SPRO)"
+    if (isSectionHeading(line)) continue;
+
+    const fieldKey = matchFieldLabel(line);
+    if (fieldKey !== null) {
+      seenFields = true;
+      // Flush previous field
+      currentField = fieldKey;
       currentValueParts = [];
-      descriptionActive = match.field === 'description';
-      if (match.remainder) {
-        currentValueParts.push(match.remainder);
-        if (descriptionActive) descriptionParts.push(match.remainder);
+      descriptionActive = fieldKey === 'description';
+
+      // Check if value is inline on the same line
+      const lowered = line.toLowerCase();
+      for (const [label] of FIELD_LABELS) {
+        if (lowered.startsWith(label + ' ') || lowered.startsWith(label + ':')) {
+          const remainder = line.slice(label.length).replace(/^[\s:\t-]+/, '').trim();
+          if (remainder) {
+            currentValueParts.push(remainder);
+            if (descriptionActive) descriptionParts.push(remainder);
+          }
+          break;
+        }
       }
-      i += match.span;
       continue;
     }
 
-    if (currentField === null) {
-      // Text before any field label — likely the requirement body from a PDF export
-      preFieldParts.push(line);
+    if (seenFields) {
+      // Line after a field label but not itself a label → it's the field value
+      if (currentField !== null) {
+        currentValueParts.push(line);
+        if (descriptionActive) descriptionParts.push(line);
+      }
     } else {
-      currentValueParts.push(line);
-      if (descriptionActive) descriptionParts.push(line);
+      // Before any field labels → requirement body text
+      bodyParts.push(line);
     }
-    i++;
   }
 
   // Prefer an explicit Description field
@@ -153,13 +143,11 @@ export function normalizeRequirementText(raw: string): string {
     return descriptionParts.join(' ').replace(/\s+/g, ' ').trim();
   }
 
-  // Fall back to text that appeared before metadata fields (PDF pattern)
-  if (preFieldParts.length && currentField !== null) {
-    // currentField !== null means we did encounter field labels, so preFieldParts
-    // is the requirement body that preceded the metadata block.
-    return preFieldParts.join(' ').replace(/\s+/g, ' ').trim();
+  // Requirement body appeared before the metadata table (Jama PDF export pattern)
+  if (bodyParts.length && seenFields) {
+    return bodyParts.join(' ').replace(/\s+/g, ' ').trim();
   }
 
-  // No structured fields found — return the cleaned text as-is
+  // No structure detected — return the full cleaned text
   return lines.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
 }
