@@ -21,6 +21,7 @@ import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
@@ -289,7 +290,7 @@ export default function RequirementReview() {
         </Stack>
       </Paper>
 
-      {isError && <Alert severity="error">Review failed: {(error as Error).message}</Alert>}
+      {isError && <Alert severity="error">Review failed: {getApiErrorMessage(error)}</Alert>}
 
       {activeResult && (
         <Stack spacing={2} ref={resultRef}>
