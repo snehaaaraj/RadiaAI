@@ -90,6 +90,10 @@ function isSectionHeading(line: string): boolean {
   return /^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\b/.test(line);
 }
 
+function extractHeadingTitle(line: string): string {
+  return line.replace(/^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\s+/, '').trim();
+}
+
 /**
  * Parse a Jama PDF export into its key fields.
  *
@@ -107,11 +111,15 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
   let currentField: string | null = null;
   let seenFields = false;
   let stopParsing = false;
+  let headingTitle = '';
 
   for (const line of lines) {
     if (!line) continue;
     if (stopParsing) break;
-    if (isSectionHeading(line)) continue;
+    if (isSectionHeading(line)) {
+      if (!headingTitle) headingTitle = extractHeadingTitle(line);
+      continue;
+    }
 
     const match = matchFieldLabel(line);
     if (match !== null) {
@@ -144,7 +152,7 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
 
   // "description" field wins over the pre-field body if both exist
   const body = joinField('description') || bodyParts.join(' ').replace(/\s+/g, ' ').trim();
-  const title = joinField('title');
+  const title = joinField('title') || headingTitle;
   const rationale = joinField('rationale');
 
   return { body, title, rationale };

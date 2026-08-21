@@ -78,6 +78,7 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
     rationale_active = False
     seen_fields = False
     stop_parsing = False
+    heading_title = ""
 
     index = 0
     while index < len(cleaned_lines):
@@ -88,6 +89,8 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
         if stop_parsing:
             break
         if _is_requirement_heading(line):
+            if not heading_title:
+                heading_title = _extract_heading_title(line)
             index += 1
             continue
 
@@ -137,7 +140,7 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
 
     # Compose: prefer explicit description field, otherwise use pre-field body text
     body = " ".join(" ".join(description_parts or body_parts).split()).strip()
-    title = " ".join(" ".join(title_parts).split()).strip()
+    title = " ".join(" ".join(title_parts).split()).strip() or heading_title
     rationale = " ".join(" ".join(rationale_parts).split()).strip()
 
     if title or body or rationale:
@@ -231,3 +234,7 @@ def _truncate_at_trailing_metadata(line: str) -> str:
 
 def _is_requirement_heading(line: str) -> bool:
     return bool(re.match(r"^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\s+.+", line))
+
+
+def _extract_heading_title(line: str) -> str:
+    return re.sub(r"^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\s+", "", line).strip()
