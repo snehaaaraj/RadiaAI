@@ -73,7 +73,8 @@ def test_requirement_review_normalizes_fielded_document_text(client: TestClient)
     """.strip()
 
     canonical_text = (
-        "The WindRunner Aircraft shall be designed for takeoff, landing, and taxi operations on "
+        "Title: Semi-Prepared Runway Operations (SPRO)\n\n"
+        "Description: The WindRunner Aircraft shall be designed for takeoff, landing, and taxi operations on "
         "semi-prepared surfaces (e.g., compacted soil/gravel) with a California Bearing Ratio (CBR) "
         "of 9 or greater, without requiring ground support equipment for maneuvering."
     )

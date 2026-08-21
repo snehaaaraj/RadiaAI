@@ -1,11 +1,9 @@
 /**
  * Client-side port of the backend requirement normalization logic.
  *
- * Mirrors backend/radia_ai/features/jama_requirement_reviewer/utils/requirement_normalization.py
- *
- * Given PDF-extracted text from a Jama export, strips boilerplate (cover, TOC, section
- * headings) and returns just the requirement statement (the "shall" text), with
- * the metadata fields preserved for context but not sent to the AI.
+ * Given PDF-extracted text from a Jama export, extracts the key fields
+ * (Title, Description/body, Rationale) and returns a clean structured string
+ * that is shown in the UI preview and sent to the AI for review.
  */
 
 /** Known Jama metadata field labels, longest first for greedy matching. */
@@ -35,8 +33,6 @@ const FIELD_LABELS: [label: string, field: string][] = [
   ['rev', 'release'],
 ];
 
-const FIELD_LABEL_SET = new Set(FIELD_LABELS.map(([label]) => label));
-
 function stripMarkdownLinks(line: string): string {
   return line.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 }
@@ -49,13 +45,15 @@ function normalizeLine(line: string): string {
   return l.trim();
 }
 
-/** Returns the matching field key if this line is exactly a known field label. */
-function matchFieldLabel(line: string): string | null {
+/** Returns [fieldKey, inlineValue] if the line starts with a known field label, else null. */
+function matchFieldLabel(line: string): [string, string] | null {
   const lowered = line.toLowerCase().replace(/:$/, '').trim();
   for (const [label, field] of FIELD_LABELS) {
-    if (lowered === label) return field;
-    // label + value on same line: "Project ID WR-ACR-732" or "Status Draft"
-    if (lowered.startsWith(label + ' ') || lowered.startsWith(label + ':')) return field;
+    if (lowered === label) return [field, ''];
+    if (lowered.startsWith(label + ' ') || lowered.startsWith(label + ':')) {
+      const remainder = line.slice(label.length).replace(/^[\s:\t-]+/, '').trim();
+      return [field, remainder];
+    }
   }
   return null;
 }
@@ -65,89 +63,81 @@ function isSectionHeading(line: string): boolean {
   return /^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\b/.test(line);
 }
 
-/** True if this line starts with a known field label (label is inline prefix). */
-function startsWithFieldLabel(line: string): boolean {
-  const lowered = line.toLowerCase();
-  for (const label of FIELD_LABEL_SET) {
-    if (lowered.startsWith(label + ' ') || lowered.startsWith(label + ':')) return true;
-  }
-  return false;
-}
-
 /**
- * Canonicalize a Jama PDF export into just the requirement statement.
+ * Parse a Jama PDF export into its key fields.
  *
- * Strategy:
- * 1. Split into lines, discard section headings.
- * 2. Parse field label / value pairs (label on its own line, value on next line(s)).
- * 3. Return the `description` field if found, otherwise the text that appeared
- *    before any metadata fields (the requirement body in Jama PDF exports).
+ * Returns the requirement body (text before the metadata table), title, and rationale
+ * as separate strings. The body maps to what Jama calls "Description".
  */
-export function normalizeRequirementText(raw: string): string {
+function extractFields(raw: string): { body: string; title: string; rationale: string } {
   const lines = raw
     .replace(/\r\n?/g, '\n')
     .split('\n')
     .map(normalizeLine);
 
-  const bodyParts: string[] = [];       // text before any field label
-  const descriptionParts: string[] = []; // explicit Description field value
+  const bodyParts: string[] = [];
+  const fields: Record<string, string[]> = {};
   let currentField: string | null = null;
-  let currentValueParts: string[] = [];
-  let descriptionActive = false;
   let seenFields = false;
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (const line of lines) {
     if (!line) continue;
-
-    // Skip section headings like "1 WR-ACR-732 Semi-Prepared Runway Operations (SPRO)"
     if (isSectionHeading(line)) continue;
 
-    const fieldKey = matchFieldLabel(line);
-    if (fieldKey !== null) {
+    const match = matchFieldLabel(line);
+    if (match !== null) {
+      const [fieldKey, inlineValue] = match;
       seenFields = true;
-      // Flush previous field
       currentField = fieldKey;
-      currentValueParts = [];
-      descriptionActive = fieldKey === 'description';
-
-      // Check if value is inline on the same line
-      const lowered = line.toLowerCase();
-      for (const [label] of FIELD_LABELS) {
-        if (lowered.startsWith(label + ' ') || lowered.startsWith(label + ':')) {
-          const remainder = line.slice(label.length).replace(/^[\s:\t-]+/, '').trim();
-          if (remainder) {
-            currentValueParts.push(remainder);
-            if (descriptionActive) descriptionParts.push(remainder);
-          }
-          break;
-        }
-      }
+      if (!fields[fieldKey]) fields[fieldKey] = [];
+      if (inlineValue) fields[fieldKey].push(inlineValue);
       continue;
     }
 
-    if (seenFields) {
-      // Line after a field label but not itself a label → it's the field value
-      if (currentField !== null) {
-        currentValueParts.push(line);
-        if (descriptionActive) descriptionParts.push(line);
-      }
-    } else {
-      // Before any field labels → requirement body text
+    if (!seenFields) {
       bodyParts.push(line);
+    } else if (currentField !== null) {
+      if (!fields[currentField]) fields[currentField] = [];
+      fields[currentField].push(line);
     }
   }
 
-  // Prefer an explicit Description field
-  if (descriptionParts.length) {
-    return descriptionParts.join(' ').replace(/\s+/g, ' ').trim();
+  const joinField = (key: string) =>
+    (fields[key] ?? []).join(' ').replace(/\s+/g, ' ').trim();
+
+  // "description" field wins over the pre-field body if both exist
+  const body = joinField('description') || bodyParts.join(' ').replace(/\s+/g, ' ').trim();
+  const title = joinField('title');
+  const rationale = joinField('rationale');
+
+  return { body, title, rationale };
+}
+
+/**
+ * Normalize a Jama PDF export into a structured string containing
+ * Title, Description, and Rationale — the fields the AI uses for review.
+ *
+ * Falls back to the full cleaned text when no structure is detected.
+ */
+export function normalizeRequirementText(raw: string): string {
+  const { body, title, rationale } = extractFields(raw);
+
+  // If no structure was found, return the raw text as-is
+  if (!body && !title && !rationale) {
+    return raw
+      .replace(/\r\n?/g, '\n')
+      .split('\n')
+      .map(normalizeLine)
+      .filter(Boolean)
+      .join(' ')
+      .replace(/\s+/g, ' ')
+      .trim();
   }
 
-  // Requirement body appeared before the metadata table (Jama PDF export pattern)
-  if (bodyParts.length && seenFields) {
-    return bodyParts.join(' ').replace(/\s+/g, ' ').trim();
-  }
+  const parts: string[] = [];
+  if (title) parts.push(`Title: ${title}`);
+  if (body) parts.push(`Description: ${body}`);
+  if (rationale) parts.push(`Rationale: ${rationale}`);
 
-  // No structure detected — return the full cleaned text
-  return lines.filter(Boolean).join(' ').replace(/\s+/g, ' ').trim();
+  return parts.join('\n\n');
 }
