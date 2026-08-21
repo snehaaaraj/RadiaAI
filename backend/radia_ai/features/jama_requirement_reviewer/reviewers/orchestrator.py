@@ -115,28 +115,63 @@ class ReviewOrchestrator:
         stable_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(stable_json.encode("utf-8")).hexdigest()
 
+    # Generic fallback labels that need resolution to actual documents
+    _FALLBACK_REFERENCES = {
+        "incose", "ears", "company style guide", "internal engineering standards",
+        "cert-guidance", "certification guidance", "company-style-guide",
+    }
+
     def _enrich_findings(self, findings: list) -> list:
+        """Resolve references to actual SharePoint document names/URLs.
+
+        - Fallback labels (INCOSE, EARS, etc.): resolve both name and URL.
+        - Real document names (set by LLM enhancer): keep name, resolve URL only.
+        """
         if self._standards_service is None:
             return findings
 
         enriched = []
         for finding in findings:
-            resolved = self._standards_service.resolve_reference(
-                finding.reference,
-                category=finding.category,
-                reviewer=finding.reviewer,
-            )
-            if resolved is None or not resolved.sharepoint_url:
-                enriched.append(finding)
-                continue
+            is_fallback = finding.reference.lower().strip() in self._FALLBACK_REFERENCES
 
-            enriched.append(
-                finding.model_copy(
-                    update={
-                        "reference": resolved.name,
-                        "reference_title": resolved.name,
-                        "reference_url": resolved.sharepoint_url,
-                    }
+            if is_fallback:
+                # Resolve both name and URL
+                resolved = self._standards_service.resolve_reference(
+                    finding.reference,
+                    category=finding.category,
+                    reviewer=finding.reviewer,
                 )
-            )
+                if resolved and resolved.sharepoint_url:
+                    enriched.append(
+                        finding.model_copy(
+                            update={
+                                "reference": resolved.name,
+                                "reference_title": resolved.name,
+                                "reference_url": resolved.sharepoint_url,
+                            }
+                        )
+                    )
+                else:
+                    enriched.append(finding)
+            elif not finding.reference_url:
+                # LLM already set the reference name — just look up the URL
+                resolved = self._standards_service.resolve_reference(
+                    finding.reference,
+                    category=finding.category,
+                    reviewer=finding.reviewer,
+                )
+                if resolved and resolved.sharepoint_url:
+                    enriched.append(
+                        finding.model_copy(
+                            update={
+                                "reference_url": resolved.sharepoint_url,
+                            }
+                        )
+                    )
+                else:
+                    enriched.append(finding)
+            else:
+                # Already fully resolved
+                enriched.append(finding)
+
         return enriched

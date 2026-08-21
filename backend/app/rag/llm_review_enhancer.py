@@ -160,7 +160,8 @@ class LLMReviewEnhancer:
         domain = domain_keywords.get(reviewer_name, "requirements engineering")
         query = f"{domain} {requirement_text[:200]}"
 
-        return self._rag.retrieve(query, mode="hybrid")
+        # Use top_k=10 to ensure coverage across all indexed standard documents
+        return self._rag.retrieve(query, mode="hybrid", top_k=10, diversify=True)
 
     def _build_enhancement_prompt(
         self,

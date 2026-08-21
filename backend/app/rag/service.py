@@ -85,15 +85,31 @@ class RAGService:
         mode: str = "hybrid",
         top_k: int | None = None,
         filters: dict[str, str] | None = None,
+        diversify: bool = False,
     ) -> RetrievedContext:
-        """Retrieve relevant chunks from Azure AI Search."""
-        results = self._search.search(
-            query=query,
-            mode=mode,
-            top_k=top_k or self._settings.retrieval_top_k,
-            filters=filters,
+        """
+        Retrieve relevant chunks from Azure AI Search.
+
+        When *diversify* is True, fetches extra results and ensures chunks are
+        drawn from as many distinct source documents as possible so the LLM
+        can cite multiple standards rather than a single dominant document.
+        """
+        effective_top_k = top_k or self._settings.retrieval_top_k
+
+        if not diversify:
+            results = self._search.search(
+                query=query, mode=mode, top_k=effective_top_k, filters=filters,
+            )
+            return RetrievedContext(chunks=results, query=query, mode=mode)
+
+        # Fetch a larger pool and diversify across source documents
+        pool_size = max(effective_top_k * 5, 25)
+        raw_results = self._search.search(
+            query=query, mode=mode, top_k=pool_size, filters=filters,
         )
-        return RetrievedContext(chunks=results, query=query, mode=mode)
+
+        diversified = _diversify_by_source(raw_results, effective_top_k)
+        return RetrievedContext(chunks=diversified, query=query, mode=mode)
 
     def generate_with_context(
         self,
@@ -128,3 +144,45 @@ class RAGService:
             messages,
             temperature=temperature if temperature is not None else self._settings.azure_openai.temperature,
         )
+
+
+def _diversify_by_source(results: list[dict[str, Any]], target_count: int) -> list[dict[str, Any]]:
+    """
+    Select *target_count* chunks from *results* ensuring maximum document diversity.
+
+    Strategy — round-robin across source filenames:
+      1. Group results by filename, preserving score order within each group.
+      2. Round-robin pick the top-scored chunk from each document in turn.
+      3. Continue until *target_count* slots are filled or all results are used.
+
+    This guarantees that if 9 documents each have a relevant chunk, the LLM
+    will see at least one chunk from each document (up to target_count).
+    """
+    if len(results) <= target_count:
+        return results
+
+    # Group by filename, preserving original score order
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for r in results:
+        key = r.get("filename", "unknown")
+        groups.setdefault(key, []).append(r)
+
+    selected: list[dict[str, Any]] = []
+    # Track position within each group
+    group_keys = list(groups.keys())
+    pointers = {k: 0 for k in group_keys}
+
+    while len(selected) < target_count:
+        added_this_round = False
+        for key in group_keys:
+            if len(selected) >= target_count:
+                break
+            idx = pointers[key]
+            if idx < len(groups[key]):
+                selected.append(groups[key][idx])
+                pointers[key] = idx + 1
+                added_this_round = True
+        if not added_this_round:
+            break
+
+    return selected

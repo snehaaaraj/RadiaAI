@@ -80,12 +80,18 @@ class OpenAIClient:
         max_tokens: int | None = None,
     ) -> str:
         """Run a chat completion and return the assistant message content."""
-        response = self._client.chat.completions.create(
-            model=self._settings.chat_deployment,
-            messages=messages,
-            temperature=temperature if temperature is not None else self._settings.temperature,
-            max_completion_tokens=max_tokens or self._settings.max_tokens,
-        )
+        kwargs: dict[str, Any] = {
+            "model": self._settings.chat_deployment,
+            "messages": messages,
+            "max_completion_tokens": max_tokens or self._settings.max_tokens,
+        }
+        # Some models (e.g. GPT-5, o-series) only support temperature=1.
+        # Only pass temperature if explicitly requested and non-default.
+        temp = temperature if temperature is not None else self._settings.temperature
+        if temp > 0.0:
+            kwargs["temperature"] = temp
+
+        response = self._client.chat.completions.create(**kwargs)
         return response.choices[0].message.content or ""
 
 
