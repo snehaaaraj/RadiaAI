@@ -39,6 +39,7 @@ class SharePointFileContent(TypedDict):
     document_type: str
     previous_hash: str | None
 
+
 # Graph API base URL
 _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
