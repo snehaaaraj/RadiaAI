@@ -1,0 +1,14 @@
+{
+  "name": "radia-ai-backend-cloudflare",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:containers:list": "wrangler containers list"
+  },
+  "devDependencies": {
+    "@cloudflare/containers": "0.3.7",
+    "wrangler": "4.125.0"
+  }
+}

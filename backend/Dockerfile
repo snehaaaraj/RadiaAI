@@ -43,6 +43,7 @@ COPY --from=deps /usr/local/bin /usr/local/bin
 
 # Copy application source code
 COPY app/ ./app/
+COPY radia_ai/ ./radia_ai/
 
 # Set correct ownership
 RUN chown -R radia:radia /app
