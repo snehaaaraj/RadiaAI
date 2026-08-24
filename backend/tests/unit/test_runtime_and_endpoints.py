@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING, cast
 
 import pytest
-from fastapi import HTTPException
-from fastapi.testclient import TestClient
+from fastapi import FastAPI, HTTPException
 from starlette.requests import Request
 
-from app.api.v1.endpoints.ingest import upload_and_ingest, trigger_ingestion
-from app.api.v1.endpoints.search import search
-from app.core.config import AppSettings, get_settings
+from app.core.config import (
+    AppSettings,
+    AzureBlobSettings,
+    AzureOpenAISettings,
+    AzureSearchSettings,
+    get_settings,
+)
 from app.core.security import _entra_auth, _stub_auth
 from app.dependencies.container import get_ingestion_service, get_search_service
+
+if TYPE_CHECKING:
+    from fastapi.testclient import TestClient
 
 
 def _make_request() -> Request:
@@ -54,19 +61,19 @@ def test_app_settings_rejects_debug_in_production() -> None:
             environment="production",
             debug=True,
             log_level="INFO",
-            azure_openai={
-                "endpoint": "https://test.openai.azure.com",
-                "api_key": "test-key",
-                "chat_deployment": "gpt-4o-test",
-                "embedding_deployment": "embedding-test",
-            },
-            azure_search={
-                "endpoint": "https://test.search.windows.net",
-                "api_key": "test-key",
-            },
-            azure_blob={
-                "connection_string": "DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test;",
-            },
+            azure_openai=AzureOpenAISettings.model_construct(
+                endpoint="https://test.openai.azure.com",
+                api_key="test-key",
+                chat_deployment="gpt-4o-test",
+                embedding_deployment="embedding-test",
+            ),
+            azure_search=AzureSearchSettings.model_construct(
+                endpoint="https://test.search.windows.net",
+                api_key="test-key",
+            ),
+            azure_blob=AzureBlobSettings.model_construct(
+                connection_string="DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test;",
+            ),
         )
 
 
@@ -137,7 +144,7 @@ class DummyIngestionService:
 @pytest.mark.unit
 def test_search_endpoint_returns_structured_results(client: TestClient) -> None:
     dummy = DummySearchService(calls=[])
-    app = client.app
+    app = cast(FastAPI, client.app)
     app.dependency_overrides[get_search_service] = lambda: dummy
     try:
         response = client.post(
@@ -163,7 +170,7 @@ def test_search_endpoint_returns_structured_results(client: TestClient) -> None:
 @pytest.mark.unit
 def test_trigger_ingestion_uses_blob_branch(client: TestClient) -> None:
     dummy = DummyIngestionService(blob_calls=[], sharepoint_calls=0, raw_calls=[])
-    app = client.app
+    app = cast(FastAPI, client.app)
     app.dependency_overrides[get_ingestion_service] = lambda: dummy
     try:
         response = client.post(
@@ -184,7 +191,7 @@ def test_trigger_ingestion_uses_blob_branch(client: TestClient) -> None:
 @pytest.mark.unit
 def test_trigger_ingestion_uses_sharepoint_branch(client: TestClient) -> None:
     dummy = DummyIngestionService(blob_calls=[], sharepoint_calls=0, raw_calls=[])
-    app = client.app
+    app = cast(FastAPI, client.app)
     app.dependency_overrides[get_ingestion_service] = lambda: dummy
     try:
         response = client.post("/api/v1/ingest", json={"source": "sharepoint"})
@@ -199,7 +206,7 @@ def test_trigger_ingestion_uses_sharepoint_branch(client: TestClient) -> None:
 @pytest.mark.unit
 def test_upload_and_ingest_reads_uploaded_file(client: TestClient) -> None:
     dummy = DummyIngestionService(blob_calls=[], sharepoint_calls=0, raw_calls=[])
-    app = client.app
+    app = cast(FastAPI, client.app)
     app.dependency_overrides[get_ingestion_service] = lambda: dummy
     try:
         response = client.post(
