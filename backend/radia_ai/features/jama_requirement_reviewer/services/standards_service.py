@@ -1,8 +1,13 @@
 ﻿"""Service layer for standards catalog endpoints."""
 
-from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import SharePointStandardsClient
 from app.core.logging import get_logger
-from radia_ai.features.jama_requirement_reviewer.models.standards_models import StandardReference, StandardsResponse
+from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
+    SharePointStandardsClient,
+)
+from radia_ai.features.jama_requirement_reviewer.models.standards_models import (
+    StandardReference,
+    StandardsResponse,
+)
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
 
 logger = get_logger(__name__)

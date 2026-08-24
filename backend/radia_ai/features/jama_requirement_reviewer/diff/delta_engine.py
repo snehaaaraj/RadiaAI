@@ -11,7 +11,9 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     RequirementReviewInput,
     TraceLinkChange,
 )
-from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import normalize_requirement_review_input
+from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import (
+    normalize_requirement_review_input,
+)
 
 
 @dataclass(frozen=True)

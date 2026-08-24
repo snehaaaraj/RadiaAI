@@ -6,8 +6,12 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     DeltaReviewInput,
     DeltaReviewResponse,
 )
-from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import RequirementReviewService
-from radia_ai.features.jama_requirement_reviewer.services.review_version_service import ReviewVersionService
+from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import (
+    RequirementReviewService,
+)
+from radia_ai.features.jama_requirement_reviewer.services.review_version_service import (
+    ReviewVersionService,
+)
 from radia_ai.features.jama_requirement_reviewer.utils.review_utils import overall_from_statuses
 
 

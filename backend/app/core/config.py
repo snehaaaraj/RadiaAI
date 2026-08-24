@@ -150,7 +150,7 @@ class AppSettings(BaseSettings):
 
     @field_validator("debug")
     @classmethod
-    def no_debug_in_production(cls, value: bool, info: object) -> bool:  # noqa: ANN001
+    def no_debug_in_production(cls, value: bool, info: object) -> bool:
         """Prevent debug mode from being enabled in production environments."""
         # We check the raw values dict since environment may not be validated yet
         data = getattr(info, "data", {})

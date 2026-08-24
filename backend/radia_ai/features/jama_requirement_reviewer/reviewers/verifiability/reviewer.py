@@ -13,7 +13,10 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     ReviewStatus,
 )
 from radia_ai.features.jama_requirement_reviewer.reviewers.base import RequirementReviewer
-from radia_ai.features.jama_requirement_reviewer.rules.verifiability_rules import OPERATING_CONDITION_HINTS, UNMEASURABLE_TERMS
+from radia_ai.features.jama_requirement_reviewer.rules.verifiability_rules import (
+    OPERATING_CONDITION_HINTS,
+    UNMEASURABLE_TERMS,
+)
 
 
 class VerifiabilityReviewer(RequirementReviewer):

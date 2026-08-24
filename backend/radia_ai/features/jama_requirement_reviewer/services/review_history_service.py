@@ -19,7 +19,9 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     DeltaReviewResponse,
     RequirementReviewResponse,
 )
-from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import ReviewHistoryRepository
+from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
+    ReviewHistoryRepository,
+)
 
 
 class ReviewHistoryService:
