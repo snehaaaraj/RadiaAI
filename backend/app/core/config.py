@@ -5,6 +5,7 @@ All Azure endpoints, keys, and deployment names must be provided through the
 environment (or a .env file during local development). Nothing is hardcoded here.
 """
 
+import json
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -159,6 +160,21 @@ class AppSettings(BaseSettings):
         default=["http://localhost:5173", "http://localhost:3000"],
         description="CORS allowed origins",
     )
+
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, value: Any) -> list[str]:
+        """Parse ALLOWED_ORIGINS from JSON string or list."""
+        if isinstance(value, str):
+            import json
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return parsed
+            except json.JSONDecodeError:
+                # Fall back to comma-separated string
+                return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value if isinstance(value, list) else []
 
     # --- RAG ---
     retrieval_top_k: int = Field(
