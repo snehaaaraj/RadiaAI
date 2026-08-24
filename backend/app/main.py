@@ -273,7 +273,9 @@ def _register_routers(app: FastAPI, settings: AppSettings) -> None:
             "message": "Radia AI Backend is successfully running",
             "status": "online",
             "version": settings.app_version,
-            "docs": f"{settings.api_prefix.rstrip('/v1')}/docs" if settings.environment != "production" else "disabled in production",
+            "docs": f"{settings.api_prefix.rstrip('/v1')}/docs"
+            if settings.environment != "production"
+            else "disabled in production",
             "health": f"{settings.api_prefix}/health",
         }
 
