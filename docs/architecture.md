@@ -231,6 +231,27 @@ Partially implemented or scaffolded:
 - traceability reviewer
 - certification reviewer
 
-## 13. Summary
+## 13. Stub Files & Placeholder Features
+
+Radia AI maintains a clear separation of implemented, partial, and placeholder features to allow for organized future development:
+
+### Placeholders (Reserved for Future Development)
+
+| File | Purpose |
+|------|---------|
+| `frontend/src/radia_ai/features/jamaRoundtrip/pages/JamaRoundtripHome.tsx` | Jama roundtrip landing page — reserved for future import/export/sync workflows |
+| `backend/radia_ai/features/jama_roundtrip/__init__.py` | Jama integration namespace — no implementation |
+
+### Partial Implementations (Functional UI, May Need Enhancement)
+
+| File | Purpose | Current Status |
+|------|---------|-----------------|
+| `frontend/src/pages/Search.tsx` | Document search with hybrid/keyword/vector modes | Full UI implemented, backend integration functional |
+| `frontend/src/pages/Chat.tsx` | Chat/Q&A over indexed documents | Conversation interface implemented, RAG pipeline functional |
+| `frontend/src/pages/Documents.tsx` | Document management and ingestion dashboard | Table view with status indicators implemented |
+
+These partial features are production-ready for their current scope but can be extended for additional workflows.
+
+## 14. Summary
 
 Radia AI is an enterprise requirements-quality platform that emphasizes deterministic behavior, structured findings, and audit-friendly review workflows. Its architecture cleanly separates UI, orchestration, reviewer logic, and standards resolution so the system can evolve without losing explainability or reproducibility.
