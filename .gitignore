@@ -35,6 +35,7 @@ htmlcov/
 node_modules/
 frontend/dist/
 frontend/build/
+frontend/coverage/
 .npm
 *.tsbuildinfo
 .eslintcache
