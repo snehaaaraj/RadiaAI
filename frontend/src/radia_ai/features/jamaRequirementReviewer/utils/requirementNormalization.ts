@@ -33,6 +33,9 @@ const FIELD_LABELS: [label: string, field: string][] = [
   ['rev', 'release'],
 ];
 
+const CORE_FIELD_LABELS = new Set(['title', 'description', 'rationale']);
+const TRAILING_METADATA_LABELS = FIELD_LABELS.map(([label]) => label).filter((label) => !CORE_FIELD_LABELS.has(label));
+
 function stripMarkdownLinks(line: string): string {
   return line.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
 }
@@ -58,9 +61,37 @@ function matchFieldLabel(line: string): [string, string] | null {
   return null;
 }
 
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function truncateAtTrailingMetadata(line: string): string {
+  const lowered = line.toLowerCase();
+  let cutoff = line.length;
+  for (const label of TRAILING_METADATA_LABELS) {
+    const regex = new RegExp(`\\b${escapeRegex(label)}\\b`, 'i');
+    const match = regex.exec(lowered);
+    if (match && match.index < cutoff) {
+      cutoff = match.index;
+    }
+  }
+  return line.slice(0, cutoff).trimEnd();
+}
+
+function containsTrailingMetadata(line: string): boolean {
+  return TRAILING_METADATA_LABELS.some((label) => {
+    const regex = new RegExp(`\\b${escapeRegex(label)}\\b`, 'i');
+    return regex.test(line);
+  });
+}
+
 /** True if the line looks like a Jama section heading: "1 WR-ACR-732 Some Title" */
 function isSectionHeading(line: string): boolean {
   return /^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\b/.test(line);
+}
+
+function extractHeadingTitle(line: string): string {
+  return line.replace(/^\d+\s+[A-Z]{2,}-[A-Z]+-\d+\s+/, '').trim();
 }
 
 /**
@@ -78,38 +109,41 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
   const bodyParts: string[] = [];
   const fields: Record<string, string[]> = {};
   let currentField: string | null = null;
-  // Track whether the current field already received its value inline (label + value on
-  // same line). If so, the next non-label line is NOT a continuation — it belongs to
-  // the next field or is unrelated. This matches how Jama PDF tables work: each row
-  // has label | value on one line; multi-line labels (split across rows) have an empty
-  // value cell and the value appears on the next line.
-  let currentFieldHasInlineValue = false;
   let seenFields = false;
+  let stopParsing = false;
+  let headingTitle = '';
 
   for (const line of lines) {
     if (!line) continue;
-    if (isSectionHeading(line)) continue;
+    if (stopParsing) break;
+    if (isSectionHeading(line)) {
+      if (!headingTitle) headingTitle = extractHeadingTitle(line);
+      continue;
+    }
 
     const match = matchFieldLabel(line);
     if (match !== null) {
       const [fieldKey, inlineValue] = match;
       seenFields = true;
       currentField = fieldKey;
-      currentFieldHasInlineValue = inlineValue.length > 0;
       if (!fields[fieldKey]) fields[fieldKey] = [];
-      if (inlineValue) fields[fieldKey].push(inlineValue);
+      const content = truncateAtTrailingMetadata(inlineValue);
+      if (content) fields[fieldKey].push(content);
+      if (containsTrailingMetadata(inlineValue)) stopParsing = true;
       continue;
     }
 
     if (!seenFields) {
       bodyParts.push(line);
-    } else if (currentField !== null && !currentFieldHasInlineValue) {
-      // Only accumulate continuation lines when the label was alone on its line
-      // (value-on-next-line pattern). Stop when we see a non-label line after an
-      // inline-value field — that line is likely the next field's label split across rows.
-      if (!fields[currentField]) fields[currentField] = [];
-      fields[currentField].push(line);
-      currentFieldHasInlineValue = true; // treat as satisfied after first continuation
+    } else if (currentField !== null) {
+      const content = truncateAtTrailingMetadata(line);
+      if (content) {
+        if (!fields[currentField]) fields[currentField] = [];
+        fields[currentField].push(content);
+      }
+      if (containsTrailingMetadata(line)) {
+        stopParsing = true;
+      }
     }
   }
 
@@ -118,7 +152,7 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
 
   // "description" field wins over the pre-field body if both exist
   const body = joinField('description') || bodyParts.join(' ').replace(/\s+/g, ' ').trim();
-  const title = joinField('title');
+  const title = joinField('title') || headingTitle;
   const rationale = joinField('rationale');
 
   return { body, title, rationale };

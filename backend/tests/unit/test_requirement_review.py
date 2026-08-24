@@ -3,6 +3,13 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from radia_ai.features.jama_requirement_reviewer.models.review_models import (
+    RequirementReviewInput,
+)
+from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import (
+    normalize_requirement_review_input,
+)
+
 
 @pytest.mark.unit
 def test_requirement_review_returns_200(client: TestClient) -> None:
@@ -89,3 +96,83 @@ def test_requirement_review_normalizes_fielded_document_text(client: TestClient)
     assert "overall" in data
     assert "category_results" in data
     assert "findings" in data
+
+
+@pytest.mark.unit
+def test_requirement_review_normalization_preserves_wrapped_field_lines() -> None:
+    raw_text = """
+    Title: Lubrication, Movable Pin Arrangements
+
+    Description: Movable Pin Arrangements Unless permanently sealed by design, all movable pin
+    arrangements on the aircraft shall have a means to lubricate the joints with grease fittings
+    or other materials that prevent corrosion or damage of the movable pin arrangement.
+
+    Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of
+    Permanent Sealing & Servicing.
+    """.strip()
+
+    normalized = normalize_requirement_review_input(
+        RequirementReviewInput(text=raw_text, requirement_level="aircraft")
+    )
+
+    assert normalized.text == (
+        "Title: Lubrication, Movable Pin Arrangements\n\n"
+        "Description: Movable Pin Arrangements Unless permanently sealed by design, all movable pin "
+        "arrangements on the aircraft shall have a means to lubricate the joints with grease fittings "
+        "or other materials that prevent corrosion or damage of the movable pin arrangement.\n\n"
+        "Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of Permanent Sealing & Servicing."
+    )
+
+
+@pytest.mark.unit
+def test_requirement_review_normalization_drops_trailing_metadata_on_rationale_line() -> None:
+    raw_text = """
+    Title: Lubrication, Movable Pin Arrangements
+
+    Description: Movable Pin Arrangements Unless permanently sealed by design, all movable pin arrangements
+    on the aircraft shall have a means to lubricate the joints with grease fittings or other materials that
+    prevent corrosion or damage of the movable pin arrangement. Note: design solution will be system and case specific.
+
+    Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of Permanent Sealing & Servicing.
+    Requirement Volatility Low Derived Requirement No Safety Requirement No Security Effectiveness Requirement No
+    Validation Method Engineering Review,Traceability Verification Method Undetermined,Inspection,Review
+    """.strip()
+
+    normalized = normalize_requirement_review_input(
+        RequirementReviewInput(text=raw_text, requirement_level="aircraft")
+    )
+
+    assert normalized.text == (
+        "Title: Lubrication, Movable Pin Arrangements\n\n"
+        "Description: Movable Pin Arrangements Unless permanently sealed by design, all movable pin arrangements "
+        "on the aircraft shall have a means to lubricate the joints with grease fittings or other materials that "
+        "prevent corrosion or damage of the movable pin arrangement. Note: design solution will be system and case specific.\n\n"
+        "Rationale: Prevention against corrosion. See WR-ACR-241 for conditions of Permanent Sealing & Servicing."
+    )
+
+
+@pytest.mark.unit
+def test_requirement_review_normalization_drops_heading_line_from_description() -> None:
+    raw_text = """
+    1 WR-ACR-732 Semi-Prepared Runway Operations (SPRO)
+    The WindRunner Aircraft shall be designed for takeoff, landing, and taxi operations on
+    semi-prepared surfaces (e.g., compacted soil/gravel) with a California Bearing Ratio (CBR)
+    of 9 or greater, without requiring ground support equipment for maneuvering.
+
+    Project ID WR-ACR-732
+    Title Semi-Prepared Runway Operations (SPRO)
+    Rationale Ensures mission compatibility with SPRO sites
+    Requirement Volatility Low
+    """.strip()
+
+    normalized = normalize_requirement_review_input(
+        RequirementReviewInput(text=raw_text, requirement_level="aircraft")
+    )
+
+    assert normalized.text == (
+        "Title: Semi-Prepared Runway Operations (SPRO)\n\n"
+        "Description: The WindRunner Aircraft shall be designed for takeoff, landing, and taxi operations on "
+        "semi-prepared surfaces (e.g., compacted soil/gravel) with a California Bearing Ratio (CBR) of 9 or greater, "
+        "without requiring ground support equipment for maneuvering.\n\n"
+        "Rationale: Ensures mission compatibility with SPRO sites"
+    )
