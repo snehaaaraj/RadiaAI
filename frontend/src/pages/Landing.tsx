@@ -14,7 +14,7 @@ import { motion } from 'framer-motion';
 import { TopBar } from '@/components/layout/TopBar';
 import { useNavigate } from 'react-router-dom';
 import { RadiaMark } from '@/components/layout/RadiaMark';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/useAppContext';
 import { NavigationGuardProvider } from '@/context/NavigationGuardContext';
 import windrunnerLanding from '@/assets/windrunner-landing.png';
 import { APP_NAME, HEADER_HEIGHT, ROUTES } from '@/utils/constants';

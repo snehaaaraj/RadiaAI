@@ -1,7 +1,7 @@
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-interface NavigationGuardContextValue {
+export interface NavigationGuardContextValue {
   /** Pages call this to register whether they have unsaved/in-progress state */
   setDirty: (dirty: boolean) => void;
   /** Sidebar / any nav component calls this instead of navigate() directly */
@@ -12,7 +12,7 @@ interface NavigationGuardContextValue {
   handleCancel: () => void;
 }
 
-const NavigationGuardContext = createContext<NavigationGuardContextValue | null>(null);
+export const NavigationGuardContext = createContext<NavigationGuardContextValue | null>(null);
 
 export function NavigationGuardProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -52,10 +52,4 @@ export function NavigationGuardProvider({ children }: { children: ReactNode }) {
       {children}
     </NavigationGuardContext.Provider>
   );
-}
-
-export function useNavigationGuardContext(): NavigationGuardContextValue {
-  const ctx = useContext(NavigationGuardContext);
-  if (!ctx) throw new Error('useNavigationGuardContext must be used inside NavigationGuardProvider');
-  return ctx;
 }

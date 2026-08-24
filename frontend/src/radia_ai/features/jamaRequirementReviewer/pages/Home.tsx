@@ -11,7 +11,7 @@ import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/useAppContext';
 import { useHealth } from '@/hooks/useHealth';
 import { ROUTES } from '@/utils/constants';
 
