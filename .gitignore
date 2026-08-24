@@ -80,6 +80,9 @@ infra/.terraform.lock.hcl
 !*.tfvars.example
 azuredeploy.parameters.json
 
+# Azure App Service
+.azure/
+
 # =============================================================================
 # Misc
 # =============================================================================

@@ -101,9 +101,10 @@ RadiaAi-2.0/
 │   │
 │   ├── tests/
 │   │   └── unit/                      # 19 unit tests
-│   ├── Dockerfile
+│   ├── startup.sh                     # Azure App Service gunicorn startup
 │   ├── pyproject.toml
-│   └── requirements.txt
+│   ├── requirements.txt               # production dependencies
+│   └── requirements-dev.txt           # dev/test dependencies
 │
 ├── frontend/
 │   ├── src/
@@ -121,7 +122,6 @@ RadiaAi-2.0/
 │   │   │   ├── jamaRoundtrip/
 │   │   │   └── resources/
 │   │   └── types/                     # TypeScript API interfaces
-│   ├── Dockerfile
 │   └── package.json
 │
 ├── docker/
@@ -219,9 +219,8 @@ Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
 
 ### Prerequisites
 
-- Docker Desktop
-- Node.js 20+ (for local frontend development)
-- Python 3.12+ (for local backend development)
+- Node.js 20+
+- Python 3.12+
 - Azure subscription with: Azure OpenAI (GPT-5 + text-embedding-3-large), Azure AI Search, Azure Blob Storage
 
 ### 1. Clone and configure
@@ -233,22 +232,16 @@ cp .env.example .env
 # Edit .env with your Azure credentials
 ```
 
-### 2. Run with Docker Compose
-
-```bash
-docker compose up --build
-```
-
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/api/docs
-
-### 3. Local backend development (without Docker)
+### 2. Start the backend
 
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate       # Windows: .venv\Scripts\activate
+# Windows
+.venv\Scripts\activate
+# macOS / Linux
+source .venv/bin/activate
+
 pip install -r requirements.txt
 uvicorn radia_ai.main:app --reload --port 8000
 ```
@@ -259,14 +252,19 @@ On first start, the server will:
 3. Extract, chunk, embed, and index all documents
 4. Subsequent starts skip unchanged documents (~10s startup)
 
-### 4. Local frontend development (without Docker)
+Backend API available at: http://localhost:8000/api/docs
+
+### 3. Start the frontend (in a new terminal)
 
 ```bash
 cd frontend
 npm install
 npm run start
-      # starts Vite dev server on :5173, proxies /api to :8000
+# Vite dev server on http://localhost:5173
+# Proxies /api/* calls to http://localhost:8000
 ```
+
+Frontend available at: http://localhost:5173
 
 ---
 
@@ -340,4 +338,4 @@ pytest --cov=app --cov=radia_ai # with coverage report
 
 **AI/ML:** Azure OpenAI GPT-5 (reasoning), text-embedding-3-large (3072d), Azure AI Search (vector + semantic)
 
-**Infrastructure:** Docker, nginx, Azure App Service / Container Apps
+**Infrastructure:** Azure App Service (Free F1, Python), Vercel (Frontend)
