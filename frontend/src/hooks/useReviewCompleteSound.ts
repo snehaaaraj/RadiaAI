@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import { useAppContext } from '@/context/AppContext';
+import { useAppContext } from '@/context/useAppContext';
 
 /**
  * Plays a short two-tone chime using the Web Audio API when a review completes.

@@ -14,7 +14,7 @@ import type { MouseEvent } from 'react';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RadiaMark } from './RadiaMark';
-import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
+import { useNavigationGuardContext } from '@/context/useNavigationGuardContext';
 import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 
 type LandingNavItem = {
