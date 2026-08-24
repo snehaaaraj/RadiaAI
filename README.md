@@ -1,8 +1,8 @@
 # Radia AI
 
-Deterministic AI-assisted Requirements Engineering platform for aerospace teams.
-Originally started as a Jama requirements reviewer and now refactored toward
-structured, explainable requirement quality workflows.
+AI-powered Requirements Engineering platform for aerospace teams.
+Uses Azure OpenAI (GPT-5) with Retrieval-Augmented Generation (RAG) against
+indexed standards documents to provide grounded, traceable requirement reviews.
 
 ---
 
@@ -29,17 +29,21 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 │            FastAPI + Python 3.12 + Pydantic v2             │
 │                       port 8000                            │
 │                                                            │
-│  radia_ai/main.py                  ← primary entrypoint    │
-│  radia_ai/features/jama_requirement_reviewer/              │
-│                                   ← active reviewer logic  │
-│  radia_ai/features/jama_roundtrip/                         │
-│                                   ← future feature slot    │
-│  app/                              ← shared + compat layer │
+│  Hybrid review pipeline:                                   │
+│    1. Deterministic rules (regex, word lists) — instant    │
+│    2. RAG retrieval (Azure AI Search) — ~5s               │
+│    3. GPT-5 consolidated review — runs in parallel         │
+│    4. Merge + enrich with SharePoint URLs                  │
+│                                                            │
+│  Auto-ingestion at startup:                                │
+│    SharePoint → extract text → chunk → embed → index       │
+│    File-hash caching skips unchanged documents             │
 └──────────┬──────────┬────────────────┬─────────────────────┘
            │          │                │
     ┌──────▼──┐ ┌─────▼──────┐ ┌──────▼──────┐
     │  Azure  │ │  Azure AI  │ │   Azure     │
     │ OpenAI  │ │   Search   │ │   Blob      │
+    │ (GPT-5) │ │  (Vector)  │ │  Storage    │
     └─────────┘ └────────────┘ └─────────────┘
 ```
 
@@ -51,44 +55,72 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 RadiaAi-2.0/
 ├── backend/
 │   ├── radia_ai/
-│   │   ├── main.py             # project-named FastAPI entrypoint
+│   │   ├── main.py                    # project-named FastAPI entrypoint
 │   │   └── features/
-│   │       ├── jama_requirement_reviewer/  # active reviewer implementation
-│   │       └── jama_roundtrip/             # placeholder namespace
-│   ├── app/                   # shared legacy package + compatibility wrappers
-│   │   ├── api/v1/endpoints/  # shared/non-review endpoints + wrapper modules
-│   │   ├── core/              # config, logging, exceptions, security
-│   │   ├── schemas/           # Pydantic v2 request/response models
-│   │   ├── services/          # shared or compatibility service exports
-│   │   ├── rag/               # retrieval-augmented generation components
-│   │   ├── ingestion/         # document ingestion pipeline
-│   │   ├── connectors/        # source system adapters
-│   │   ├── dependencies/      # shared DI + reviewer compatibility wrappers
-│   │   └── main.py            # compatibility entrypoint
+│   │       ├── jama_requirement_reviewer/
+│   │       │   ├── api/v1/endpoints/  # review + standards REST endpoints
+│   │       │   ├── connectors/        # SharePoint Graph API client
+│   │       │   ├── dependencies/      # DI container + lifespan (Azure client init)
+│   │       │   ├── models/            # Pydantic domain models (review, standards)
+│   │       │   ├── repositories/      # review history persistence
+│   │       │   ├── reviewers/         # hybrid reviewer modules:
+│   │       │   │   ├── base.py        #   abstract reviewer interface
+│   │       │   │   ├── orchestrator.py#   parallel deterministic + LLM orchestration
+│   │       │   │   ├── language/      #   modal verbs, ambiguity, banned words
+│   │       │   │   ├── structure/     #   compound reqs, EARS syntax, levels
+│   │       │   │   ├── verifiability/ #   measurability, operating conditions
+│   │       │   │   ├── traceability/  #   parent/child, allocation (LLM-powered)
+│   │       │   │   └── certification/ #   DO-178, DAL, safety (LLM-powered)
+│   │       │   ├── rules/             # deterministic rule constants (word lists)
+│   │       │   ├── schemas/           # API request/response schemas
+│   │       │   ├── services/          # review, delta, history, standards services
+│   │       │   ├── standards/         # standards registry (fallback)
+│   │       │   └── utils/             # normalization, scoring helpers
+│   │       └── jama_roundtrip/        # placeholder namespace
+│   │
+│   ├── app/                           # shared infrastructure layer
+│   │   ├── api/v1/endpoints/          # search, ingest, chat, health, documents
+│   │   ├── core/
+│   │   │   ├── azure_clients.py       # OpenAI, Search, Blob client wrappers
+│   │   │   ├── config.py             # Pydantic settings (all Azure config)
+│   │   │   ├── logging.py            # structlog configuration
+│   │   │   ├── exceptions.py         # domain exception hierarchy
+│   │   │   └── security.py           # Entra ID auth middleware
+│   │   ├── ingestion/
+│   │   │   ├── service.py            # end-to-end ingest pipeline
+│   │   │   ├── chunker.py            # token-based text chunking with overlap
+│   │   │   └── extractor.py          # PDF/DOCX/TXT text extraction
+│   │   ├── rag/
+│   │   │   ├── service.py            # RAG retrieval + diversified search
+│   │   │   └── llm_review_enhancer_v2.py  # consolidated single-call LLM review
+│   │   ├── prompts/
+│   │   │   └── review_prompts.py     # GPT-5 system prompt (all categories)
+│   │   ├── schemas/                   # shared Pydantic schemas
+│   │   ├── dependencies/              # compatibility wrapper (re-exports)
+│   │   └── main.py                    # FastAPI app factory + middleware
+│   │
 │   ├── tests/
+│   │   └── unit/                      # 19 unit tests
 │   ├── Dockerfile
 │   ├── pyproject.toml
 │   └── requirements.txt
 │
 ├── frontend/
 │   ├── src/
-│   │   ├── assets/     # logos and static UI assets
-│   │   ├── components/ # reusable UI components
-│   │   ├── hooks/      # React Query hooks
-│   │   ├── pages/      # shared route-level page components
-│   │   ├── context/    # global app state
-│   │   ├── radia_ai/
-│   │   │   └── features/
-│   │   │       ├── jamaRequirementReviewer/
-│   │   │       │   ├── api/
-│   │   │       │   ├── components/
-│   │   │       │   ├── hooks/
-│   │   │       │   └── pages/
-│   │   │       ├── jamaRoundtrip/
-│   │   │       │   └── pages/
-│   │   │       └── resources/
-│   │   │           └── pages/
-│   │   └── types/      # TypeScript API interfaces
+│   │   ├── api/client.ts              # Axios client (5-min timeout for GPT-5)
+│   │   ├── components/                # reusable UI components
+│   │   ├── hooks/                     # React Query hooks
+│   │   ├── pages/                     # shared route-level pages
+│   │   ├── context/                   # global app state
+│   │   ├── radia_ai/features/
+│   │   │   ├── jamaRequirementReviewer/
+│   │   │   │   ├── api/              # review API calls
+│   │   │   │   ├── components/       # ReviewChangeSet, CategoryScoreGrid, etc.
+│   │   │   │   ├── hooks/            # useRequirementReview, useReviewHistory
+│   │   │   │   └── pages/            # RequirementReview, DeltaReview, Standards
+│   │   │   ├── jamaRoundtrip/
+│   │   │   └── resources/
+│   │   └── types/                     # TypeScript API interfaces
 │   ├── Dockerfile
 │   └── package.json
 │
@@ -101,54 +133,85 @@ RadiaAi-2.0/
 
 ---
 
-## Functional Coverage Status
+## Review Pipeline
 
-### Requirements analysis workflow
+The review system uses a **hybrid architecture** — deterministic rules run in parallel
+with a single consolidated GPT-5 + RAG call:
+
+```
+                        ┌─────────────────────────┐
+    Input Requirement   │    ThreadPoolExecutor    │
+    ─────────────────►  │                         │
+                        │  Thread 1: Deterministic │  ← regex rules (~1ms)
+                        │    language/structure/   │
+                        │    verifiability checks  │
+                        │                         │
+                        │  Thread 2: LLM + RAG    │  ← GPT-5 (~60s)
+                        │    1. Embed query        │
+                        │    2. Search (diverse)   │
+                        │    3. GPT-5 consolidated │
+                        │       review prompt      │
+                        └────────────┬────────────┘
+                                     │
+                              Merge findings
+                              Enrich references
+                              (SharePoint URLs)
+                                     │
+                                     ▼
+                          Review Response (JSON)
+```
+
+**Key behaviors:**
+- Deterministic rules provide instant feedback for common issues
+- GPT-5 provides deeper analysis grounded in indexed standards documents
+- All findings include a `suggested_rewrite` (full improved requirement text)
+- References point to actual SharePoint document URLs, not hardcoded names
+- File-hash caching: unchanged documents are not re-embedded on restart
+
+---
+
+## Ingestion Pipeline
+
+Standards documents are automatically ingested from SharePoint at server startup:
+
+1. **Download** from SharePoint via Microsoft Graph API
+2. **Extract text** using PyMuPDF (PDF), python-docx (DOCX), or UTF-8 (TXT/MD)
+3. **Chunk** into ~512-word overlapping segments
+4. **Embed** via Azure OpenAI text-embedding-3-large (3072 dimensions)
+5. **Index** into Azure AI Search with vector + keyword + semantic search
+6. **Cache** file hashes — skip re-processing unchanged documents
+
+Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
+
+---
+
+## Functional Coverage
+
+### Requirements review workflow
 
 - [x] Upload or copy/paste requirement content
+- [x] AI-powered review across 5 categories (language, structure, verifiability, traceability, certification)
 - [x] Color-coded overall scoring
 - [x] Sub-category scoring displayed directly below overall score
 - [x] Persistent review state across navigation with explicit **Clear Review**
+- [x] Findings grounded in indexed standards with source document links
 
 ### AI-assisted modification workflow
 
 - [x] AI-generated suggested changes from findings
 - [x] Detailed change-set display:
-  - [x] What was changed
-  - [x] Source-of-truth standard reference with direct link
-  - [x] Supporting evidence/context for each change
+  - [x] What should change (recommendation)
+  - [x] Source-of-truth standard reference with direct SharePoint link
+  - [x] Supporting evidence/context for each finding
+  - [x] Full suggested rewrite (changeset)
 
----
+### Document ingestion
 
-## Current Frontend Experience
-
-- Dedicated **Launchpad** landing page at `/`
-- Dedicated **Radia AI Resources** page at `/radia-ai`
-- Main app workspace now starts at `/workspace`
-- Dedicated **Jama Roundtrip** placeholder page at `/jama-roundtrip`
-- Theme-aware branding with separate light and dark logo assets
-- Landing/resources header navigation:
-  - `RADIA | RADIA AI | Jama Requirement Reviewer | Jama Roundtrip`
-- Workspace header breadcrumb:
-  - `RADIA | Radia AI | <current resource> | <current sub-page>`
-- Resource-based workspace launch:
-  - selecting **Open workspace** launches the resource at `/workspace` (resource home)
-- Personalization controls for:
-  - theme mode (system / light / dark)
-  - default workspace start page
-  - sidebar open/collapsed state
-  - review-complete sound notification
-- Animated page transitions and cards using **Framer Motion**
-- Persistent review form/results state across navigation for:
-  - individual requirement review
-  - delta review
-- Explicit **Clear Review** actions to reset persisted review state
-- Auto-scroll to score/result area after a review completes
-- Improved review result presentation with:
-  - overall score hero
-  - per-category scoring cards
-  - severity color-coding
-  - clearer suggested changes, evidence, and standards references
+- [x] Auto-sync from SharePoint at startup
+- [x] Manual upload via API endpoint
+- [x] File-hash deduplication (skip unchanged)
+- [x] PDF, TXT extraction
+- [x] Hybrid search (keyword + vector + semantic)
 
 ---
 
@@ -159,7 +222,7 @@ RadiaAi-2.0/
 - Docker Desktop
 - Node.js 20+ (for local frontend development)
 - Python 3.12+ (for local backend development)
-- Azure subscription with: Azure OpenAI, Azure AI Search, Azure Blob Storage
+- Azure subscription with: Azure OpenAI (GPT-5 + text-embedding-3-large), Azure AI Search, Azure Blob Storage
 
 ### 1. Clone and configure
 
@@ -180,13 +243,6 @@ docker compose up --build
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/api/docs
 
-The Dockerized frontend serves:
-
-- Launchpad: `/`
-- Radia AI Resources: `/radia-ai`
-- Jama Roundtrip placeholder: `/jama-roundtrip`
-- Main workspace: `/workspace`
-
 ### 3. Local backend development (without Docker)
 
 ```bash
@@ -197,6 +253,12 @@ pip install -r requirements.txt
 uvicorn radia_ai.main:app --reload --port 8000
 ```
 
+On first start, the server will:
+1. Create/update the Azure AI Search index
+2. Download standards from SharePoint
+3. Extract, chunk, embed, and index all documents
+4. Subsequent starts skip unchanged documents (~10s startup)
+
 ### 4. Local frontend development (without Docker)
 
 ```bash
@@ -206,33 +268,6 @@ npm run start
       # starts Vite dev server on :5173, proxies /api to :8000
 ```
 
-Local frontend URLs:
-
-- Launchpad: http://localhost:5173/
-- Radia AI Resources: http://localhost:5173/radia-ai
-- Jama Roundtrip placeholder: http://localhost:5173/jama-roundtrip
-- Workspace: http://localhost:5173/workspace
-
----
-
-## Frontend Styling Convention
-
-- Prefer MUI theme overrides and sidecar `*.styles.ts` files over large inline `sx` objects in page/component JSX.
-- Keep styling next to the component it belongs to (for example, `Settings.tsx` + `Settings.styles.ts`) instead of introducing global CSS.
-- Use raw `.css` or CSS modules only when a component is mostly static and does not need MUI theme tokens, responsive objects, or component-state styling.
-
----
-
-## Running Tests
-
-```bash
-cd backend
-pytest                          # all tests
-pytest -m unit                  # unit tests only
-pytest -m integration           # integration tests only (requires Azure)
-pytest --cov=app --cov=radia_ai # with coverage report during migration
-```
-
 ---
 
 ## API Endpoints (v1)
@@ -240,16 +275,17 @@ pytest --cov=app --cov=radia_ai # with coverage report during migration
 | Method | Path | Description |
 |--------|------|-------------|
 | GET | `/api/v1/health` | Application health check |
-| GET | `/api/v1/review/version` | Reviewer/prompt/standards determinism metadata |
-| GET | `/api/v1/standards` | Standards/reference libraries used by reviewers |
-| POST | `/api/v1/review/requirement` | Deterministic individual requirement review |
-| POST | `/api/v1/review/delta` | Deterministic incremental delta review |
+| GET | `/api/v1/review/version` | Reviewer bundle version + determinism metadata |
+| GET | `/api/v1/standards` | Standards/reference libraries (SharePoint or fallback) |
+| POST | `/api/v1/review/requirement` | AI-powered individual requirement review |
+| POST | `/api/v1/review/delta` | Incremental delta review for changed requirements |
 | GET | `/api/v1/review/history` | List stored review runs and findings |
-| POST | `/api/v1/review/history/{review_id}/disposition` | Apply finding disposition (Accepted/Rejected/Deferred) |
-| POST | `/api/v1/chat` | Legacy RAG question answering (migration in progress) |
+| POST | `/api/v1/review/history/{id}/disposition` | Apply finding disposition (Accepted/Rejected/Deferred) |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
-| POST | `/api/v1/ingest` | Trigger document ingestion |
+| POST | `/api/v1/ingest` | Trigger document ingestion (blob or SharePoint) |
+| POST | `/api/v1/ingest/upload` | Upload and ingest a single document file |
 | GET | `/api/v1/documents` | List indexed documents |
+| POST | `/api/v1/chat` | RAG question answering |
 
 Interactive docs available at `/api/docs` (non-production environments).
 
@@ -258,18 +294,18 @@ Interactive docs available at `/api/docs` (non-production environments).
 ## Configuration
 
 All configuration is managed via environment variables. See `.env.example` for
-the full reference with descriptions for every variable.
-
-Key settings:
+the full reference with descriptions.
 
 | Variable | Description |
 |----------|-------------|
-| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI resource URL |
-| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Deployed model name (e.g., `gpt-4o`) |
-| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Embedding model deployment name |
+| `AZURE_OPENAI_ENDPOINT` | Azure OpenAI / AI Foundry endpoint (base URL only) |
+| `AZURE_OPENAI_CHAT_DEPLOYMENT` | Chat model deployment (e.g., `gpt-5`) |
+| `AZURE_OPENAI_EMBEDDING_DEPLOYMENT` | Embedding model (e.g., `text-embedding-3-large`) |
+| `AZURE_OPENAI_MAX_TOKENS` | Max completion tokens (16384 recommended for GPT-5) |
 | `AZURE_SEARCH_ENDPOINT` | Azure AI Search endpoint |
-| `AZURE_SEARCH_INDEX_NAME` | Search index name |
+| `AZURE_SEARCH_INDEX_NAME` | Search index name (default: `radia-documents`) |
 | `AZURE_BLOB_CONNECTION_STRING` | Blob Storage connection string |
+| `SHAREPOINT_*` | SharePoint Graph API credentials for standards library |
 | `ENTRA_*` | Microsoft Entra ID settings (leave empty for local dev) |
 
 ---
@@ -284,10 +320,24 @@ Key settings:
 
 ---
 
+## Running Tests
+
+```bash
+cd backend
+pytest                          # all tests (19 unit tests)
+pytest -m unit                  # unit tests only
+pytest -m integration           # integration tests only (requires Azure)
+pytest --cov=app --cov=radia_ai # with coverage report
+```
+
+---
+
 ## Technology Stack
 
-**Backend:** Python 3.12, FastAPI, Pydantic v2, Azure SDK, structlog, pytest
+**Backend:** Python 3.12, FastAPI, Pydantic v2, Azure OpenAI SDK, Azure AI Search SDK, Azure Blob SDK, PyMuPDF, python-docx, structlog, pytest
 
 **Frontend:** React 18, TypeScript, Vite, MUI v6, React Query v5, Axios, Framer Motion
+
+**AI/ML:** Azure OpenAI GPT-5 (reasoning), text-embedding-3-large (3072d), Azure AI Search (vector + semantic)
 
 **Infrastructure:** Docker, nginx, Azure App Service / Container Apps

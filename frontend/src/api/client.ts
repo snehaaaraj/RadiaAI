@@ -24,7 +24,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 30_000, // 30 seconds — LLM calls can be slow
+  timeout: 120_000, // 2 minutes
 });
 
 // ---------------------------------------------------------------------------

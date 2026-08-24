@@ -21,7 +21,9 @@ import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
+import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
@@ -125,9 +127,10 @@ export default function RequirementReview() {
   }, [activeResult]);
 
   const handleFileContent = (content: string, filename: string) => {
-    setText(content);
+    const normalized = normalizeRequirementText(content);
+    setText(normalized);
     setUploadedFilename(filename);
-    updateFormState({ text: content, uploadedFilename: filename });
+    updateFormState({ text: normalized, uploadedFilename: filename });
   };
 
   const handleClearFile = () => {
@@ -155,7 +158,7 @@ export default function RequirementReview() {
           Individual Requirement Review
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Deterministic review across syntax, correctness, and verifiability categories.
+          AI-powered review across language, structure, verifiability, traceability, and certification.
         </Typography>
       </Box>
 
@@ -241,8 +244,8 @@ export default function RequirementReview() {
               />
             ) : (
               <FileUploadZone
-                accept=".txt,.docx,.pdf"
-                label="Upload a .txt, Word .docx, or .pdf document containing the requirement"
+                accept=".txt,.pdf"
+                label="Upload a .pdf or .txt document containing the requirement"
                 onFileContent={handleFileContent}
                 filename={uploadedFilename}
                 onClear={handleClearFile}
@@ -251,9 +254,17 @@ export default function RequirementReview() {
           </Box>
 
           {uploadedFilename && text.trim() && (
-            <Alert severity="info" sx={requirementReviewStyles.uploadAlert}>
-              Loaded from <strong>{uploadedFilename}</strong> - review the text tab before submitting.
-            </Alert>
+            <TextField
+              fullWidth
+              multiline
+              minRows={4}
+              maxRows={12}
+              value={text}
+              InputProps={{ readOnly: true }}
+              label="Extracted text (sent to AI)"
+              size="small"
+              helperText="This is the cleaned text extracted from your file."
+            />
           )}
 
           <Box sx={requirementReviewStyles.actionRow}>
@@ -273,13 +284,13 @@ export default function RequirementReview() {
                 })
               }
             >
-              Run deterministic review
+              Run AI review
             </Button>
           </Box>
         </Stack>
       </Paper>
 
-      {isError && <Alert severity="error">Review failed: {(error as Error).message}</Alert>}
+      {isError && <Alert severity="error">Review failed: {getApiErrorMessage(error)}</Alert>}
 
       {activeResult && (
         <Stack spacing={2} ref={resultRef}>

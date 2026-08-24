@@ -226,7 +226,7 @@ export default function Settings() {
                     Sound on review complete
                   </Typography>
                   <Typography variant="body2" color="text.secondary">
-                    Play a short chime when a deterministic review finishes.
+                    Play a short chime when a review finishes.
                   </Typography>
                 </Box>
                 <FormControlLabel
