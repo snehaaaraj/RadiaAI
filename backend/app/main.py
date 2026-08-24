@@ -266,6 +266,17 @@ def _register_routers(app: FastAPI, settings: AppSettings) -> None:
     """Mount versioned API routers."""
     app.include_router(v1_router, prefix=settings.api_prefix)
 
+    @app.get("/", tags=["Root"])
+    async def root() -> dict[str, str]:
+        """Root endpoint — confirms the backend is running."""
+        return {
+            "message": "Radia AI Backend is successfully running",
+            "status": "online",
+            "version": settings.app_version,
+            "docs": f"{settings.api_prefix.rstrip('/v1')}/docs" if settings.environment != "production" else "disabled in production",
+            "health": f"{settings.api_prefix}/health",
+        }
+
 
 # ---------------------------------------------------------------------------
 # Application instance — used by uvicorn
