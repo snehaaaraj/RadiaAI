@@ -39,7 +39,9 @@ class IngestRequest(BaseModel):
     """Request body for triggering ingestion of already-uploaded documents."""
 
     source: str = Field(description="Connector source identifier")
-    document_ids: list[str] = Field(default_factory=list, description="Subset to ingest; empty = all")
+    document_ids: list[str] = Field(
+        default_factory=list, description="Subset to ingest; empty = all"
+    )
 
 
 class IngestResponse(BaseModel):

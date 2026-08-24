@@ -14,14 +14,18 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve .env location: check backend/.env first, then project root .env
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # backend/
-_PROJECT_ROOT = _BACKEND_DIR.parent                           # RadiaAi-2.0/
-_ENV_FILE = str(_BACKEND_DIR / ".env") if (_BACKEND_DIR / ".env").exists() else str(_PROJECT_ROOT / ".env")
+_PROJECT_ROOT = _BACKEND_DIR.parent  # RadiaAi-2.0/
+_ENV_FILE = (
+    str(_BACKEND_DIR / ".env") if (_BACKEND_DIR / ".env").exists() else str(_PROJECT_ROOT / ".env")
+)
 
 
 class AzureOpenAISettings(BaseSettings):
     """Azure OpenAI service configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="AZURE_OPENAI_", env_file=_ENV_FILE, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="AZURE_OPENAI_", env_file=_ENV_FILE, extra="ignore"
+    )
 
     endpoint: AnyHttpUrl = Field(..., description="Azure OpenAI resource endpoint")
     api_key: str = Field(..., description="Azure OpenAI API key")
@@ -38,7 +42,9 @@ class AzureOpenAISettings(BaseSettings):
 class AzureSearchSettings(BaseSettings):
     """Azure AI Search service configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="AZURE_SEARCH_", env_file=_ENV_FILE, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="AZURE_SEARCH_", env_file=_ENV_FILE, extra="ignore"
+    )
 
     endpoint: AnyHttpUrl = Field(..., description="Azure AI Search endpoint")
     api_key: str = Field(..., description="Azure AI Search admin key")
@@ -64,7 +70,9 @@ class SharePointSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="SHAREPOINT_", env_file=_ENV_FILE, extra="ignore")
 
-    tenant_id: str = Field(default="", description="Azure AD tenant ID (can share with ENTRA_TENANT_ID)")
+    tenant_id: str = Field(
+        default="", description="Azure AD tenant ID (can share with ENTRA_TENANT_ID)"
+    )
     client_id: str = Field(default="", description="App registration client ID with Sites.Read.All")
     client_secret: str = Field(default="", description="App registration client secret")
     site_url: str = Field(
@@ -123,9 +131,7 @@ class AppSettings(BaseSettings):
         default="local", description="Deployment environment"
     )
     debug: bool = Field(default=False, description="Enable debug mode (never True in production)")
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
-        default="INFO"
-    )
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
 
     # --- API ---
     api_prefix: str = Field(default="/api/v1")

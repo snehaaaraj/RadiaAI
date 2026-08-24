@@ -34,7 +34,7 @@ def configure_logging(settings: AppSettings) -> None:
 
     # Processors applied to every log record
     shared_processors: list[structlog.types.Processor] = [
-        structlog.contextvars.merge_contextvars,          # inject request_id etc.
+        structlog.contextvars.merge_contextvars,  # inject request_id etc.
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),

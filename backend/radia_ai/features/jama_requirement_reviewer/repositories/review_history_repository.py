@@ -1,4 +1,4 @@
-﻿"""In-memory repository for review history records."""
+"""In-memory repository for review history records."""
 # ruff: noqa: TC001
 
 from __future__ import annotations
@@ -66,4 +66,3 @@ class ReviewHistoryRepository:
             "Review ID not found in history.",
             detail={"review_id": review_id},
         )
-

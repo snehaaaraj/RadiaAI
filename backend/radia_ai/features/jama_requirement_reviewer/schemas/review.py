@@ -1,4 +1,4 @@
-﻿"""Schemas for deterministic requirements review endpoints."""
+"""Schemas for deterministic requirements review endpoints."""
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     DeltaReviewInput,
@@ -15,4 +15,3 @@ __all__ = [
     "RequirementReviewResponse",
     "ReviewVersionResponse",
 ]
-

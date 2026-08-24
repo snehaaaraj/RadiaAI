@@ -67,7 +67,5 @@ def client(test_app) -> TestClient:
 @pytest.fixture
 async def async_client(test_app) -> AsyncClient:
     """Async test client for async endpoint and service tests."""
-    async with AsyncClient(
-        transport=ASGITransport(app=test_app), base_url="http://test"
-    ) as client:
+    async with AsyncClient(transport=ASGITransport(app=test_app), base_url="http://test") as client:
         yield client

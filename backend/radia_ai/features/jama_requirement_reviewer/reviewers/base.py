@@ -24,4 +24,3 @@ class RequirementReviewer(ABC):
     @abstractmethod
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
         """Review a single requirement (deterministic rules only)."""
-

@@ -1,2 +1,1 @@
-﻿"""Jama Requirement Reviewer package."""
-
+"""Jama Requirement Reviewer package."""
