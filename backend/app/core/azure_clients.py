@@ -12,8 +12,8 @@ and reused for the lifetime of the application.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
-import json
 from typing import Any
 
 from azure.core.credentials import AzureKeyCredential
@@ -170,10 +170,8 @@ class SearchService:
         except Exception:
             # Incompatible existing index — delete and recreate
             logger.warning("index_schema_incompatible_recreating", index_name=self._settings.index_name)
-            try:
+            with contextlib.suppress(Exception):
                 self._index_client.delete_index(self._settings.index_name)
-            except Exception:
-                pass
             self._index_client.create_or_update_index(index)
 
         logger.info("search_index_ensured", index_name=self._settings.index_name)

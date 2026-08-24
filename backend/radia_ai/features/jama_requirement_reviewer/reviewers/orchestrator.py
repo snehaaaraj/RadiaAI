@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
@@ -17,14 +17,18 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     ReviewVersionEntry,
     ReviewVersionResponse,
 )
+from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import (
+    normalize_requirement_review_input,
+)
 from radia_ai.features.jama_requirement_reviewer.utils.review_utils import overall_from_statuses
-from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import normalize_requirement_review_input
 
 if TYPE_CHECKING:
     from app.core.config import AppSettings
     from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
     from radia_ai.features.jama_requirement_reviewer.reviewers.base import RequirementReviewer
-    from radia_ai.features.jama_requirement_reviewer.services.standards_service import StandardsService
+    from radia_ai.features.jama_requirement_reviewer.services.standards_service import (
+        StandardsService,
+    )
 
 
 class ReviewOrchestrator:

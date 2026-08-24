@@ -27,7 +27,6 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     FindingSeverity,
     PassFail,
     RequirementReviewInput,
-    ReviewerResult,
     ReviewFinding,
     ReviewStatus,
 )

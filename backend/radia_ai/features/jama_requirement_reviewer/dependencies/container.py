@@ -21,20 +21,39 @@ from app.core.logging import get_logger
 from app.ingestion.service import IngestionService
 from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
-from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import ReviewHistoryRepository
-from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import CertificationReviewer
+from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
+    SharePointStandardsClient,
+)
+from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
+    ReviewHistoryRepository,
+)
+from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import (
+    CertificationReviewer,
+)
 from radia_ai.features.jama_requirement_reviewer.reviewers.language.reviewer import LanguageReviewer
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
-from radia_ai.features.jama_requirement_reviewer.reviewers.structure.reviewer import StructureReviewer
-from radia_ai.features.jama_requirement_reviewer.reviewers.traceability.reviewer import TraceabilityReviewer
-from radia_ai.features.jama_requirement_reviewer.reviewers.verifiability.reviewer import VerifiabilityReviewer
-from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import SharePointStandardsClient
-from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import RequirementReviewService
-from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import RequirementDeltaReviewService
-from radia_ai.features.jama_requirement_reviewer.services.review_history_service import ReviewHistoryService
-from radia_ai.features.jama_requirement_reviewer.services.review_version_service import ReviewVersionService
+from radia_ai.features.jama_requirement_reviewer.reviewers.structure.reviewer import (
+    StructureReviewer,
+)
+from radia_ai.features.jama_requirement_reviewer.reviewers.traceability.reviewer import (
+    TraceabilityReviewer,
+)
+from radia_ai.features.jama_requirement_reviewer.reviewers.verifiability.reviewer import (
+    VerifiabilityReviewer,
+)
+from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import (
+    RequirementDeltaReviewService,
+)
+from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import (
+    RequirementReviewService,
+)
+from radia_ai.features.jama_requirement_reviewer.services.review_history_service import (
+    ReviewHistoryService,
+)
+from radia_ai.features.jama_requirement_reviewer.services.review_version_service import (
+    ReviewVersionService,
+)
 from radia_ai.features.jama_requirement_reviewer.services.standards_service import StandardsService
-
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
 
 logger = get_logger(__name__)

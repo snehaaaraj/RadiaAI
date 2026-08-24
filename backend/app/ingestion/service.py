@@ -8,15 +8,16 @@ Tracks file hashes to skip re-processing unchanged documents.
 
 from __future__ import annotations
 
-import uuid
 from typing import Any
 
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService, compute_file_hash
 from app.core.config import AppSettings
 from app.core.logging import get_logger
-from app.ingestion.chunker import Chunk, chunk_text
+from app.ingestion.chunker import chunk_text
 from app.ingestion.extractor import extract_text
-from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import SharePointStandardsClient
+from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
+    SharePointStandardsClient,
+)
 
 logger = get_logger(__name__)
 
@@ -178,7 +179,7 @@ class IngestionService:
 
         # Build search documents
         search_docs = []
-        for chunk, embedding in zip(chunks, all_embeddings):
+        for chunk, embedding in zip(chunks, all_embeddings, strict=False):
             search_docs.append({
                 "chunk_id": chunk.chunk_id,
                 "content": chunk.content,
