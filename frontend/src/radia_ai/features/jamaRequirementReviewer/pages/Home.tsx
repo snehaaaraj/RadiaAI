@@ -18,7 +18,7 @@ import { ROUTES } from '@/utils/constants';
 const QUICK_ACTIONS = [
   {
     title: 'Single Requirement Review',
-    description: 'Check one requirement for language, structure, and verifiability.',
+    description: 'Review one requirement for multiple quality aspects.',
     icon: <RuleIcon color="secondary" />,
     path: ROUTES.REVIEW_REQUIREMENT,
     label: 'Open single review',

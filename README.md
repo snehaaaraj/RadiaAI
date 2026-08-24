@@ -1,8 +1,8 @@
-# Radia AI
+# Radia AI 2.0
 
-AI-powered Requirements Engineering platform for aerospace teams.
-Uses Azure OpenAI (GPT-5) with Retrieval-Augmented Generation (RAG) against
-indexed standards documents to provide grounded, traceable requirement reviews.
+AI-powered Requirements Engineering platform for aerospace and systems teams.
+Combines deterministic, rule-based requirement quality checks with Retrieval-Augmented Generation (RAG) 
+against indexed standards documents to provide grounded, traceable, and explainable requirement reviews.
 
 ---
 
@@ -322,6 +322,8 @@ pytest --cov=app --cov=radia_ai # with coverage report
 
 **Frontend:** React 18, TypeScript, Vite, MUI v6, React Query v5, Axios, Framer Motion
 
-**AI/ML:** Azure OpenAI GPT-5 (reasoning), text-embedding-3-large (3072d), Azure AI Search (vector + semantic)
+**AI/ML:** Azure OpenAI (GPT-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
 
-**Infrastructure:** Azure App Service / Container Apps
+**Infrastructure:** Azure App Service / Container Apps, Azure OpenAI, Azure AI Search, Azure Blob Storage
+
+**Note:** Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.
