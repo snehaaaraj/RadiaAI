@@ -63,6 +63,7 @@ def _resolve_settings(app: FastAPI) -> AppSettings:
     """Use explicit app-scoped settings when present, else load the default settings."""
     return getattr(app.state, "settings", None) or get_settings()
 
+
 # ---------------------------------------------------------------------------
 # Lifespan - startup and shutdown hooks
 # ---------------------------------------------------------------------------
@@ -127,7 +128,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if sharepoint_client._settings.is_configured:
         try:
             result = ingestion_service.ingest_from_sharepoint()
-            logger.info("sharepoint_auto_sync_complete", **{k: v for k, v in result.items() if k != "details"})
+            logger.info(
+                "sharepoint_auto_sync_complete",
+                **{k: v for k, v in result.items() if k != "details"},
+            )
         except Exception:
             logger.exception("sharepoint_auto_sync_failed")
 

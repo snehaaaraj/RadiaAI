@@ -1,4 +1,4 @@
-﻿"""
+"""
 SharePoint document library client using Microsoft Graph API.
 
 Fetches the list of standard reference documents from the configured SharePoint
@@ -26,32 +26,32 @@ _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 # Maps file extension -> requirement review category tags
 _EXT_CATEGORY_MAP: dict[str, list[str]] = {
-    ".pdf":  ["reference"],
+    ".pdf": ["reference"],
     ".docx": ["reference"],
-    ".doc":  ["reference"],
+    ".doc": ["reference"],
     ".xlsx": ["reference"],
-    ".xls":  ["reference"],
+    ".xls": ["reference"],
     ".pptx": ["reference"],
-    ".txt":  ["reference"],
-    ".md":   ["reference"],
+    ".txt": ["reference"],
+    ".md": ["reference"],
 }
 
 # Category hints derived from filename keywords
 _KEYWORD_CATEGORY_MAP: list[tuple[str, list[str]]] = [
-    ("incose",       ["language", "verifiability", "structure"]),
-    ("ears",         ["language", "structure"]),
-    ("style guide",  ["language", "structure", "naming"]),
-    ("style_guide",  ["language", "structure", "naming"]),
-    ("cert",         ["certification", "traceability", "verification"]),
-    ("do-178",       ["certification"]),
-    ("do-254",       ["certification"]),
-    ("arp4754",      ["certification"]),
-    ("trace",        ["traceability"]),
-    ("verif",        ["verifiability"]),
-    ("structure",    ["structure"]),
-    ("language",     ["language"]),
-    ("naming",       ["naming"]),
-    ("safety",       ["certification"]),
+    ("incose", ["language", "verifiability", "structure"]),
+    ("ears", ["language", "structure"]),
+    ("style guide", ["language", "structure", "naming"]),
+    ("style_guide", ["language", "structure", "naming"]),
+    ("cert", ["certification", "traceability", "verification"]),
+    ("do-178", ["certification"]),
+    ("do-254", ["certification"]),
+    ("arp4754", ["certification"]),
+    ("trace", ["traceability"]),
+    ("verif", ["verifiability"]),
+    ("structure", ["structure"]),
+    ("language", ["language"]),
+    ("naming", ["naming"]),
+    ("safety", ["certification"]),
 ]
 
 
@@ -242,7 +242,9 @@ class SharePointStandardsClient:
                     if not download_url:
                         # Build download URL from item id
                         item_id = item.get("id", "")
-                        download_url = f"{_GRAPH_BASE}/drives/{self._drive_id}/items/{item_id}/content"
+                        download_url = (
+                            f"{_GRAPH_BASE}/drives/{self._drive_id}/items/{item_id}/content"
+                        )
 
                     resp = client.get(
                         download_url,
@@ -251,12 +253,16 @@ class SharePointStandardsClient:
                         follow_redirects=True,
                     )
                     resp.raise_for_status()
-                    files.append({
-                        "name": name,
-                        "content": resp.content,
-                        "url": item.get("webUrl", ""),
-                        "document_type": _categories_from_name(name)[0] if _categories_from_name(name) else "reference",
-                    })
+                    files.append(
+                        {
+                            "name": name,
+                            "content": resp.content,
+                            "url": item.get("webUrl", ""),
+                            "document_type": _categories_from_name(name)[0]
+                            if _categories_from_name(name)
+                            else "reference",
+                        }
+                    )
 
                 logger.info("sharepoint_files_downloaded", count=len(files))
                 return files

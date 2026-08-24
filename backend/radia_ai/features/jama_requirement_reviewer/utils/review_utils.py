@@ -1,4 +1,4 @@
-﻿"""Utility functions for review status aggregation and processing."""
+"""Utility functions for review status aggregation and processing."""
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import ReviewStatus
 

@@ -45,12 +45,9 @@ async def chat(
         top_k=body.top_k,
     )
 
-    # Stub response — replaced in Phase 4
+    # Stub response
     stub_response = ChatResponse(
-        answer=(
-            "This is a Phase 1 stub response. "
-            "The RAG pipeline will be wired in Phase 4."
-        ),
+        answer=("This is a Phase 1 stub response."),
         citations=[],
         model="stub",
         retrieval_count=0,

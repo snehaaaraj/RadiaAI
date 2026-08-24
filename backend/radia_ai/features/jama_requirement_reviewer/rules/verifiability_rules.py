@@ -1,4 +1,4 @@
-﻿"""Rule constants for deterministic verifiability review."""
+"""Rule constants for deterministic verifiability review."""
 
 OPERATING_CONDITION_HINTS = {
     "under",
@@ -15,5 +15,3 @@ UNMEASURABLE_TERMS = {
     "minimal",
     "sufficient",
 }
-
-

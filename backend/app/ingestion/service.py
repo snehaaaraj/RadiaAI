@@ -61,7 +61,9 @@ class IngestionService:
 
                 if file_hash in indexed_hashes:
                     results["skipped"] += 1
-                    results["details"].append({"filename": blob_info["name"], "status": "skipped", "reason": "unchanged"})
+                    results["details"].append(
+                        {"filename": blob_info["name"], "status": "skipped", "reason": "unchanged"}
+                    )
                     continue
 
                 self._process_document(
@@ -76,7 +78,9 @@ class IngestionService:
             except Exception as e:
                 logger.exception("blob_ingest_failed", filename=blob_info["name"])
                 results["failed"] += 1
-                results["details"].append({"filename": blob_info["name"], "status": "failed", "error": str(e)})
+                results["details"].append(
+                    {"filename": blob_info["name"], "status": "failed", "error": str(e)}
+                )
 
         return results
 
@@ -119,13 +123,23 @@ class IngestionService:
                 results["details"].append({"filename": file_info["name"], "status": "indexed"})
 
             except Exception as e:
-                logger.exception("sharepoint_ingest_failed", filename=file_info.get("name", "unknown"))
+                logger.exception(
+                    "sharepoint_ingest_failed", filename=file_info.get("name", "unknown")
+                )
                 results["failed"] += 1
-                results["details"].append({"filename": file_info.get("name", "unknown"), "status": "failed", "error": str(e)})
+                results["details"].append(
+                    {
+                        "filename": file_info.get("name", "unknown"),
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
 
         return results
 
-    def ingest_raw_document(self, data: bytes, filename: str, source: str = "upload") -> dict[str, Any]:
+    def ingest_raw_document(
+        self, data: bytes, filename: str, source: str = "upload"
+    ) -> dict[str, Any]:
         """Ingest a single raw document (e.g. from a manual upload endpoint)."""
         file_hash = compute_file_hash(data)
         indexed_hashes = self._search.get_indexed_file_hashes()
@@ -180,18 +194,20 @@ class IngestionService:
         # Build search documents
         search_docs = []
         for chunk, embedding in zip(chunks, all_embeddings, strict=False):
-            search_docs.append({
-                "chunk_id": chunk.chunk_id,
-                "content": chunk.content,
-                "content_vector": embedding,
-                "source": chunk.source,
-                "filename": chunk.filename,
-                "document_type": chunk.document_type or document_type,
-                "section": chunk.section,
-                "page_number": chunk.page_number or 0,
-                "chunk_index": chunk.chunk_index,
-                "file_hash": chunk.file_hash,
-            })
+            search_docs.append(
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "content": chunk.content,
+                    "content_vector": embedding,
+                    "source": chunk.source,
+                    "filename": chunk.filename,
+                    "document_type": chunk.document_type or document_type,
+                    "section": chunk.section,
+                    "page_number": chunk.page_number or 0,
+                    "chunk_index": chunk.chunk_index,
+                    "file_hash": chunk.file_hash,
+                }
+            )
 
         self._search.upload_documents(search_docs)
         logger.info("document_indexed", filename=filename, chunks=len(search_docs))

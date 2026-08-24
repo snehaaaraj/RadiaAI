@@ -112,8 +112,8 @@ def _flag_unmeasurable_terms(text: str, terms: list[str]) -> str:
     result = text
     for term in terms:
         result = re.sub(
-            rf'\b{re.escape(term)}\b',
-            f'[QUANTIFY: {term} -> specify numeric threshold]',
+            rf"\b{re.escape(term)}\b",
+            f"[QUANTIFY: {term} -> specify numeric threshold]",
             result,
             flags=re.IGNORECASE,
         )

@@ -179,9 +179,7 @@ class LLMReviewEnhancer:
             "the standards in the context, and identify the EXACT source document.\n",
         ]
         for i, f in enumerate(findings, 1):
-            parts.append(
-                f"{i}. [{f.category}] {f.explanation} | Evidence: {f.evidence}"
-            )
+            parts.append(f"{i}. [{f.category}] {f.explanation} | Evidence: {f.evidence}")
         if not findings:
             parts.append(
                 "No deterministic issues found. Perform a deeper analysis based on "

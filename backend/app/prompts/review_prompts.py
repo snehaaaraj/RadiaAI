@@ -48,4 +48,3 @@ Respond with this JSON schema (keep each field SHORT — max 1-2 sentences):
 }
 
 IMPORTANT: Every finding MUST include a "suggested_rewrite" with the complete rewritten requirement text. Never return null for this field."""
-

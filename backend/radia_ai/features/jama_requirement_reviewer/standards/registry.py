@@ -1,4 +1,4 @@
-﻿"""Deterministic standards registry."""
+"""Deterministic standards registry."""
 
 from radia_ai.features.jama_requirement_reviewer.models.standards_models import StandardReference
 
@@ -41,5 +41,3 @@ class StandardsRegistry:
                 description="Certification and verification planning guidance.",
             ),
         ]
-
-

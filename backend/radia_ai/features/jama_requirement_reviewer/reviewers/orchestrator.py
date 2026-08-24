@@ -217,8 +217,13 @@ class ReviewOrchestrator:
 
     # Generic fallback labels that need resolution to actual documents
     _FALLBACK_REFERENCES = {
-        "incose", "ears", "company style guide", "internal engineering standards",
-        "cert-guidance", "certification guidance", "company-style-guide",
+        "incose",
+        "ears",
+        "company style guide",
+        "internal engineering standards",
+        "cert-guidance",
+        "certification guidance",
+        "company-style-guide",
     }
 
     def _enrich_findings(self, findings: list) -> list:

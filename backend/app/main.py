@@ -130,9 +130,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
     """Register global exception handlers that convert exceptions to JSON."""
 
     @app.exception_handler(RadiaBaseException)
-    async def radia_exception_handler(
-        request: Request, exc: RadiaBaseException
-    ) -> JSONResponse:
+    async def radia_exception_handler(request: Request, exc: RadiaBaseException) -> JSONResponse:
         """Map domain exceptions to standardized JSON error responses."""
         logger.warning(
             "domain_exception",
@@ -172,9 +170,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """
         Catch-all for unexpected exceptions.
 

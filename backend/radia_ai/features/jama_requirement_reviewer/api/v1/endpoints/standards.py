@@ -1,4 +1,4 @@
-﻿"""Standards catalog endpoints."""
+"""Standards catalog endpoints."""
 
 from fastapi import APIRouter, Request, status
 
@@ -20,5 +20,3 @@ async def list_standards(
     service: StandardsServiceDep,
 ) -> APIResponse[StandardsResponse]:
     return APIResponse(data=service.list_standards(), request_id=request.state.request_id)
-
-

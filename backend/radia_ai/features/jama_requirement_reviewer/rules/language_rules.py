@@ -1,4 +1,4 @@
-﻿"""Rule constants for deterministic language review."""
+"""Rule constants for deterministic language review."""
 
 AMBIGUOUS_WORDS = {
     "fast",
@@ -26,5 +26,3 @@ SUBJECTIVE_WORDS = {
     "acceptable",
     "normal",
 }
-
-

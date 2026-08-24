@@ -1,4 +1,4 @@
-﻿"""Requirements review endpoints."""
+"""Requirements review endpoints."""
 
 from fastapi import APIRouter, Request, status
 
@@ -132,4 +132,3 @@ async def apply_finding_disposition(
 ) -> APIResponse[ReviewHistoryEntry]:
     updated_entry = service.apply_disposition(review_id=review_id, payload=body)
     return APIResponse(data=updated_entry, request_id=request.state.request_id)
-

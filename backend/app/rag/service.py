@@ -56,12 +56,14 @@ class RetrievedContext:
             filename = chunk.get("filename", "")
             if filename and filename not in seen:
                 seen.add(filename)
-                refs.append({
-                    "filename": filename,
-                    "source": chunk.get("source", ""),
-                    "document_type": chunk.get("document_type", ""),
-                    "section": chunk.get("section", ""),
-                })
+                refs.append(
+                    {
+                        "filename": filename,
+                        "source": chunk.get("source", ""),
+                        "document_type": chunk.get("document_type", ""),
+                        "section": chunk.get("section", ""),
+                    }
+                )
         return refs
 
 
@@ -98,14 +100,20 @@ class RAGService:
 
         if not diversify:
             results = self._search.search(
-                query=query, mode=mode, top_k=effective_top_k, filters=filters,
+                query=query,
+                mode=mode,
+                top_k=effective_top_k,
+                filters=filters,
             )
             return RetrievedContext(chunks=results, query=query, mode=mode)
 
         # Fetch a larger pool and diversify across source documents
         pool_size = max(effective_top_k * 5, 25)
         raw_results = self._search.search(
-            query=query, mode=mode, top_k=pool_size, filters=filters,
+            query=query,
+            mode=mode,
+            top_k=pool_size,
+            filters=filters,
         )
 
         diversified = _diversify_by_source(raw_results, effective_top_k)
@@ -142,7 +150,9 @@ class RAGService:
 
         return self._openai.chat_completion(
             messages,
-            temperature=temperature if temperature is not None else self._settings.azure_openai.temperature,
+            temperature=temperature
+            if temperature is not None
+            else self._settings.azure_openai.temperature,
         )
 
 

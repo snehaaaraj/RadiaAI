@@ -1,4 +1,4 @@
-﻿"""Service for storing review history and managing finding dispositions."""
+"""Service for storing review history and managing finding dispositions."""
 # ruff: noqa: TC001
 
 from __future__ import annotations
@@ -83,4 +83,3 @@ class ReviewHistoryService:
 
     def _utc_now(self) -> str:
         return datetime.now(UTC).isoformat()
-
