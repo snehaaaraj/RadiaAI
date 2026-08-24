@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { useBeforeUnload } from 'react-router-dom';
-import { useNavigationGuardContext } from '@/context/useNavigationGuardContext';
+import { useNavigationGuardContext } from '@/context/NavigationGuardContext';
 
 /**
  * Call this in a page component to register whether it has unsaved/in-progress state.
