@@ -11,7 +11,7 @@ Wires the LLM review enhancer into all reviewers for hybrid (rules + AI) review.
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, FastAPI, Request
 
@@ -278,7 +278,7 @@ StandardsServiceDep = Annotated[StandardsService, Depends(get_standards_service)
 
 def get_search_service(request: Request) -> SearchService:
     """Resolve Azure AI Search service from application state."""
-    return request.app.state.search_service
+    return cast(SearchService, request.app.state.search_service)
 
 
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
@@ -286,7 +286,7 @@ SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
 
 def get_rag_service(request: Request) -> RAGService:
     """Resolve RAG service from application state."""
-    return request.app.state.rag_service
+    return cast(RAGService, request.app.state.rag_service)
 
 
 RAGServiceDep = Annotated[RAGService, Depends(get_rag_service)]
@@ -294,7 +294,7 @@ RAGServiceDep = Annotated[RAGService, Depends(get_rag_service)]
 
 def get_ingestion_service(request: Request) -> IngestionService:
     """Resolve ingestion service from application state."""
-    return request.app.state.ingestion_service
+    return cast(IngestionService, request.app.state.ingestion_service)
 
 
 IngestionServiceDep = Annotated[IngestionService, Depends(get_ingestion_service)]
