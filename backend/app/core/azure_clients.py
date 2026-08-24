@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
-from typing import Any
+from typing import Any, cast
 
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
@@ -317,7 +317,7 @@ class BlobStorageClient:
             overwrite=True,
             content_settings=ContentSettings(content_type=content_type),
         )
-        return blob_client.url
+        return cast(str, blob_client.url)
 
     def download_blob(self, blob_name: str) -> bytes:
         """Download blob content as bytes."""

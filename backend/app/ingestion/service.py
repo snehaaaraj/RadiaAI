@@ -8,7 +8,7 @@ Tracks file hashes to skip re-processing unchanged documents.
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, TypedDict, cast
 
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService, compute_file_hash
 from app.core.config import AppSettings
@@ -16,6 +16,7 @@ from app.core.logging import get_logger
 from app.ingestion.chunker import chunk_text
 from app.ingestion.extractor import extract_text
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
+    SharePointFileContent,
     SharePointStandardsClient,
 )
 
@@ -23,6 +24,20 @@ logger = get_logger(__name__)
 
 # Max texts per embedding API call
 _EMBEDDING_BATCH_SIZE = 16
+
+
+class IngestionDetail(TypedDict, total=False):
+    filename: str
+    status: str
+    reason: str
+    error: str
+
+
+class IngestionResult(TypedDict):
+    processed: int
+    skipped: int
+    failed: int
+    details: list[IngestionDetail]
 
 
 class IngestionService:
@@ -52,7 +67,7 @@ class IngestionService:
             blobs = [b for b in blobs if b["name"] in document_ids]
 
         indexed_hashes = self._search.get_indexed_file_hashes()
-        results = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
+        results: IngestionResult = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
 
         for blob_info in blobs:
             try:
@@ -82,19 +97,19 @@ class IngestionService:
                     {"filename": blob_info["name"], "status": "failed", "error": str(e)}
                 )
 
-        return results
+        return cast(dict[str, Any], results)
 
     def ingest_from_sharepoint(self) -> dict[str, Any]:
         """Sync standards documents from SharePoint into the search index."""
         if self._sharepoint is None or not self._sharepoint._settings.is_configured:
             return {"status": "skipped", "message": "SharePoint not configured"}
 
-        files = self._sharepoint.fetch_file_contents()
+        files: list[SharePointFileContent] = self._sharepoint.fetch_file_contents()
         if not files:
             return {"status": "skipped", "message": "No files retrieved from SharePoint"}
 
         indexed_hashes = self._search.get_indexed_file_hashes()
-        results = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
+        results: IngestionResult = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
 
         for file_info in files:
             try:
@@ -135,7 +150,7 @@ class IngestionService:
                     }
                 )
 
-        return results
+        return cast(dict[str, Any], results)
 
     def ingest_raw_document(
         self, data: bytes, filename: str, source: str = "upload"

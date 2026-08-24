@@ -7,7 +7,7 @@ environment (or a .env file during local development). Nothing is hardcoded here
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -18,6 +18,26 @@ _PROJECT_ROOT = _BACKEND_DIR.parent  # RadiaAi-2.0/
 _ENV_FILE = (
     str(_BACKEND_DIR / ".env") if (_BACKEND_DIR / ".env").exists() else str(_PROJECT_ROOT / ".env")
 )
+
+
+def _azure_openai_settings_factory() -> "AzureOpenAISettings":
+    return cast(AzureOpenAISettings, cast(Any, AzureOpenAISettings)())
+
+
+def _azure_search_settings_factory() -> "AzureSearchSettings":
+    return cast(AzureSearchSettings, cast(Any, AzureSearchSettings)())
+
+
+def _azure_blob_settings_factory() -> "AzureBlobSettings":
+    return cast(AzureBlobSettings, cast(Any, AzureBlobSettings)())
+
+
+def _entra_id_settings_factory() -> "EntraIDSettings":
+    return cast(EntraIDSettings, cast(Any, EntraIDSettings)())
+
+
+def _sharepoint_settings_factory() -> "SharePointSettings":
+    return cast(SharePointSettings, cast(Any, SharePointSettings)())
 
 
 class AzureOpenAISettings(BaseSettings):
@@ -148,11 +168,11 @@ class AppSettings(BaseSettings):
     chunk_overlap: int = Field(default=64, ge=0, le=512, description="Token overlap between chunks")
 
     # --- Sub-settings (populated from prefixed env vars) ---
-    azure_openai: AzureOpenAISettings = Field(default_factory=AzureOpenAISettings)
-    azure_search: AzureSearchSettings = Field(default_factory=AzureSearchSettings)
-    azure_blob: AzureBlobSettings = Field(default_factory=AzureBlobSettings)
-    entra: EntraIDSettings = Field(default_factory=EntraIDSettings)
-    sharepoint: SharePointSettings = Field(default_factory=SharePointSettings)
+    azure_openai: AzureOpenAISettings = Field(default_factory=_azure_openai_settings_factory)
+    azure_search: AzureSearchSettings = Field(default_factory=_azure_search_settings_factory)
+    azure_blob: AzureBlobSettings = Field(default_factory=_azure_blob_settings_factory)
+    entra: EntraIDSettings = Field(default_factory=_entra_id_settings_factory)
+    sharepoint: SharePointSettings = Field(default_factory=_sharepoint_settings_factory)
 
     @field_validator("debug")
     @classmethod

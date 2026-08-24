@@ -14,6 +14,7 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     RequirementReviewInput,
     RequirementReviewResponse,
     ReviewFinding,
+    ReviewStatus,
     ReviewVersionEntry,
     ReviewVersionResponse,
 )
@@ -74,7 +75,7 @@ class ReviewOrchestrator:
         enriched = self._enrich_findings(merged)
 
         # Build category results from merged findings
-        category_statuses: dict[str, list] = {}
+        category_statuses: dict[str, list[ReviewStatus]] = {}
         for f in enriched:
             category_statuses.setdefault(f.reviewer, []).append(f.status)
 
@@ -86,7 +87,7 @@ class ReviewOrchestrator:
         category_results = [
             CategoryResult(
                 category=name,
-                status=overall_from_statuses(statuses) if statuses else "Acceptable",
+                status=overall_from_statuses(statuses) if statuses else ReviewStatus.ACCEPTABLE,
             )
             for name, statuses in category_statuses.items()
         ]
@@ -226,7 +227,7 @@ class ReviewOrchestrator:
         "company-style-guide",
     }
 
-    def _enrich_findings(self, findings: list) -> list:
+    def _enrich_findings(self, findings: list[ReviewFinding]) -> list[ReviewFinding]:
         """Resolve references to actual SharePoint document names/URLs.
 
         - Fallback labels (INCOSE, EARS, etc.): resolve both name and URL.
