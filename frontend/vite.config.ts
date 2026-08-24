@@ -1,14 +1,18 @@
 import { defineConfig } from 'vitest/config';
 import { loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
-import path from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd(), '');
+  const repoRoot = decodeURIComponent(new URL('..', import.meta.url).pathname).replace(
+    /^\/([A-Za-z]:)/,
+    '$1'
+  );
+  const env = loadEnv(mode, repoRoot, '');
   const devProxyTarget = env.VITE_DEV_PROXY_TARGET ?? 'http://localhost:8000';
 
   return {
+    envDir: repoRoot,
     plugins: [react()],
     resolve: {
       alias: {
