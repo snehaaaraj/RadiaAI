@@ -136,7 +136,9 @@ class DummyIngestionService:
         self.sharepoint_calls += 1
         return {"processed": 3, "skipped": 0, "failed": 0}
 
-    def ingest_raw_document(self, data: bytes, filename: str, source: str = "upload") -> dict[str, str]:
+    def ingest_raw_document(
+        self, data: bytes, filename: str, source: str = "upload"
+    ) -> dict[str, str]:
         self.raw_calls.append((data, filename, source))
         return {"status": "indexed", "filename": filename}
 
