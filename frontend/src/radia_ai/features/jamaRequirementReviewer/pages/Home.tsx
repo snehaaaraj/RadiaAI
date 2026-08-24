@@ -34,7 +34,7 @@ const QUICK_ACTIONS = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const { data: health, isLoading, isError } = useHealth();
+  const { data: health, isLoading } = useHealth();
   const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
 
@@ -66,13 +66,11 @@ export default function Home() {
           </Typography>
           {isLoading ? (
             <Chip label="Checking..." size="small" />
-          ) : isError ? (
-            <Chip label="API unavailable" color="error" size="small" variant="outlined" />
           ) : (
             <Chip
               icon={<CheckCircleIcon />}
               label={`API ${health?.status ?? 'unknown'} — v${health?.version ?? '—'}`}
-              color={health?.status === 'ok' ? 'success' : health?.status === 'degraded' ? 'warning' : 'error'}
+              color={health?.status === 'ok' ? 'success' : 'warning'}
               size="small"
               variant="outlined"
             />
