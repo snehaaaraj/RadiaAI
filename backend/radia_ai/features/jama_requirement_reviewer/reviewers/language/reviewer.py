@@ -1,4 +1,4 @@
-﻿"""Language reviewer with deterministic rule checks."""
+"""Language reviewer with deterministic rule checks."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from radia_ai.features.jama_requirement_reviewer.rules.language_rules import AMB
 
 class LanguageReviewer(RequirementReviewer):
     name = "language"
-    reviewer_version = "1.0.0"
-    prompt_version = "language.v1"
-    standards_version = "incose.v1"
+    reviewer_version = "2.0.0"
+    prompt_version = "language.v2"
+    standards_version = "rag-live"
     supports_individual_review = True
 
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
@@ -110,10 +110,7 @@ class LanguageReviewer(RequirementReviewer):
                         "Rewrite sentence in active voice with a clear responsible subject."
                     ),
                     reference="INCOSE",
-                    suggested_rewrite=(
-                        "Identify the responsible system/actor and rewrite using active voice, e.g.:\n"
-                        f"  The [system] shall [active verb] ... (replacing '{passive_phrase}')"
-                    ),
+                    suggested_rewrite=None,
                 )
             )
 

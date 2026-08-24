@@ -50,7 +50,7 @@ export default function Home() {
             Jama Requirement Reviewer
           </Typography>
           <Typography variant="body1" color="text.secondary" maxWidth={720}>
-            Feature workspace for deterministic requirement review, traceability, standards coverage, and revision-quality workflows.
+            Feature workspace for AI-powered requirement review, traceability, standards coverage, and revision-quality workflows.
           </Typography>
         </Box>
       </motion.div>

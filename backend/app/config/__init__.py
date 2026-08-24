@@ -1,1 +1,1 @@
-"""Azure service configuration objects (Phase 2)."""
+"""Azure service configuration objects."""

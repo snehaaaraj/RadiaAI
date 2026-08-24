@@ -1,4 +1,4 @@
-﻿"""Requirement structure reviewer with deterministic rule checks."""
+"""Requirement structure reviewer with deterministic rule checks."""
 
 from __future__ import annotations
 
@@ -17,9 +17,9 @@ from radia_ai.features.jama_requirement_reviewer.rules.structure_rules import RE
 
 class StructureReviewer(RequirementReviewer):
     name = "structure"
-    reviewer_version = "1.0.0"
-    prompt_version = "structure.v1"
-    standards_version = "incose.v1"
+    reviewer_version = "2.0.0"
+    prompt_version = "structure.v2"
+    standards_version = "rag-live"
     supports_individual_review = True
 
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:

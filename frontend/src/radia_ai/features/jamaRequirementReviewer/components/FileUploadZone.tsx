@@ -5,9 +5,9 @@ import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
-import mammoth from 'mammoth/mammoth.browser';
 import * as pdfjsLib from 'pdfjs-dist';
 import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
+import { cleanExtractedText } from './fileUploadTextCleaner';
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -23,14 +23,6 @@ interface FileUploadZoneProps {
   onClear?: () => void;
 }
 
-function normalizeText(content: string) {
-  return content
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
-    .map((line) => line.replace(/[ \t]+$/g, ''))
-    .join('\n')
-    .trim();
-}
 
 async function extractPdfText(arrayBuffer: ArrayBuffer) {
   const document = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
@@ -39,15 +31,21 @@ async function extractPdfText(arrayBuffer: ArrayBuffer) {
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
     const page = await document.getPage(pageNumber);
     const textContent = await page.getTextContent();
-    const pageText = textContent.items
-      .map((item) => ('str' in item ? item.str : ''))
-      .join(' ')
-      .replace(/\s+/g, ' ')
-      .trim();
-    if (pageText) pageTexts.push(pageText);
+
+    // Preserve line breaks by checking the hasEOL flag on each item
+    let pageText = '';
+    for (const item of textContent.items) {
+      if (!('str' in item)) continue;
+      pageText += item.str;
+      if ((item as { hasEOL?: boolean }).hasEOL) pageText += '\n';
+      else pageText += ' ';
+    }
+    const trimmed = pageText.trim();
+    if (trimmed) pageTexts.push(trimmed);
   }
 
-  return normalizeText(pageTexts.join('\n\n'));
+  const fullText = pageTexts.join('\n\n');
+  return cleanExtractedText(fullText);
 }
 
 export function FileUploadZone({ accept, label, onFileContent, filename, onClear }: FileUploadZoneProps) {
@@ -59,24 +57,9 @@ export function FileUploadZone({ accept, label, onFileContent, filename, onClear
     async (file: File) => {
       setReadError('');
       const lowerName = file.name.toLowerCase();
-      const isDocx =
-        lowerName.endsWith('.docx') ||
-        file.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       const isPdf = lowerName.endsWith('.pdf') || file.type === 'application/pdf';
 
       try {
-        if (lowerName.endsWith('.doc')) {
-          setReadError('Legacy .doc files are not supported. Please upload a .docx, .pdf, or .txt file.');
-          return;
-        }
-
-        if (isDocx) {
-          const arrayBuffer = await file.arrayBuffer();
-          const result = await mammoth.extractRawText({ arrayBuffer });
-          onFileContent(normalizeText(result.value), file.name);
-          return;
-        }
-
         if (isPdf) {
           const arrayBuffer = await file.arrayBuffer();
           const content = await extractPdfText(arrayBuffer);
@@ -85,7 +68,7 @@ export function FileUploadZone({ accept, label, onFileContent, filename, onClear
         }
 
         const content = await file.text();
-        onFileContent(normalizeText(content), file.name);
+        onFileContent(cleanExtractedText(content), file.name);
       } catch {
         setReadError('Failed to read file.');
       }

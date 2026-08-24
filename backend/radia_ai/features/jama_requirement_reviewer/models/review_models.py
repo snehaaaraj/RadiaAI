@@ -1,4 +1,4 @@
-﻿"""Deterministic requirements review domain models."""
+"""Hybrid (deterministic + LLM) requirements review domain models."""
 
 from __future__ import annotations
 

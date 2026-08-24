@@ -21,7 +21,7 @@ import { APP_NAME, HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 
 const highlights = [
   {
-    title: 'Deterministic Reviews',
+    title: 'AI-Powered Reviews',
     description: 'Every result is structured, explainable, and repeatable across teams.',
     icon: <BuildCircleIcon color="primary" />,
   },

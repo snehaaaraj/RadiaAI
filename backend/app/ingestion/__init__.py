@@ -1,1 +1,1 @@
-"""Document ingestion pipeline (Phase 2)."""
+"""Document ingestion pipeline — text extraction, chunking, embedding, and indexing."""

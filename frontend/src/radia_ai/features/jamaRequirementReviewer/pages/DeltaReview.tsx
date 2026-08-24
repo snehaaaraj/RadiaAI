@@ -22,6 +22,7 @@ import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import { useApplyFindingDisposition } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 
 const BASELINE_SAMPLE = JSON.stringify(
@@ -228,7 +229,7 @@ export default function DeltaReview() {
           Delta Review
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Incremental deterministic review for changed requirements only.
+          Incremental AI-powered review for changed requirements only.
         </Typography>
       </Box>
 
@@ -457,7 +458,7 @@ export default function DeltaReview() {
         </Stack>
       </Paper>
 
-      {isError && <Alert severity="error">Delta review failed: {(error as Error).message}</Alert>}
+      {isError && <Alert severity="error">Delta review failed: {getApiErrorMessage(error)}</Alert>}
 
       {activeResult && (
         <Stack spacing={2} ref={resultRef}>

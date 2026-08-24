@@ -13,6 +13,7 @@ import { useMutation } from '@tanstack/react-query';
 import { searchDocuments } from '@/api/search';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { SearchMode, SearchResult } from '@/types/api';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 
 export default function Search() {
   const [query, setQuery] = useState('');
@@ -62,7 +63,7 @@ export default function Search() {
       {/* Results */}
       {isPending && <LoadingSpinner message="Searching…" />}
       {isError && (
-        <Typography color="error">Search failed: {(error as Error).message}</Typography>
+        <Typography color="error">Search failed: {getApiErrorMessage(error)}</Typography>
       )}
       {data && (
         <Box>

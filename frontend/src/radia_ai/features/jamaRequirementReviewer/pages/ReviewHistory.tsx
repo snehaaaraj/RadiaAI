@@ -14,6 +14,7 @@ import { ReviewStatusChip } from '@/radia_ai/features/jamaRequirementReviewer/co
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useReviewHistory } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import type { FindingDispositionStatus, ReviewWorkflow } from '@/types/api';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 import { reviewHistoryStyles } from './ReviewHistory.styles';
 
@@ -61,7 +62,7 @@ export default function ReviewHistory() {
   };
 
   if (isLoading) return <LoadingSpinner message="Loading review history..." />;
-  if (isError) return <Alert severity="error">Failed to load history: {(error as Error).message}</Alert>;
+  if (isError) return <Alert severity="error">Failed to load history: {getApiErrorMessage(error)}</Alert>;
 
   return (
     <Stack spacing={3}>

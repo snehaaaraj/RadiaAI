@@ -29,7 +29,7 @@ const TOOL_RESOURCES: ToolResource[] = [
     id: 'jama-requirement-review',
     label: 'Jama Requirement Review',
     description:
-      'Run deterministic quality checks for Jama requirements with explainable findings/suggestions and resource traceability-ready outputs.',
+      'Run AI-powered quality checks for Jama requirements with explainable findings/suggestions and resource traceability-ready outputs.',
     route: ROUTES.HOME,
     ctaLabel: 'Open workspace',
   },

@@ -1,13 +1,12 @@
-﻿"""
+"""
 Dependency injection container.
 
 This module is the single place where concrete implementations are wired to
 abstract interfaces. Endpoint handlers declare what they need via type annotations
 and Depends(); this module provides the actual instances.
 
-Phase 1: Only settings and auth are wired.
-Phase 2+: Azure service wrappers will be registered here as singletons
-          using FastAPI's lifespan context manager pattern.
+Initialises Azure OpenAI, Azure AI Search, and Blob Storage clients at startup.
+Wires the LLM review enhancer into all reviewers for hybrid (rules + AI) review.
 """
 
 from collections.abc import AsyncGenerator
@@ -16,8 +15,12 @@ from typing import Annotated
 
 from fastapi import Depends, FastAPI, Request
 
+from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
+from app.ingestion.service import IngestionService
+from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
+from app.rag.service import RAGService
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import ReviewHistoryRepository
 from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import CertificationReviewer
 from radia_ai.features.jama_requirement_reviewer.reviewers.language.reviewer import LanguageReviewer
@@ -51,11 +54,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
     FastAPI lifespan context manager.
 
-    Startup: initialise shared resources (Azure clients, connection pools).
+    Startup: initialise Azure clients, RAG pipeline, ingestion service,
+             and hybrid review orchestrator.
     Shutdown: gracefully close connections and flush logs.
-
-    Phase 2 will instantiate Azure service wrappers here and attach them to
-    app.state so they can be injected into request handlers.
     """
     settings = _resolve_settings(app)
     logger.info(
@@ -65,14 +66,59 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         environment=settings.environment,
     )
 
+    # Azure clients
+    openai_client = OpenAIClient(settings.azure_openai)
+    search_service = SearchService(settings.azure_search, openai_client, settings)
+    blob_client = BlobStorageClient(settings.azure_blob)
+
+    # Ensure the search index exists with the correct schema
+    try:
+        search_service.ensure_index()
+    except Exception:
+        logger.exception("search_index_creation_failed")
+
+    app.state.openai_client = openai_client
+    app.state.search_service = search_service
+    app.state.blob_client = blob_client
+
+    # RAG service
+    rag_service = RAGService(settings, openai_client, search_service)
+    app.state.rag_service = rag_service
+
+    # LLM review enhancer
+    llm_enhancer = LLMReviewEnhancer(rag_service)
+    app.state.llm_enhancer = llm_enhancer
+
+    # SharePoint + Standards
     sharepoint_client = SharePointStandardsClient(settings.sharepoint)
     app.state.standards_service = StandardsService(StandardsRegistry(), sharepoint_client)
+    app.state.sharepoint_client = sharepoint_client
+
+    # Ingestion service
+    ingestion_service = IngestionService(
+        settings=settings,
+        openai_client=openai_client,
+        search_service=search_service,
+        blob_client=blob_client,
+        sharepoint_client=sharepoint_client,
+    )
+    app.state.ingestion_service = ingestion_service
+
+    # Auto-sync standards from SharePoint at startup (non-blocking)
+    if sharepoint_client._settings.is_configured:
+        try:
+            result = ingestion_service.ingest_from_sharepoint()
+            logger.info("sharepoint_auto_sync_complete", **{k: v for k, v in result.items() if k != "details"})
+        except Exception:
+            logger.exception("sharepoint_auto_sync_failed")
+
+    # Review orchestrator (hybrid: deterministic rules + LLM+RAG)
     app.state.review_orchestrator = _build_review_orchestrator(
         settings,
         app.state.standards_service,
+        llm_enhancer,
     )
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
-    app.state.sharepoint_client = sharepoint_client
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
     app.state.review_history_repository = ReviewHistoryRepository()
     app.state.review_history_service = ReviewHistoryService(app.state.review_history_repository)
@@ -80,11 +126,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         app.state.requirement_review_service,
         app.state.review_version_service,
     )
-
-    # Phase 2: initialise Azure clients here, e.g.:
-    # app.state.search_service = AzureSearchService(settings.azure_search)
-    # app.state.openai_service = AzureOpenAIService(settings.azure_openai)
-    # app.state.blob_service = BlobStorageService(settings.azure_blob)
 
     yield  # application runs
 
@@ -99,9 +140,11 @@ SettingsDep = Annotated[AppSettings, Depends(get_settings)]
 
 
 def _build_review_orchestrator(
-    settings: AppSettings, standards_service: StandardsService | None = None
+    settings: AppSettings,
+    standards_service: StandardsService | None = None,
+    llm_enhancer: LLMReviewEnhancer | None = None,
 ) -> ReviewOrchestrator:
-    """Construct the deterministic review orchestrator with registered reviewers."""
+    """Construct the hybrid review orchestrator with registered reviewers."""
     return ReviewOrchestrator(
         settings=settings,
         reviewers=[
@@ -112,7 +155,8 @@ def _build_review_orchestrator(
             CertificationReviewer(),
         ],
         standards_service=standards_service,
-        reviewer_bundle_version="1.1.0",
+        llm_enhancer=llm_enhancer,
+        reviewer_bundle_version="2.0.0",
     )
 
 
@@ -202,3 +246,32 @@ def get_standards_service(request: Request) -> StandardsService:
 
 
 StandardsServiceDep = Annotated[StandardsService, Depends(get_standards_service)]
+
+
+# ---------------------------------------------------------------------------
+# Azure service injectable dependencies
+# ---------------------------------------------------------------------------
+
+
+def get_search_service(request: Request) -> SearchService:
+    """Resolve Azure AI Search service from application state."""
+    return request.app.state.search_service
+
+
+SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
+
+
+def get_rag_service(request: Request) -> RAGService:
+    """Resolve RAG service from application state."""
+    return request.app.state.rag_service
+
+
+RAGServiceDep = Annotated[RAGService, Depends(get_rag_service)]
+
+
+def get_ingestion_service(request: Request) -> IngestionService:
+    """Resolve ingestion service from application state."""
+    return request.app.state.ingestion_service
+
+
+IngestionServiceDep = Annotated[IngestionService, Depends(get_ingestion_service)]

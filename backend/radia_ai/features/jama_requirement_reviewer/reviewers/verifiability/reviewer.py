@@ -1,4 +1,4 @@
-﻿"""Verifiability reviewer with deterministic rule checks."""
+"""Verifiability reviewer with deterministic rule checks."""
 
 from __future__ import annotations
 
@@ -18,9 +18,9 @@ from radia_ai.features.jama_requirement_reviewer.rules.verifiability_rules impor
 
 class VerifiabilityReviewer(RequirementReviewer):
     name = "verifiability"
-    reviewer_version = "1.0.0"
-    prompt_version = "verifiability.v1"
-    standards_version = "incose.v1"
+    reviewer_version = "2.0.0"
+    prompt_version = "verifiability.v2"
+    standards_version = "rag-live"
     supports_individual_review = True
 
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
@@ -62,10 +62,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                     evidence="No EARS condition cue (e.g. 'when', 'while', 'where', 'if') found in requirement text.",
                     recommendation="Add context such as environmental/mission condition bounds.",
                     reference="EARS",
-                    suggested_rewrite=(
-                        "Prefix the requirement with an operating condition clause, e.g.:\n"
-                        "  When [operating condition], the [system] shall [behaviour]."
-                    ),
+                    suggested_rewrite=None,
                 )
             )
 
@@ -84,10 +81,7 @@ class VerifiabilityReviewer(RequirementReviewer):
                         "Add measurable values, tolerances, or explicit pass/fail criteria."
                     ),
                     reference="INCOSE",
-                    suggested_rewrite=(
-                        "Append a quantitative acceptance criterion, e.g.:\n"
-                        "  ... shall [behavior] within [VALUE +/- TOLERANCE] [UNIT]."
-                    ),
+                    suggested_rewrite=None,
                 )
             )
 

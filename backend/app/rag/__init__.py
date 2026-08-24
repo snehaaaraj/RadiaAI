@@ -1,1 +1,1 @@
-"""RAG pipeline stages (Phase 4)."""
+"""RAG (Retrieval-Augmented Generation) pipeline — search retrieval and LLM integration."""
