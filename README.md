@@ -1,8 +1,8 @@
-# Radia AI
+# Radia AI 2.0
 
-AI-powered Requirements Engineering platform for aerospace teams.
-Uses Azure OpenAI (GPT-5) with Retrieval-Augmented Generation (RAG) against
-indexed standards documents to provide grounded, traceable requirement reviews.
+AI-powered Requirements Engineering platform for aerospace and systems teams.
+Combines deterministic, rule-based requirement quality checks with Retrieval-Augmented Generation (RAG) 
+against indexed standards documents to provide grounded, traceable, and explainable requirement reviews.
 
 ---
 
@@ -101,10 +101,8 @@ RadiaAi-2.0/
 │   │
 │   ├── tests/
 │   │   └── unit/                      # 19 unit tests
-│   ├── startup.sh                     # Azure App Service gunicorn startup
 │   ├── pyproject.toml
-│   ├── requirements.txt               # production dependencies
-│   └── requirements-dev.txt           # dev/test dependencies
+│   └── requirements.txt
 │
 ├── frontend/
 │   ├── src/
@@ -124,10 +122,7 @@ RadiaAi-2.0/
 │   │   └── types/                     # TypeScript API interfaces
 │   └── package.json
 │
-├── docker/
-│   └── nginx.conf
 ├── .env.example
-├── docker-compose.yml
 └── README.md
 ```
 
@@ -219,8 +214,8 @@ Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
 
 ### Prerequisites
 
-- Node.js 20+
-- Python 3.12+
+- Node.js 20+ (for local frontend development)
+- Python 3.12+ (for local backend development)
 - Azure subscription with: Azure OpenAI (GPT-5 + text-embedding-3-large), Azure AI Search, Azure Blob Storage
 
 ### 1. Clone and configure
@@ -232,16 +227,12 @@ cp .env.example .env
 # Edit .env with your Azure credentials
 ```
 
-### 2. Start the backend
+### 2. Local backend development
 
 ```bash
 cd backend
 python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS / Linux
-source .venv/bin/activate
-
+source .venv/bin/activate       # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 uvicorn radia_ai.main:app --reload --port 8000
 ```
@@ -252,19 +243,14 @@ On first start, the server will:
 3. Extract, chunk, embed, and index all documents
 4. Subsequent starts skip unchanged documents (~10s startup)
 
-Backend API available at: http://localhost:8000/api/docs
-
-### 3. Start the frontend (in a new terminal)
+### 3. Local frontend development
 
 ```bash
 cd frontend
 npm install
 npm run start
-# Vite dev server on http://localhost:5173
-# Proxies /api/* calls to http://localhost:8000
+      # starts Vite dev server on :5173, proxies /api to :8000
 ```
-
-Frontend available at: http://localhost:5173
 
 ---
 
@@ -313,7 +299,6 @@ the full reference with descriptions.
 - Secrets are loaded from `.env` (never committed to git)
 - Authentication supports Microsoft Entra ID configuration with local development fallback
 - All API responses use a standardized error envelope (no stack traces exposed)
-- Containers run as non-root users
 - Input validation via Pydantic v2 on all endpoints
 
 ---
@@ -336,6 +321,8 @@ pytest --cov=app --cov=radia_ai # with coverage report
 
 **Frontend:** React 18, TypeScript, Vite, MUI v6, React Query v5, Axios, Framer Motion
 
-**AI/ML:** Azure OpenAI GPT-5 (reasoning), text-embedding-3-large (3072d), Azure AI Search (vector + semantic)
+**AI/ML:** Azure OpenAI (GPT-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
 
-**Infrastructure:** Azure App Service (Free F1, Python), Vercel (Frontend)
+**Infrastructure:** Azure App Service / Container Apps, Azure OpenAI, Azure AI Search, Azure Blob Storage
+
+**Note:** Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.

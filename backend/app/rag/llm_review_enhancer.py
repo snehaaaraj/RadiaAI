@@ -16,18 +16,13 @@ from typing import Any
 
 from app.core.logging import get_logger
 from app.prompts.review_prompts import (
-    CERTIFICATION_REVIEW_SYSTEM,
-    LANGUAGE_REVIEW_SYSTEM,
-    STRUCTURE_REVIEW_SYSTEM,
-    TRACEABILITY_REVIEW_SYSTEM,
-    VERIFIABILITY_REVIEW_SYSTEM,
+    CONSOLIDATED_REVIEW_SYSTEM,
 )
 from app.rag.service import RAGService, RetrievedContext
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     FindingSeverity,
     PassFail,
     RequirementReviewInput,
-    ReviewerResult,
     ReviewFinding,
     ReviewStatus,
 )
@@ -36,11 +31,11 @@ logger = get_logger(__name__)
 
 # Map reviewer names to their system prompts
 _REVIEWER_PROMPTS = {
-    "language": LANGUAGE_REVIEW_SYSTEM,
-    "structure": STRUCTURE_REVIEW_SYSTEM,
-    "verifiability": VERIFIABILITY_REVIEW_SYSTEM,
-    "traceability": TRACEABILITY_REVIEW_SYSTEM,
-    "certification": CERTIFICATION_REVIEW_SYSTEM,
+    "language": CONSOLIDATED_REVIEW_SYSTEM,
+    "structure": CONSOLIDATED_REVIEW_SYSTEM,
+    "verifiability": CONSOLIDATED_REVIEW_SYSTEM,
+    "traceability": CONSOLIDATED_REVIEW_SYSTEM,
+    "certification": CONSOLIDATED_REVIEW_SYSTEM,
 }
 
 _SEVERITY_MAP = {
@@ -180,9 +175,7 @@ class LLMReviewEnhancer:
             "the standards in the context, and identify the EXACT source document.\n",
         ]
         for i, f in enumerate(findings, 1):
-            parts.append(
-                f"{i}. [{f.category}] {f.explanation} | Evidence: {f.evidence}"
-            )
+            parts.append(f"{i}. [{f.category}] {f.explanation} | Evidence: {f.evidence}")
         if not findings:
             parts.append(
                 "No deterministic issues found. Perform a deeper analysis based on "

@@ -11,7 +11,7 @@ Wires the LLM review enhancer into all reviewers for hybrid (rules + AI) review.
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Annotated
+from typing import Annotated, cast
 
 from fastapi import Depends, FastAPI, Request
 
@@ -21,20 +21,39 @@ from app.core.logging import get_logger
 from app.ingestion.service import IngestionService
 from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
-from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import ReviewHistoryRepository
-from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import CertificationReviewer
+from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
+    SharePointStandardsClient,
+)
+from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
+    ReviewHistoryRepository,
+)
+from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import (
+    CertificationReviewer,
+)
 from radia_ai.features.jama_requirement_reviewer.reviewers.language.reviewer import LanguageReviewer
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
-from radia_ai.features.jama_requirement_reviewer.reviewers.structure.reviewer import StructureReviewer
-from radia_ai.features.jama_requirement_reviewer.reviewers.traceability.reviewer import TraceabilityReviewer
-from radia_ai.features.jama_requirement_reviewer.reviewers.verifiability.reviewer import VerifiabilityReviewer
-from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import SharePointStandardsClient
-from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import RequirementReviewService
-from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import RequirementDeltaReviewService
-from radia_ai.features.jama_requirement_reviewer.services.review_history_service import ReviewHistoryService
-from radia_ai.features.jama_requirement_reviewer.services.review_version_service import ReviewVersionService
+from radia_ai.features.jama_requirement_reviewer.reviewers.structure.reviewer import (
+    StructureReviewer,
+)
+from radia_ai.features.jama_requirement_reviewer.reviewers.traceability.reviewer import (
+    TraceabilityReviewer,
+)
+from radia_ai.features.jama_requirement_reviewer.reviewers.verifiability.reviewer import (
+    VerifiabilityReviewer,
+)
+from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import (
+    RequirementDeltaReviewService,
+)
+from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import (
+    RequirementReviewService,
+)
+from radia_ai.features.jama_requirement_reviewer.services.review_history_service import (
+    ReviewHistoryService,
+)
+from radia_ai.features.jama_requirement_reviewer.services.review_version_service import (
+    ReviewVersionService,
+)
 from radia_ai.features.jama_requirement_reviewer.services.standards_service import StandardsService
-
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
 
 logger = get_logger(__name__)
@@ -43,6 +62,7 @@ logger = get_logger(__name__)
 def _resolve_settings(app: FastAPI) -> AppSettings:
     """Use explicit app-scoped settings when present, else load the default settings."""
     return getattr(app.state, "settings", None) or get_settings()
+
 
 # ---------------------------------------------------------------------------
 # Lifespan - startup and shutdown hooks
@@ -108,7 +128,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     if sharepoint_client._settings.is_configured:
         try:
             result = ingestion_service.ingest_from_sharepoint()
-            logger.info("sharepoint_auto_sync_complete", **{k: v for k, v in result.items() if k != "details"})
+            logger.info(
+                "sharepoint_auto_sync_complete",
+                **{k: v for k, v in result.items() if k != "details"},
+            )
         except Exception:
             logger.exception("sharepoint_auto_sync_failed")
 
@@ -255,7 +278,7 @@ StandardsServiceDep = Annotated[StandardsService, Depends(get_standards_service)
 
 def get_search_service(request: Request) -> SearchService:
     """Resolve Azure AI Search service from application state."""
-    return request.app.state.search_service
+    return cast(SearchService, request.app.state.search_service)
 
 
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
@@ -263,7 +286,7 @@ SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
 
 def get_rag_service(request: Request) -> RAGService:
     """Resolve RAG service from application state."""
-    return request.app.state.rag_service
+    return cast(RAGService, request.app.state.rag_service)
 
 
 RAGServiceDep = Annotated[RAGService, Depends(get_rag_service)]
@@ -271,7 +294,7 @@ RAGServiceDep = Annotated[RAGService, Depends(get_rag_service)]
 
 def get_ingestion_service(request: Request) -> IngestionService:
     """Resolve ingestion service from application state."""
-    return request.app.state.ingestion_service
+    return cast(IngestionService, request.app.state.ingestion_service)
 
 
 IngestionServiceDep = Annotated[IngestionService, Depends(get_ingestion_service)]

@@ -11,6 +11,7 @@ Design principles:
 """
 
 from http import HTTPStatus
+from typing import Any
 
 
 class RadiaBaseException(Exception):
@@ -19,7 +20,7 @@ class RadiaBaseException(Exception):
     http_status: int = HTTPStatus.INTERNAL_SERVER_ERROR
     error_code: str = "INTERNAL_ERROR"
 
-    def __init__(self, message: str, detail: dict | None = None) -> None:
+    def __init__(self, message: str, detail: dict[str, Any] | None = None) -> None:
         super().__init__(message)
         self.message = message
         self.detail = detail or {}

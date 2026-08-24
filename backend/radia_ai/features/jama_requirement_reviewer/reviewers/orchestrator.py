@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
@@ -14,17 +14,22 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     RequirementReviewInput,
     RequirementReviewResponse,
     ReviewFinding,
+    ReviewStatus,
     ReviewVersionEntry,
     ReviewVersionResponse,
 )
+from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import (
+    normalize_requirement_review_input,
+)
 from radia_ai.features.jama_requirement_reviewer.utils.review_utils import overall_from_statuses
-from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import normalize_requirement_review_input
 
 if TYPE_CHECKING:
     from app.core.config import AppSettings
     from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
     from radia_ai.features.jama_requirement_reviewer.reviewers.base import RequirementReviewer
-    from radia_ai.features.jama_requirement_reviewer.services.standards_service import StandardsService
+    from radia_ai.features.jama_requirement_reviewer.services.standards_service import (
+        StandardsService,
+    )
 
 
 class ReviewOrchestrator:
@@ -70,7 +75,7 @@ class ReviewOrchestrator:
         enriched = self._enrich_findings(merged)
 
         # Build category results from merged findings
-        category_statuses: dict[str, list] = {}
+        category_statuses: dict[str, list[ReviewStatus]] = {}
         for f in enriched:
             category_statuses.setdefault(f.reviewer, []).append(f.status)
 
@@ -82,7 +87,7 @@ class ReviewOrchestrator:
         category_results = [
             CategoryResult(
                 category=name,
-                status=overall_from_statuses(statuses) if statuses else "Acceptable",
+                status=overall_from_statuses(statuses) if statuses else ReviewStatus.ACCEPTABLE,
             )
             for name, statuses in category_statuses.items()
         ]
@@ -213,11 +218,16 @@ class ReviewOrchestrator:
 
     # Generic fallback labels that need resolution to actual documents
     _FALLBACK_REFERENCES = {
-        "incose", "ears", "company style guide", "internal engineering standards",
-        "cert-guidance", "certification guidance", "company-style-guide",
+        "incose",
+        "ears",
+        "company style guide",
+        "internal engineering standards",
+        "cert-guidance",
+        "certification guidance",
+        "company-style-guide",
     }
 
-    def _enrich_findings(self, findings: list) -> list:
+    def _enrich_findings(self, findings: list[ReviewFinding]) -> list[ReviewFinding]:
         """Resolve references to actual SharePoint document names/URLs.
 
         - Fallback labels (INCOSE, EARS, etc.): resolve both name and URL.

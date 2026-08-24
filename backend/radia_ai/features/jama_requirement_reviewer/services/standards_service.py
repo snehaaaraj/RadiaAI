@@ -1,8 +1,13 @@
-﻿"""Service layer for standards catalog endpoints."""
+"""Service layer for standards catalog endpoints."""
 
-from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import SharePointStandardsClient
 from app.core.logging import get_logger
-from radia_ai.features.jama_requirement_reviewer.models.standards_models import StandardReference, StandardsResponse
+from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
+    SharePointStandardsClient,
+)
+from radia_ai.features.jama_requirement_reviewer.models.standards_models import (
+    StandardReference,
+    StandardsResponse,
+)
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
 
 logger = get_logger(__name__)
@@ -88,8 +93,9 @@ def _reference_aliases(reference_text: str, category: str, reviewer: str) -> set
     if "ears" in tokens or "ears" in reference_text:
         aliases.update({"ears", "requirement syntax"})
     if "style" in tokens or "guide" in tokens:
-        aliases.update({"style guide", "company style guide", "engineering standards",
-                         "company-style-guide"})
+        aliases.update(
+            {"style guide", "company style guide", "engineering standards", "company-style-guide"}
+        )
     if "internal" in tokens or "engineering" in tokens:
         aliases.update({"company-style-guide", "style guide", "engineering standards"})
     if "traceability" in tokens or "trace" in tokens:

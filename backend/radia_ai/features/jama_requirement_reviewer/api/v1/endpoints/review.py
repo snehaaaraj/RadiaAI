@@ -1,15 +1,15 @@
-﻿"""Requirements review endpoints."""
+"""Requirements review endpoints."""
 
 from fastapi import APIRouter, Request, status
 
 from app.core.logging import get_logger
+from app.schemas.common import APIResponse
 from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
     RequirementDeltaReviewServiceDep,
     RequirementReviewServiceDep,
     ReviewHistoryServiceDep,
     ReviewVersionServiceDep,
 )
-from app.schemas.common import APIResponse
 from radia_ai.features.jama_requirement_reviewer.schemas.review import (
     DeltaReviewInput,
     DeltaReviewResponse,
@@ -132,4 +132,3 @@ async def apply_finding_disposition(
 ) -> APIResponse[ReviewHistoryEntry]:
     updated_entry = service.apply_disposition(review_id=review_id, payload=body)
     return APIResponse(data=updated_entry, request_id=request.state.request_id)
-

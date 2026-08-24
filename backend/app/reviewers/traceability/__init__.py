@@ -1,2 +1,1 @@
 """Traceability reviewer package."""
-

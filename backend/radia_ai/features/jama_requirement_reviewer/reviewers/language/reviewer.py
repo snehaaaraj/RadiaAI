@@ -13,7 +13,10 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     ReviewStatus,
 )
 from radia_ai.features.jama_requirement_reviewer.reviewers.base import RequirementReviewer
-from radia_ai.features.jama_requirement_reviewer.rules.language_rules import AMBIGUOUS_WORDS, BANNED_WORDS
+from radia_ai.features.jama_requirement_reviewer.rules.language_rules import (
+    AMBIGUOUS_WORDS,
+    BANNED_WORDS,
+)
 
 
 class LanguageReviewer(RequirementReviewer):
@@ -135,9 +138,9 @@ def _overall_from_findings(findings: list[ReviewFinding]) -> ReviewStatus:
 
 def _replace_modal_with_shall(text: str) -> str:
     """Replace the first non-mandatory modal with 'shall'."""
-    result = re.sub(r'\bshould\b', 'shall', text, count=1, flags=re.IGNORECASE)
-    result = re.sub(r'\bwill\b', 'shall', result, count=1, flags=re.IGNORECASE)
-    result = re.sub(r'\bmay\b', 'shall', result, count=1, flags=re.IGNORECASE)
+    result = re.sub(r"\bshould\b", "shall", text, count=1, flags=re.IGNORECASE)
+    result = re.sub(r"\bwill\b", "shall", result, count=1, flags=re.IGNORECASE)
+    result = re.sub(r"\bmay\b", "shall", result, count=1, flags=re.IGNORECASE)
     return result
 
 
@@ -146,8 +149,8 @@ def _remove_banned_words(text: str, banned: list[str]) -> str:
     result = text
     for word in banned:
         result = re.sub(
-            rf'\b{re.escape(word)}\b',
-            f'[REPLACE: {word}]',
+            rf"\b{re.escape(word)}\b",
+            f"[REPLACE: {word}]",
             result,
             flags=re.IGNORECASE,
         )
@@ -159,8 +162,8 @@ def _flag_ambiguous_words(text: str, ambiguous: list[str]) -> str:
     result = text
     for word in ambiguous:
         result = re.sub(
-            rf'\b{re.escape(word)}\b',
-            f'[SPECIFY: {word}]',
+            rf"\b{re.escape(word)}\b",
+            f"[SPECIFY: {word}]",
             result,
             flags=re.IGNORECASE,
         )

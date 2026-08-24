@@ -1,2 +1,1 @@
 """Verifiability reviewer package."""
-

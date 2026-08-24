@@ -127,7 +127,8 @@ def _overall_from_findings(findings: list[ReviewFinding]) -> ReviewStatus:
 def _split_compound_requirement(text: str) -> str:
     """Annotate a compound requirement to indicate each 'shall' clause should become its own requirement."""
     import re
-    parts = re.split(r'(?<=\w)\s+and\s+(?=\w)', text, flags=re.IGNORECASE)
+
+    parts = re.split(r"(?<=\w)\s+and\s+(?=\w)", text, flags=re.IGNORECASE)
     if len(parts) > 1:
         numbered = "\n".join(f"REQ-X{i + 1}: {p.strip()}" for i, p in enumerate(parts))
         return f"[Split into separate requirements]\n{numbered}"
@@ -137,11 +138,12 @@ def _split_compound_requirement(text: str) -> str:
 def _flag_subjective_words(text: str, subjective: list[str]) -> str:
     """Annotate each subjective word with a placeholder for a measurable replacement."""
     import re
+
     result = text
     for word in subjective:
         result = re.sub(
-            rf'\b{re.escape(word)}\b',
-            f'[MEASURE: {word}]',
+            rf"\b{re.escape(word)}\b",
+            f"[MEASURE: {word}]",
             result,
             flags=re.IGNORECASE,
         )

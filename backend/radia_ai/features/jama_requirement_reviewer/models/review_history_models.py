@@ -1,4 +1,4 @@
-﻿"""Models for review history and human disposition loop."""
+"""Models for review history and human disposition loop."""
 # ruff: noqa: TC001
 
 from __future__ import annotations
@@ -114,4 +114,3 @@ def create_delta_history_entry(
         findings=findings,
         determinism=response.determinism,
     )
-

@@ -1,4 +1,4 @@
-﻿"""Deterministic delta engine for requirements revisions."""
+"""Deterministic delta engine for requirements revisions."""
 
 from __future__ import annotations
 
@@ -11,7 +11,9 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     RequirementReviewInput,
     TraceLinkChange,
 )
-from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import normalize_requirement_review_input
+from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import (
+    normalize_requirement_review_input,
+)
 
 
 @dataclass(frozen=True)
@@ -86,4 +88,3 @@ def _fingerprint(requirement: RequirementReviewInput) -> str:
     }
     serialized = json.dumps(payload, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
-

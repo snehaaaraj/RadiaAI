@@ -35,6 +35,7 @@ htmlcov/
 node_modules/
 frontend/dist/
 frontend/build/
+frontend/coverage/
 .npm
 *.tsbuildinfo
 .eslintcache
@@ -51,11 +52,6 @@ frontend/build/
 *.key
 *.cert
 *.p12
-
-# =============================================================================
-# Docker
-# =============================================================================
-docker-compose.override.yml
 
 # =============================================================================
 # IDE
@@ -79,9 +75,6 @@ infra/.terraform.lock.hcl
 *.tfvars
 !*.tfvars.example
 azuredeploy.parameters.json
-
-# Azure App Service
-.azure/
 
 # =============================================================================
 # Misc

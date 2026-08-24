@@ -205,4 +205,3 @@ class DeltaReviewResponse(BaseModel):
     change_summary: DeltaChangeSummary
     reviewed_requirements: list[DeltaRequirementReviewResult] = Field(default_factory=list)
     determinism: DeterminismContext
-

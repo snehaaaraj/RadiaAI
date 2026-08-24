@@ -7,7 +7,7 @@ straightforward to add pagination, request tracing, or API version fields
 without breaking existing clients.
 """
 
-from typing import Generic, TypeVar
+from typing import Any, Generic, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -36,7 +36,7 @@ class ErrorDetail(BaseModel):
 
     code: str = Field(description="Stable error code (e.g. DOCUMENT_NOT_FOUND)")
     message: str = Field(description="Human-readable error message")
-    detail: dict = Field(default_factory=dict, description="Optional additional context")
+    detail: dict[str, Any] = Field(default_factory=dict, description="Optional additional context")
 
 
 class ErrorResponse(BaseModel):

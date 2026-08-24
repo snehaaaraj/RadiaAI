@@ -1,4 +1,4 @@
-﻿"""Models for standards catalog APIs."""
+"""Models for standards catalog APIs."""
 
 from pydantic import BaseModel, Field
 
@@ -23,5 +23,3 @@ class StandardsResponse(BaseModel):
 
     standards: list[StandardReference] = Field(default_factory=list)
     source: str = "registry"  # "sharepoint" | "registry" | "fallback"
-
-

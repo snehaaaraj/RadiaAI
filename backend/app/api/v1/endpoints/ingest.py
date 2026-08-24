@@ -7,7 +7,7 @@ POST /api/v1/ingest/upload  — upload a single document for ingestion
 
 import uuid
 
-from fastapi import APIRouter, Request, UploadFile, File, status
+from fastapi import APIRouter, File, Request, UploadFile, status
 
 from app.core.logging import get_logger
 from app.schemas.common import APIResponse

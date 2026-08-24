@@ -1,4 +1,4 @@
-﻿"""Service for deterministic delta reviews."""
+"""Service for deterministic delta reviews."""
 
 from radia_ai.features.jama_requirement_reviewer.diff.delta_engine import compute_delta
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
@@ -6,8 +6,12 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     DeltaReviewInput,
     DeltaReviewResponse,
 )
-from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import RequirementReviewService
-from radia_ai.features.jama_requirement_reviewer.services.review_version_service import ReviewVersionService
+from radia_ai.features.jama_requirement_reviewer.services.requirement_review_service import (
+    RequirementReviewService,
+)
+from radia_ai.features.jama_requirement_reviewer.services.review_version_service import (
+    ReviewVersionService,
+)
 from radia_ai.features.jama_requirement_reviewer.utils.review_utils import overall_from_statuses
 
 
@@ -41,9 +45,7 @@ class RequirementDeltaReviewService:
                 )
             )
 
-        overall = overall_from_statuses(
-            [result.overall for result in reviewed_requirements]
-        )
+        overall = overall_from_statuses([result.overall for result in reviewed_requirements])
         determinism = self._review_version_service.get_review_version().determinism
         return DeltaReviewResponse(
             overall=overall,

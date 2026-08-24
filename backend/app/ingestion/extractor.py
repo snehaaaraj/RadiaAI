@@ -46,5 +46,6 @@ def _extract_pdf(data: bytes) -> str:
         text = data.decode("latin-1", errors="replace")
         # Strip binary noise — not reliable but better than nothing
         import re
+
         clean = re.sub(r"[^\x20-\x7E\n\r\t]", " ", text)
         return clean

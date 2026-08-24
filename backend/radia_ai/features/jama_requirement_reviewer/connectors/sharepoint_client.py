@@ -1,4 +1,4 @@
-﻿"""
+"""
 SharePoint document library client using Microsoft Graph API.
 
 Fetches the list of standard reference documents from the configured SharePoint
@@ -10,6 +10,7 @@ the Graph API on every request to GET /standards.
 """
 
 import time
+from typing import Any, TypedDict, cast
 from urllib.parse import quote
 
 import httpx
@@ -21,37 +22,55 @@ from radia_ai.features.jama_requirement_reviewer.models.standards_models import 
 
 logger = get_logger(__name__)
 
+
+class GraphDriveItem(TypedDict, total=False):
+    id: str
+    name: str
+    webUrl: str
+    lastModifiedDateTime: str
+    size: int
+    folder: dict[str, Any]
+
+
+class SharePointFileContent(TypedDict):
+    name: str
+    content: bytes
+    url: str
+    document_type: str
+    previous_hash: str | None
+
+
 # Graph API base URL
 _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
 
 # Maps file extension -> requirement review category tags
 _EXT_CATEGORY_MAP: dict[str, list[str]] = {
-    ".pdf":  ["reference"],
+    ".pdf": ["reference"],
     ".docx": ["reference"],
-    ".doc":  ["reference"],
+    ".doc": ["reference"],
     ".xlsx": ["reference"],
-    ".xls":  ["reference"],
+    ".xls": ["reference"],
     ".pptx": ["reference"],
-    ".txt":  ["reference"],
-    ".md":   ["reference"],
+    ".txt": ["reference"],
+    ".md": ["reference"],
 }
 
 # Category hints derived from filename keywords
 _KEYWORD_CATEGORY_MAP: list[tuple[str, list[str]]] = [
-    ("incose",       ["language", "verifiability", "structure"]),
-    ("ears",         ["language", "structure"]),
-    ("style guide",  ["language", "structure", "naming"]),
-    ("style_guide",  ["language", "structure", "naming"]),
-    ("cert",         ["certification", "traceability", "verification"]),
-    ("do-178",       ["certification"]),
-    ("do-254",       ["certification"]),
-    ("arp4754",      ["certification"]),
-    ("trace",        ["traceability"]),
-    ("verif",        ["verifiability"]),
-    ("structure",    ["structure"]),
-    ("language",     ["language"]),
-    ("naming",       ["naming"]),
-    ("safety",       ["certification"]),
+    ("incose", ["language", "verifiability", "structure"]),
+    ("ears", ["language", "structure"]),
+    ("style guide", ["language", "structure", "naming"]),
+    ("style_guide", ["language", "structure", "naming"]),
+    ("cert", ["certification", "traceability", "verification"]),
+    ("do-178", ["certification"]),
+    ("do-254", ["certification"]),
+    ("arp4754", ["certification"]),
+    ("trace", ["traceability"]),
+    ("verif", ["verifiability"]),
+    ("structure", ["structure"]),
+    ("language", ["language"]),
+    ("naming", ["naming"]),
+    ("safety", ["certification"]),
 ]
 
 
@@ -114,7 +133,7 @@ class SharePointStandardsClient:
         graph_url = f"{_GRAPH_BASE}/sites/{hostname}:/{site_path}"
         resp = client.get(graph_url, headers=self._headers(), timeout=15)
         resp.raise_for_status()
-        return resp.json()["id"]
+        return cast(str, resp.json()["id"])
 
     def _resolve_drive_id(self, client: httpx.Client, site_id: str) -> str:
         """Resolve the drive (document library) ID by name."""
@@ -124,11 +143,11 @@ class SharePointStandardsClient:
             timeout=15,
         )
         resp.raise_for_status()
-        drives: list[dict] = resp.json().get("value", [])
+        drives = cast(list[dict[str, Any]], resp.json().get("value", []))
         target = self._settings.drive_name.lower()
         for drive in drives:
             if drive.get("name", "").lower() == target:
-                return drive["id"]
+                return cast(str, drive["id"])
         # If exact match fails, log available drives and use first one
         names = [d.get("name") for d in drives]
         logger.warning(
@@ -137,10 +156,10 @@ class SharePointStandardsClient:
             available=names,
         )
         if drives:
-            return drives[0]["id"]
+            return cast(str, drives[0]["id"])
         raise ValueError(f"No drives found on site {site_id}")
 
-    def _list_folder_children(self, client: httpx.Client, drive_id: str) -> list[dict]:
+    def _list_folder_children(self, client: httpx.Client, drive_id: str) -> list[GraphDriveItem]:
         """Return the Graph API items from the configured standards folder."""
         folder = self._settings.standards_folder
         # URL-encode the path segments but keep slashes
@@ -148,9 +167,9 @@ class SharePointStandardsClient:
         url = f"{_GRAPH_BASE}/drives/{drive_id}/root:/{encoded_folder}:/children"
         resp = client.get(url, headers=self._headers(), timeout=15)
         resp.raise_for_status()
-        return resp.json().get("value", [])
+        return cast(list[GraphDriveItem], resp.json().get("value", []))
 
-    def _item_to_standard(self, item: dict) -> StandardReference | None:
+    def _item_to_standard(self, item: GraphDriveItem) -> StandardReference | None:
         """Convert a Graph API driveItem to a StandardReference. Returns None for folders."""
         if "folder" in item:
             return None  # skip subfolders
@@ -215,7 +234,7 @@ class SharePointStandardsClient:
             # Return stale cache if available, otherwise empty list
             return self._cached_standards
 
-    def fetch_file_contents(self) -> list[dict]:
+    def fetch_file_contents(self) -> list[SharePointFileContent]:
         """
         Download actual file bytes for every document in the standards folder.
 
@@ -233,7 +252,7 @@ class SharePointStandardsClient:
                     self._drive_id = self._resolve_drive_id(client, self._site_id)
 
                 items = self._list_folder_children(client, self._drive_id)
-                files = []
+                files: list[SharePointFileContent] = []
                 for item in items:
                     if "folder" in item:
                         continue
@@ -242,21 +261,28 @@ class SharePointStandardsClient:
                     if not download_url:
                         # Build download URL from item id
                         item_id = item.get("id", "")
-                        download_url = f"{_GRAPH_BASE}/drives/{self._drive_id}/items/{item_id}/content"
+                        download_url = (
+                            f"{_GRAPH_BASE}/drives/{self._drive_id}/items/{item_id}/content"
+                        )
 
                     resp = client.get(
-                        download_url,
+                        cast(str, download_url),
                         headers=self._headers(),
                         timeout=60,
                         follow_redirects=True,
                     )
                     resp.raise_for_status()
-                    files.append({
-                        "name": name,
-                        "content": resp.content,
-                        "url": item.get("webUrl", ""),
-                        "document_type": _categories_from_name(name)[0] if _categories_from_name(name) else "reference",
-                    })
+                    files.append(
+                        {
+                            "name": name,
+                            "content": resp.content,
+                            "url": item.get("webUrl", ""),
+                            "document_type": _categories_from_name(name)[0]
+                            if _categories_from_name(name)
+                            else "reference",
+                            "previous_hash": None,
+                        }
+                    )
 
                 logger.info("sharepoint_files_downloaded", count=len(files))
                 return files

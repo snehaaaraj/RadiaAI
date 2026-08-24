@@ -18,19 +18,83 @@ from fastapi import FastAPI, Request, Response, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import ValidationError
 
 from app.api.v1.router import router as v1_router
-from app.core.config import get_settings
+from app.core.config import (
+    AppSettings,
+    AzureBlobSettings,
+    AzureOpenAISettings,
+    AzureSearchSettings,
+    EntraIDSettings,
+    SharePointSettings,
+    get_settings,
+)
 from app.core.exceptions import RadiaBaseException
 from app.core.logging import configure_logging, get_logger
 from app.dependencies.container import lifespan
 from app.schemas.common import ErrorDetail, ErrorResponse
 from app.utils.request_id import generate_request_id, set_request_id
 
-# Initialise logging before anything else so all startup messages are structured
-settings = get_settings()
-configure_logging(settings)
 logger = get_logger(__name__)
+
+
+def _default_settings() -> AppSettings:
+    """Provide safe defaults so the app factory can be imported without env vars."""
+    return AppSettings.model_construct(
+        app_name="Radia AI",
+        app_version="0.1.0",
+        environment="local",
+        debug=False,
+        log_level="INFO",
+        api_prefix="/api/v1",
+        allowed_origins=["http://localhost:5173", "http://localhost:3000"],
+        retrieval_top_k=5,
+        chunk_size=512,
+        chunk_overlap=64,
+        azure_openai=AzureOpenAISettings.model_construct(
+            endpoint="https://example.openai.azure.com",
+            api_key="",
+            api_version="2024-10-21",
+            chat_deployment="gpt-4o",
+            embedding_deployment="text-embedding-3-large",
+            embedding_dimensions=3072,
+            max_tokens=4096,
+            temperature=0.0,
+        ),
+        azure_search=AzureSearchSettings.model_construct(
+            endpoint="https://example.search.windows.net",
+            api_key="",
+            index_name="radia-documents",
+            semantic_config_name="radia-semantic-config",
+        ),
+        azure_blob=AzureBlobSettings.model_construct(
+            connection_string="DefaultEndpointsProtocol=https;AccountName=example;AccountKey=example;",
+            container_name="radia-documents",
+        ),
+        entra=EntraIDSettings.model_construct(
+            tenant_id="",
+            client_id="",
+            client_secret="",
+            audience="",
+        ),
+        sharepoint=SharePointSettings.model_construct(
+            tenant_id="",
+            client_id="",
+            client_secret="",
+            site_url="",
+            drive_name="Requirements Management",
+            standards_folder="0. Reference Material/AI Reference Material",
+            cache_ttl_seconds=300,
+        ),
+    )
+
+
+def _resolve_settings() -> AppSettings:
+    try:
+        return get_settings()
+    except ValidationError:
+        return _default_settings()
 
 
 def create_app() -> FastAPI:
@@ -40,6 +104,9 @@ def create_app() -> FastAPI:
     Using a factory function (instead of a module-level app = FastAPI())
     makes it trivial to create isolated test instances with different settings.
     """
+    settings = _resolve_settings()
+    configure_logging(settings)
+
     app = FastAPI(
         title=settings.app_name,
         version=settings.app_version,
@@ -53,9 +120,9 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
-    _register_middleware(app)
+    _register_middleware(app, settings)
     _register_exception_handlers(app)
-    _register_routers(app)
+    _register_routers(app, settings)
 
     return app
 
@@ -65,7 +132,7 @@ def create_app() -> FastAPI:
 # ---------------------------------------------------------------------------
 
 
-def _register_middleware(app: FastAPI) -> None:
+def _register_middleware(app: FastAPI, settings: AppSettings) -> None:
     """Attach all middleware to the application in correct order (outermost first)."""
 
     # CORS — must be outermost so preflight OPTIONS requests are handled correctly
@@ -130,9 +197,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
     """Register global exception handlers that convert exceptions to JSON."""
 
     @app.exception_handler(RadiaBaseException)
-    async def radia_exception_handler(
-        request: Request, exc: RadiaBaseException
-    ) -> JSONResponse:
+    async def radia_exception_handler(request: Request, exc: RadiaBaseException) -> JSONResponse:
         """Map domain exceptions to standardized JSON error responses."""
         logger.warning(
             "domain_exception",
@@ -172,9 +237,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(Exception)
-    async def unhandled_exception_handler(
-        request: Request, exc: Exception
-    ) -> JSONResponse:
+    async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
         """
         Catch-all for unexpected exceptions.
 
@@ -199,7 +262,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _register_routers(app: FastAPI) -> None:
+def _register_routers(app: FastAPI, settings: AppSettings) -> None:
     """Mount versioned API routers."""
     app.include_router(v1_router, prefix=settings.api_prefix)
 

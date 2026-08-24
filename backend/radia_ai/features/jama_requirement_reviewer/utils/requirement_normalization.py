@@ -1,4 +1,4 @@
-﻿"""Normalize requirement review inputs into a canonical review representation."""
+"""Normalize requirement review inputs into a canonical review representation."""
 
 from __future__ import annotations
 
@@ -69,7 +69,7 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
 
     current_label: str | None = None
     current_value_parts: list[str] = []
-    body_parts: list[str] = []      # text before any field label (PDF body pattern)
+    body_parts: list[str] = []  # text before any field label (PDF body pattern)
     description_parts: list[str] = []
     title_parts: list[str] = []
     rationale_parts: list[str] = []
@@ -159,7 +159,11 @@ def _canonicalize_text(text: str) -> tuple[str, dict[str, str]]:
 def _split_lines(text: str) -> list[str]:
     normalized = unicodedata.normalize("NFKC", text)
     normalized = normalized.replace("\r\n", "\n").replace("\r", "\n")
-    normalized = "".join(ch for ch in normalized if ch == "\n" or ch == "\t" or not unicodedata.category(ch).startswith("C"))
+    normalized = "".join(
+        ch
+        for ch in normalized
+        if ch == "\n" or ch == "\t" or not unicodedata.category(ch).startswith("C")
+    )
     return normalized.split("\n")
 
 
@@ -183,10 +187,10 @@ def _consume_label(lines: list[str], index: int) -> tuple[str | None, int, str]:
         if lowered_current == label:
             return field, 1, ""
         if lowered_current.startswith(f"{label}:"):
-            remainder = current[len(label):].lstrip(" :\t-")
+            remainder = current[len(label) :].lstrip(" :\t-")
             return field, 1, remainder.strip()
         if lowered_current.startswith(f"{label} "):
-            remainder = current[len(label):].lstrip(" :\t-")
+            remainder = current[len(label) :].lstrip(" :\t-")
             return field, 1, remainder.strip()
 
     max_width = min(4, len(lines) - index)
@@ -203,10 +207,10 @@ def _consume_label(lines: list[str], index: int) -> tuple[str | None, int, str]:
             if lowered == label:
                 return field, width, ""
             if lowered.startswith(f"{label}:"):
-                remainder = candidate[len(label):].lstrip(" :\t-")
+                remainder = candidate[len(label) :].lstrip(" :\t-")
                 return field, width, remainder.strip()
             if lowered.startswith(f"{label} "):
-                remainder = candidate[len(label):].lstrip(" :\t-")
+                remainder = candidate[len(label) :].lstrip(" :\t-")
                 return field, width, remainder.strip()
     return None, 0, ""
 
@@ -219,7 +223,10 @@ def _store_field(extracted: dict[str, str], field: str, parts: list[str]) -> Non
 
 def _contains_trailing_metadata(line: str) -> bool:
     lowered = line.lower()
-    return any(re.search(rf"\b{re.escape(label)}\b", lowered, flags=re.IGNORECASE) for label in _TRAILING_METADATA_LABELS)
+    return any(
+        re.search(rf"\b{re.escape(label)}\b", lowered, flags=re.IGNORECASE)
+        for label in _TRAILING_METADATA_LABELS
+    )
 
 
 def _truncate_at_trailing_metadata(line: str) -> str:

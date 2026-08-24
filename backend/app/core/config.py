@@ -7,21 +7,45 @@ environment (or a .env file during local development). Nothing is hardcoded here
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast
 
 from pydantic import AnyHttpUrl, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve .env location: check backend/.env first, then project root .env
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # backend/
-_PROJECT_ROOT = _BACKEND_DIR.parent                           # RadiaAi-2.0/
-_ENV_FILE = str(_BACKEND_DIR / ".env") if (_BACKEND_DIR / ".env").exists() else str(_PROJECT_ROOT / ".env")
+_PROJECT_ROOT = _BACKEND_DIR.parent  # RadiaAi-2.0/
+_ENV_FILE = (
+    str(_BACKEND_DIR / ".env") if (_BACKEND_DIR / ".env").exists() else str(_PROJECT_ROOT / ".env")
+)
+
+
+def _azure_openai_settings_factory() -> "AzureOpenAISettings":
+    return cast(AzureOpenAISettings, cast(Any, AzureOpenAISettings)())
+
+
+def _azure_search_settings_factory() -> "AzureSearchSettings":
+    return cast(AzureSearchSettings, cast(Any, AzureSearchSettings)())
+
+
+def _azure_blob_settings_factory() -> "AzureBlobSettings":
+    return cast(AzureBlobSettings, cast(Any, AzureBlobSettings)())
+
+
+def _entra_id_settings_factory() -> "EntraIDSettings":
+    return cast(EntraIDSettings, cast(Any, EntraIDSettings)())
+
+
+def _sharepoint_settings_factory() -> "SharePointSettings":
+    return cast(SharePointSettings, cast(Any, SharePointSettings)())
 
 
 class AzureOpenAISettings(BaseSettings):
     """Azure OpenAI service configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="AZURE_OPENAI_", env_file=_ENV_FILE, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="AZURE_OPENAI_", env_file=_ENV_FILE, extra="ignore"
+    )
 
     endpoint: AnyHttpUrl = Field(..., description="Azure OpenAI resource endpoint")
     api_key: str = Field(..., description="Azure OpenAI API key")
@@ -38,7 +62,9 @@ class AzureOpenAISettings(BaseSettings):
 class AzureSearchSettings(BaseSettings):
     """Azure AI Search service configuration."""
 
-    model_config = SettingsConfigDict(env_prefix="AZURE_SEARCH_", env_file=_ENV_FILE, extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="AZURE_SEARCH_", env_file=_ENV_FILE, extra="ignore"
+    )
 
     endpoint: AnyHttpUrl = Field(..., description="Azure AI Search endpoint")
     api_key: str = Field(..., description="Azure AI Search admin key")
@@ -64,7 +90,9 @@ class SharePointSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="SHAREPOINT_", env_file=_ENV_FILE, extra="ignore")
 
-    tenant_id: str = Field(default="", description="Azure AD tenant ID (can share with ENTRA_TENANT_ID)")
+    tenant_id: str = Field(
+        default="", description="Azure AD tenant ID (can share with ENTRA_TENANT_ID)"
+    )
     client_id: str = Field(default="", description="App registration client ID with Sites.Read.All")
     client_secret: str = Field(default="", description="App registration client secret")
     site_url: str = Field(
@@ -123,9 +151,7 @@ class AppSettings(BaseSettings):
         default="local", description="Deployment environment"
     )
     debug: bool = Field(default=False, description="Enable debug mode (never True in production)")
-    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(
-        default="INFO"
-    )
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
 
     # --- API ---
     api_prefix: str = Field(default="/api/v1")
@@ -142,15 +168,15 @@ class AppSettings(BaseSettings):
     chunk_overlap: int = Field(default=64, ge=0, le=512, description="Token overlap between chunks")
 
     # --- Sub-settings (populated from prefixed env vars) ---
-    azure_openai: AzureOpenAISettings = Field(default_factory=AzureOpenAISettings)
-    azure_search: AzureSearchSettings = Field(default_factory=AzureSearchSettings)
-    azure_blob: AzureBlobSettings = Field(default_factory=AzureBlobSettings)
-    entra: EntraIDSettings = Field(default_factory=EntraIDSettings)
-    sharepoint: SharePointSettings = Field(default_factory=SharePointSettings)
+    azure_openai: AzureOpenAISettings = Field(default_factory=_azure_openai_settings_factory)
+    azure_search: AzureSearchSettings = Field(default_factory=_azure_search_settings_factory)
+    azure_blob: AzureBlobSettings = Field(default_factory=_azure_blob_settings_factory)
+    entra: EntraIDSettings = Field(default_factory=_entra_id_settings_factory)
+    sharepoint: SharePointSettings = Field(default_factory=_sharepoint_settings_factory)
 
     @field_validator("debug")
     @classmethod
-    def no_debug_in_production(cls, value: bool, info: object) -> bool:  # noqa: ANN001
+    def no_debug_in_production(cls, value: bool, info: object) -> bool:
         """Prevent debug mode from being enabled in production environments."""
         # We check the raw values dict since environment may not be validated yet
         data = getattr(info, "data", {})

@@ -1,9 +1,9 @@
-﻿"""Standards catalog endpoints."""
+"""Standards catalog endpoints."""
 
 from fastapi import APIRouter, Request, status
 
-from radia_ai.features.jama_requirement_reviewer.dependencies.container import StandardsServiceDep
 from app.schemas.common import APIResponse
+from radia_ai.features.jama_requirement_reviewer.dependencies.container import StandardsServiceDep
 from radia_ai.features.jama_requirement_reviewer.schemas.standards import StandardsResponse
 
 router = APIRouter()
@@ -20,5 +20,3 @@ async def list_standards(
     service: StandardsServiceDep,
 ) -> APIResponse[StandardsResponse]:
     return APIResponse(data=service.list_standards(), request_id=request.state.request_id)
-
-

@@ -12,9 +12,9 @@ and reused for the lifetime of the application.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
-import json
-from typing import Any
+from typing import Any, cast
 
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
@@ -103,7 +103,9 @@ class OpenAIClient:
 class SearchService:
     """Wraps Azure AI Search for index management and querying."""
 
-    def __init__(self, settings: AzureSearchSettings, openai_client: OpenAIClient, app_settings: AppSettings) -> None:
+    def __init__(
+        self, settings: AzureSearchSettings, openai_client: OpenAIClient, app_settings: AppSettings
+    ) -> None:
         self._settings = settings
         self._openai = openai_client
         self._app_settings = app_settings
@@ -124,11 +126,24 @@ class SearchService:
         embedding_dims = self._app_settings.azure_openai.embedding_dimensions
 
         fields = [
-            SimpleField(name="chunk_id", type=SearchFieldDataType.String, key=True, filterable=True),
-            SearchableField(name="content", type=SearchFieldDataType.String, analyzer_name="en.microsoft"),
-            SimpleField(name="source", type=SearchFieldDataType.String, filterable=True, facetable=True),
-            SimpleField(name="filename", type=SearchFieldDataType.String, filterable=True, facetable=True),
-            SimpleField(name="document_type", type=SearchFieldDataType.String, filterable=True, facetable=True),
+            SimpleField(
+                name="chunk_id", type=SearchFieldDataType.String, key=True, filterable=True
+            ),
+            SearchableField(
+                name="content", type=SearchFieldDataType.String, analyzer_name="en.microsoft"
+            ),
+            SimpleField(
+                name="source", type=SearchFieldDataType.String, filterable=True, facetable=True
+            ),
+            SimpleField(
+                name="filename", type=SearchFieldDataType.String, filterable=True, facetable=True
+            ),
+            SimpleField(
+                name="document_type",
+                type=SearchFieldDataType.String,
+                filterable=True,
+                facetable=True,
+            ),
             SimpleField(name="section", type=SearchFieldDataType.String, filterable=True),
             SimpleField(name="page_number", type=SearchFieldDataType.Int32, filterable=True),
             SimpleField(name="chunk_index", type=SearchFieldDataType.Int32, filterable=True),
@@ -145,7 +160,9 @@ class SearchService:
         vector_search = VectorSearch(
             algorithms=[HnswAlgorithmConfiguration(name="default-hnsw")],
             profiles=[
-                VectorSearchProfile(name="default-vector-profile", algorithm_configuration_name="default-hnsw")
+                VectorSearchProfile(
+                    name="default-vector-profile", algorithm_configuration_name="default-hnsw"
+                )
             ],
         )
 
@@ -169,11 +186,11 @@ class SearchService:
             self._index_client.create_or_update_index(index)
         except Exception:
             # Incompatible existing index — delete and recreate
-            logger.warning("index_schema_incompatible_recreating", index_name=self._settings.index_name)
-            try:
+            logger.warning(
+                "index_schema_incompatible_recreating", index_name=self._settings.index_name
+            )
+            with contextlib.suppress(Exception):
                 self._index_client.delete_index(self._settings.index_name)
-            except Exception:
-                pass
             self._index_client.create_or_update_index(index)
 
         logger.info("search_index_ensured", index_name=self._settings.index_name)
@@ -236,7 +253,15 @@ class SearchService:
             vector_queries=[vector_query] if vector_query else None,
             filter=filter_expr,
             top=top,
-            select=["chunk_id", "content", "source", "filename", "document_type", "section", "page_number"],
+            select=[
+                "chunk_id",
+                "content",
+                "source",
+                "filename",
+                "document_type",
+                "section",
+                "page_number",
+            ],
         )
 
         return [
@@ -282,7 +307,9 @@ class BlobStorageClient:
         self._service_client = BlobServiceClient.from_connection_string(settings.connection_string)
         self._container_client = self._service_client.get_container_client(settings.container_name)
 
-    def upload_blob(self, blob_name: str, data: bytes, content_type: str = "application/octet-stream") -> str:
+    def upload_blob(
+        self, blob_name: str, data: bytes, content_type: str = "application/octet-stream"
+    ) -> str:
         """Upload a blob and return its URL."""
         blob_client = self._container_client.get_blob_client(blob_name)
         blob_client.upload_blob(
@@ -290,7 +317,7 @@ class BlobStorageClient:
             overwrite=True,
             content_settings=ContentSettings(content_type=content_type),
         )
-        return blob_client.url
+        return cast(str, blob_client.url)
 
     def download_blob(self, blob_name: str) -> bytes:
         """Download blob content as bytes."""
@@ -305,7 +332,9 @@ class BlobStorageClient:
                 "name": blob.name,
                 "size": blob.size,
                 "last_modified": blob.last_modified.isoformat() if blob.last_modified else None,
-                "content_type": blob.content_settings.content_type if blob.content_settings else None,
+                "content_type": blob.content_settings.content_type
+                if blob.content_settings
+                else None,
                 "etag": blob.etag,
             }
             for blob in blobs

@@ -1,7 +1,6 @@
 # Web framework
 fastapi==0.115.6
 uvicorn[standard]==0.32.1
-gunicorn==23.0.0
 python-multipart==0.0.20
 
 # Validation & settings
@@ -25,3 +24,12 @@ python-docx==1.1.2      # DOCX text extraction
 python-jose[cryptography]==3.3.0   # JWT for Entra ID tokens
 tenacity==9.0.0                    # retries with backoff
 structlog==24.4.0                  # structured logging
+
+# Dev / test (pinned separately for reproducibility)
+pytest==8.3.4
+pytest-asyncio==0.24.0
+pytest-cov==6.0.0
+httpx==0.28.1                      # AsyncClient for FastAPI testing
+ruff==0.8.4
+black==24.10.0
+mypy==1.13.0

@@ -50,4 +50,3 @@ def test_review_history_and_disposition_flow(client: TestClient) -> None:
     dispositions = disposition_body["data"]["dispositions"]
     assert len(dispositions) == 1
     assert dispositions[0]["disposition"] == "Accepted"
-

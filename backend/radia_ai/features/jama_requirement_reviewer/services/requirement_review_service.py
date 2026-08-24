@@ -1,6 +1,9 @@
-﻿"""Service for single requirement deterministic reviews."""
+"""Service for single requirement deterministic reviews."""
 
-from radia_ai.features.jama_requirement_reviewer.models.review_models import RequirementReviewInput, RequirementReviewResponse
+from radia_ai.features.jama_requirement_reviewer.models.review_models import (
+    RequirementReviewInput,
+    RequirementReviewResponse,
+)
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
 
 
@@ -12,4 +15,3 @@ class RequirementReviewService:
 
     def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
         return self._orchestrator.review_requirement(payload)
-

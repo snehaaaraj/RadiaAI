@@ -12,6 +12,7 @@ Call configure_logging() once at application startup.
 
 import logging
 import sys
+from typing import cast
 
 import structlog
 
@@ -34,7 +35,7 @@ def configure_logging(settings: AppSettings) -> None:
 
     # Processors applied to every log record
     shared_processors: list[structlog.types.Processor] = [
-        structlog.contextvars.merge_contextvars,          # inject request_id etc.
+        structlog.contextvars.merge_contextvars,  # inject request_id etc.
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
@@ -79,4 +80,4 @@ def configure_logging(settings: AppSettings) -> None:
 
 def get_logger(name: str) -> structlog.stdlib.BoundLogger:
     """Return a bound structlog logger for the given module name."""
-    return structlog.get_logger(name)
+    return cast(structlog.stdlib.BoundLogger, structlog.get_logger(name))

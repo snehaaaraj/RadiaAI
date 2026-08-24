@@ -81,4 +81,3 @@ async def _entra_auth(
         )
     # Placeholder — will be replaced with real validation
     raise NotImplementedError("Entra ID token validation not yet implemented")
-

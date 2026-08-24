@@ -8,20 +8,36 @@ Tracks file hashes to skip re-processing unchanged documents.
 
 from __future__ import annotations
 
-import uuid
-from typing import Any
+from typing import Any, TypedDict, cast
 
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService, compute_file_hash
 from app.core.config import AppSettings
 from app.core.logging import get_logger
-from app.ingestion.chunker import Chunk, chunk_text
+from app.ingestion.chunker import chunk_text
 from app.ingestion.extractor import extract_text
-from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import SharePointStandardsClient
+from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
+    SharePointFileContent,
+    SharePointStandardsClient,
+)
 
 logger = get_logger(__name__)
 
 # Max texts per embedding API call
 _EMBEDDING_BATCH_SIZE = 16
+
+
+class IngestionDetail(TypedDict, total=False):
+    filename: str
+    status: str
+    reason: str
+    error: str
+
+
+class IngestionResult(TypedDict):
+    processed: int
+    skipped: int
+    failed: int
+    details: list[IngestionDetail]
 
 
 class IngestionService:
@@ -51,7 +67,7 @@ class IngestionService:
             blobs = [b for b in blobs if b["name"] in document_ids]
 
         indexed_hashes = self._search.get_indexed_file_hashes()
-        results = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
+        results: IngestionResult = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
 
         for blob_info in blobs:
             try:
@@ -60,7 +76,9 @@ class IngestionService:
 
                 if file_hash in indexed_hashes:
                     results["skipped"] += 1
-                    results["details"].append({"filename": blob_info["name"], "status": "skipped", "reason": "unchanged"})
+                    results["details"].append(
+                        {"filename": blob_info["name"], "status": "skipped", "reason": "unchanged"}
+                    )
                     continue
 
                 self._process_document(
@@ -75,21 +93,23 @@ class IngestionService:
             except Exception as e:
                 logger.exception("blob_ingest_failed", filename=blob_info["name"])
                 results["failed"] += 1
-                results["details"].append({"filename": blob_info["name"], "status": "failed", "error": str(e)})
+                results["details"].append(
+                    {"filename": blob_info["name"], "status": "failed", "error": str(e)}
+                )
 
-        return results
+        return cast(dict[str, Any], results)
 
     def ingest_from_sharepoint(self) -> dict[str, Any]:
         """Sync standards documents from SharePoint into the search index."""
         if self._sharepoint is None or not self._sharepoint._settings.is_configured:
             return {"status": "skipped", "message": "SharePoint not configured"}
 
-        files = self._sharepoint.fetch_file_contents()
+        files: list[SharePointFileContent] = self._sharepoint.fetch_file_contents()
         if not files:
             return {"status": "skipped", "message": "No files retrieved from SharePoint"}
 
         indexed_hashes = self._search.get_indexed_file_hashes()
-        results = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
+        results: IngestionResult = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
 
         for file_info in files:
             try:
@@ -118,13 +138,23 @@ class IngestionService:
                 results["details"].append({"filename": file_info["name"], "status": "indexed"})
 
             except Exception as e:
-                logger.exception("sharepoint_ingest_failed", filename=file_info.get("name", "unknown"))
+                logger.exception(
+                    "sharepoint_ingest_failed", filename=file_info.get("name", "unknown")
+                )
                 results["failed"] += 1
-                results["details"].append({"filename": file_info.get("name", "unknown"), "status": "failed", "error": str(e)})
+                results["details"].append(
+                    {
+                        "filename": file_info.get("name", "unknown"),
+                        "status": "failed",
+                        "error": str(e),
+                    }
+                )
 
-        return results
+        return cast(dict[str, Any], results)
 
-    def ingest_raw_document(self, data: bytes, filename: str, source: str = "upload") -> dict[str, Any]:
+    def ingest_raw_document(
+        self, data: bytes, filename: str, source: str = "upload"
+    ) -> dict[str, Any]:
         """Ingest a single raw document (e.g. from a manual upload endpoint)."""
         file_hash = compute_file_hash(data)
         indexed_hashes = self._search.get_indexed_file_hashes()
@@ -178,19 +208,21 @@ class IngestionService:
 
         # Build search documents
         search_docs = []
-        for chunk, embedding in zip(chunks, all_embeddings):
-            search_docs.append({
-                "chunk_id": chunk.chunk_id,
-                "content": chunk.content,
-                "content_vector": embedding,
-                "source": chunk.source,
-                "filename": chunk.filename,
-                "document_type": chunk.document_type or document_type,
-                "section": chunk.section,
-                "page_number": chunk.page_number or 0,
-                "chunk_index": chunk.chunk_index,
-                "file_hash": chunk.file_hash,
-            })
+        for chunk, embedding in zip(chunks, all_embeddings, strict=False):
+            search_docs.append(
+                {
+                    "chunk_id": chunk.chunk_id,
+                    "content": chunk.content,
+                    "content_vector": embedding,
+                    "source": chunk.source,
+                    "filename": chunk.filename,
+                    "document_type": chunk.document_type or document_type,
+                    "section": chunk.section,
+                    "page_number": chunk.page_number or 0,
+                    "chunk_index": chunk.chunk_index,
+                    "file_hash": chunk.file_hash,
+                }
+            )
 
         self._search.upload_documents(search_docs)
         logger.info("document_indexed", filename=filename, chunks=len(search_docs))
