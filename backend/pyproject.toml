@@ -82,5 +82,5 @@ source = ["app"]
 omit = ["tests/*", "app/main.py"]
 
 [tool.coverage.report]
-fail_under = 40
+fail_under = 50
 show_missing = true
