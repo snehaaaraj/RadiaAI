@@ -101,7 +101,6 @@ RadiaAi-2.0/
 │   │
 │   ├── tests/
 │   │   └── unit/                      # 19 unit tests
-│   ├── Dockerfile
 │   ├── pyproject.toml
 │   └── requirements.txt
 │
@@ -124,10 +123,7 @@ RadiaAi-2.0/
 │   ├── Dockerfile
 │   └── package.json
 │
-├── docker/
-│   └── nginx.conf
 ├── .env.example
-├── docker-compose.yml
 └── README.md
 ```
 
@@ -219,7 +215,6 @@ Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
 
 ### Prerequisites
 
-- Docker Desktop
 - Node.js 20+ (for local frontend development)
 - Python 3.12+ (for local backend development)
 - Azure subscription with: Azure OpenAI (GPT-5 + text-embedding-3-large), Azure AI Search, Azure Blob Storage
@@ -233,17 +228,7 @@ cp .env.example .env
 # Edit .env with your Azure credentials
 ```
 
-### 2. Run with Docker Compose
-
-```bash
-docker compose up --build
-```
-
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- API Docs: http://localhost:8000/api/docs
-
-### 3. Local backend development (without Docker)
+### 2. Local backend development
 
 ```bash
 cd backend
@@ -259,7 +244,7 @@ On first start, the server will:
 3. Extract, chunk, embed, and index all documents
 4. Subsequent starts skip unchanged documents (~10s startup)
 
-### 4. Local frontend development (without Docker)
+### 3. Local frontend development
 
 ```bash
 cd frontend
@@ -315,7 +300,6 @@ the full reference with descriptions.
 - Secrets are loaded from `.env` (never committed to git)
 - Authentication supports Microsoft Entra ID configuration with local development fallback
 - All API responses use a standardized error envelope (no stack traces exposed)
-- Containers run as non-root users
 - Input validation via Pydantic v2 on all endpoints
 
 ---
@@ -340,4 +324,4 @@ pytest --cov=app --cov=radia_ai # with coverage report
 
 **AI/ML:** Azure OpenAI GPT-5 (reasoning), text-embedding-3-large (3072d), Azure AI Search (vector + semantic)
 
-**Infrastructure:** Docker, nginx, Azure App Service / Container Apps
+**Infrastructure:** Azure App Service / Container Apps
