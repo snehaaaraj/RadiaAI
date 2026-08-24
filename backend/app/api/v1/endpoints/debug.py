@@ -8,7 +8,7 @@ router = APIRouter()
 
 
 @router.get("/debug/config")
-async def debug_config(settings: AppSettings = Depends(get_settings)) -> dict:
+async def debug_config(settings: AppSettings = Depends(get_settings)) -> dict[str, str | list[str]]:
     """Return non-sensitive configuration for debugging."""
     return {
         "environment": settings.environment,
