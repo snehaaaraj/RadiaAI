@@ -6,13 +6,17 @@ import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Grid from '@mui/material/Grid2';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
 import RuleIcon from '@mui/icons-material/Rule';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppContext } from '@/context/useAppContext';
 import { useHealth } from '@/hooks/useHealth';
+import { useIngestDocuments } from '@/hooks/useIngestDocuments';
 import { ROUTES } from '@/utils/constants';
 
 const QUICK_ACTIONS = [
@@ -35,8 +39,13 @@ const QUICK_ACTIONS = [
 export default function Home() {
   const navigate = useNavigate();
   const { data: health, isLoading } = useHealth();
+  const { mutate: ingestDocuments, isPending: isIngesting, isSuccess, isError, data: ingestResult } = useIngestDocuments();
   const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
+
+  const handleIngest = () => {
+    ingestDocuments({ source: 'sharepoint' });
+  };
 
   return (
     <Stack spacing={3}>
@@ -75,8 +84,39 @@ export default function Home() {
               variant="outlined"
             />
           )}
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={isIngesting ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />}
+            onClick={handleIngest}
+            disabled={isIngesting}
+          >
+            {isIngesting ? 'Ingesting...' : 'Ingest Documents'}
+          </Button>
         </Box>
       </motion.div>
+
+      {isSuccess && (
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: -10 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+        >
+          <Alert severity="success" onClose={() => {}}>
+            {ingestResult?.message ?? 'Ingestion triggered successfully'}
+          </Alert>
+        </motion.div>
+      )}
+
+      {isError && (
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: -10 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+        >
+          <Alert severity="error" onClose={() => {}}>
+            Failed to trigger ingestion. Please check backend logs.
+          </Alert>
+        </motion.div>
+      )}
 
       <Grid container spacing={2}>
         {QUICK_ACTIONS.map(({ title, description, icon, path, label }, index) => (

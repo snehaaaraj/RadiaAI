@@ -120,7 +120,6 @@ RadiaAi-2.0/
 │   │   │   ├── jamaRoundtrip/
 │   │   │   └── resources/
 │   │   └── types/                     # TypeScript API interfaces
-│   ├── Dockerfile
 │   └── package.json
 │
 ├── .env.example
@@ -252,6 +251,21 @@ npm install
 npm run start
       # starts Vite dev server on :5173, proxies /api to :8000
 ```
+
+### 4. Frontend deployment to Vercel (temporary production path)
+
+This repository is configured to deploy the frontend from the repo root using [vercel.json](./vercel.json).
+
+1. Import this repo into Vercel (or run `vercel` from the repo root)
+2. Add `VITE_API_BASE_URL` in Vercel Project Settings → Environment Variables
+   - Value format: `https://<your-azure-backend>.azurewebsites.net/api/v1`
+3. Redeploy after env var updates
+4. Ensure the backend `ALLOWED_ORIGINS` includes your Vercel domain(s)
+
+Quick validation after deploy:
+- `GET <azure-backend>/api/v1/health` returns 200
+- Frontend loads without API/CORS errors in browser console
+- Run one small PDF ingestion/review path end-to-end first, then scale up
 
 ---
 

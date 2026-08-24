@@ -141,6 +141,17 @@ export interface DocumentSummary {
   ingested_at: string | null;
 }
 
+export interface IngestRequest {
+  source: string;
+  document_ids?: string[];
+}
+
+export interface IngestResponse {
+  job_id: string;
+  queued_count: number;
+  message: string;
+}
+
 // ---------------------------------------------------------------------------
 // Requirements review
 // ---------------------------------------------------------------------------

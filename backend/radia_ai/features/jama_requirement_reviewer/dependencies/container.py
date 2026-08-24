@@ -124,16 +124,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     app.state.ingestion_service = ingestion_service
 
-    # Auto-sync standards from SharePoint at startup (non-blocking)
-    if sharepoint_client._settings.is_configured:
-        try:
-            result = ingestion_service.ingest_from_sharepoint()
-            logger.info(
-                "sharepoint_auto_sync_complete",
-                **{k: v for k, v in result.items() if k != "details"},
-            )
-        except Exception:
-            logger.exception("sharepoint_auto_sync_failed")
+    # Note: Auto-sync removed for Vercel serverless compatibility.
+    # Use manual ingestion via POST /api/v1/ingest endpoint or UI button instead.
+    logger.info("ingestion_service_ready", message="Manual ingestion available via /api/v1/ingest")
 
     # Review orchestrator (hybrid: deterministic rules + LLM+RAG)
     app.state.review_orchestrator = _build_review_orchestrator(
