@@ -5,7 +5,7 @@
  * Intentionally minimal in Phase 1. Phase 2 will add auth state (user, token).
  */
 
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { createContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ROUTES } from '@/utils/constants';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
@@ -53,7 +53,7 @@ const WORKSPACE_ROUTES: WorkspaceStartPage[] = [
   ROUTES.DOCUMENTS,
 ];
 
-interface AppContextValue {
+export interface AppContextValue {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
   themePreference: ThemePreference;
@@ -71,7 +71,7 @@ interface AppContextValue {
   resetPersonalization: () => void;
 }
 
-const AppContext = createContext<AppContextValue | null>(null);
+export const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpenState] = useState<boolean>(() => {
@@ -168,10 +168,4 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <AppContext.Provider value={value}>{children}</AppContext.Provider>
   );
-}
-
-export function useAppContext(): AppContextValue {
-  const ctx = useContext(AppContext);
-  if (!ctx) throw new Error('useAppContext must be used inside AppProvider');
-  return ctx;
 }

@@ -5,8 +5,9 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
 import { NavigationConfirmDialog } from '@/components/common/NavigationConfirmDialog';
-import { NavigationGuardProvider, useNavigationGuardContext } from '@/context/NavigationGuardContext';
-import { useAppContext } from '@/context/AppContext';
+import { NavigationGuardProvider } from '@/context/NavigationGuardContext';
+import { useAppContext } from '@/context/useAppContext';
+import { useNavigationGuardContext } from '@/context/useNavigationGuardContext';
 import { HEADER_HEIGHT, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 
 function AppLayoutInner() {

@@ -192,7 +192,6 @@ export default function DeltaReview() {
         sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       }
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const updateFormState = (next: Partial<DeltaReviewFormState>) => {
