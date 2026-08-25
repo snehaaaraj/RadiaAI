@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
@@ -21,7 +20,7 @@ import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
-import { getApiErrorMessage } from '@/utils/apiErrorMessage';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
@@ -289,7 +288,26 @@ export default function RequirementReview() {
         </Stack>
       </Paper>
 
-      {isError && <Alert severity="error">Review failed: {getApiErrorMessage(error)}</Alert>}
+      {isError && (
+        <ErrorDisplay
+          error={error}
+          context="Requirement Review"
+          onRetry={() => {
+            if (text.trim()) {
+              runReview({
+                requirement_id: requirementId || undefined,
+                requirement_level: requirementLevel,
+                text: text.trim(),
+              }, {
+                onSuccess: (response) => {
+                  setPersistedResult(response);
+                  playReviewCompleteSound();
+                },
+              });
+            }
+          }}
+        />
+      )}
 
       {activeResult && (
         <Stack spacing={2} ref={resultRef}>

@@ -38,6 +38,7 @@ from azure.storage.blob import BlobServiceClient, ContentSettings
 from openai import AzureOpenAI
 
 from app.core.config import AppSettings, AzureBlobSettings, AzureOpenAISettings, AzureSearchSettings
+from app.core.exceptions import EmbeddingError, LLMError
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -63,14 +64,29 @@ class OpenAIClient:
         """Generate embedding vectors for a batch of texts."""
         if not texts:
             return []
-        # Truncate to stay within the 8192 token limit
-        truncated = [t[:30000] for t in texts]
-        response = self._client.embeddings.create(
-            input=truncated,
-            model=self._settings.embedding_deployment,
-            dimensions=self._settings.embedding_dimensions,
-        )
-        return [item.embedding for item in response.data]
+
+        try:
+            # Truncate to stay within the 8192 token limit
+            truncated = [t[:30000] for t in texts]
+            response = self._client.embeddings.create(
+                input=truncated,
+                model=self._settings.embedding_deployment,
+                dimensions=self._settings.embedding_dimensions,
+            )
+            return [item.embedding for item in response.data]
+        except Exception as e:
+            logger.error(
+                "embedding_generation_failed",
+                model=self._settings.embedding_deployment,
+                text_count=len(texts),
+                error=str(e),
+            )
+            raise EmbeddingError(
+                message=f"Failed to generate embeddings for {len(texts)} text(s)",
+                model=self._settings.embedding_deployment,
+                original_error=str(e),
+                detail={"text_count": len(texts)},
+            ) from e
 
     def chat_completion(
         self,
@@ -80,19 +96,33 @@ class OpenAIClient:
         max_tokens: int | None = None,
     ) -> str:
         """Run a chat completion and return the assistant message content."""
-        kwargs: dict[str, Any] = {
-            "model": self._settings.chat_deployment,
-            "messages": messages,
-            "max_completion_tokens": max_tokens or self._settings.max_tokens,
-        }
-        # Some models (e.g. GPT-5, o-series) only support temperature=1.
-        # Only pass temperature if explicitly requested and non-default.
-        temp = temperature if temperature is not None else self._settings.temperature
-        if temp > 0.0:
-            kwargs["temperature"] = temp
+        try:
+            kwargs: dict[str, Any] = {
+                "model": self._settings.chat_deployment,
+                "messages": messages,
+                "max_completion_tokens": max_tokens or self._settings.max_tokens,
+            }
+            # Some models (e.g. GPT-5, o-series) only support temperature=1.
+            # Only pass temperature if explicitly requested and non-default.
+            temp = temperature if temperature is not None else self._settings.temperature
+            if temp > 0.0:
+                kwargs["temperature"] = temp
 
-        response = self._client.chat.completions.create(**kwargs)
-        return response.choices[0].message.content or ""
+            response = self._client.chat.completions.create(**kwargs)
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            logger.error(
+                "chat_completion_failed",
+                model=self._settings.chat_deployment,
+                message_count=len(messages),
+                error=str(e),
+            )
+            raise LLMError(
+                message=f"Chat completion failed with model {self._settings.chat_deployment}",
+                model=self._settings.chat_deployment,
+                original_error=str(e),
+                detail={"message_count": len(messages)},
+            ) from e
 
 
 # ---------------------------------------------------------------------------
