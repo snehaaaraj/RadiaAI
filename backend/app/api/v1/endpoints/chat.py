@@ -2,9 +2,7 @@
 Chat endpoint — RAG question answering.
 
 POST /api/v1/chat
-
-Phase 1: Returns a stub response to validate the API contract.
-Phase 4: Will wire in the full RAG pipeline (retrieval → prompt → LLM).
+TODO: Implement the full RAG pipeline for chatbot.
 """
 
 from fastapi import APIRouter, Request, status
@@ -35,8 +33,7 @@ async def chat(
     """
     RAG chat endpoint.
 
-    Phase 1 stub — returns a placeholder response.
-    The real implementation will inject a ChatService via Depends() in Phase 4.
+    Returns a placeholder response until the full RAG pipeline is implemented.
     """
     logger.info(
         "chat_request",
@@ -47,7 +44,7 @@ async def chat(
 
     # Stub response
     stub_response = ChatResponse(
-        answer=("This is a Phase 1 stub response."),
+        answer=("This is a stub response."),
         citations=[],
         model="stub",
         retrieval_count=0,
