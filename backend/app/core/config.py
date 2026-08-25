@@ -160,6 +160,22 @@ class AppSettings(BaseSettings):
         description="CORS allowed origins",
     )
 
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, value: str | list[str]) -> list[str]:
+        """Parse ALLOWED_ORIGINS from JSON string or list."""
+        if isinstance(value, str):
+            import json
+
+            try:
+                parsed = json.loads(value)
+                if isinstance(parsed, list):
+                    return parsed
+            except json.JSONDecodeError:
+                # Fall back to comma-separated string
+                return [origin.strip() for origin in value.split(",") if origin.strip()]
+        return value if isinstance(value, list) else []
+
     # --- RAG ---
     retrieval_top_k: int = Field(
         default=5, ge=1, le=20, description="Number of chunks to retrieve per query"
