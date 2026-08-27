@@ -136,9 +136,11 @@ def _register_middleware(app: FastAPI, settings: AppSettings) -> None:
     """Attach all middleware to the application in correct order (outermost first)."""
 
     # CORS — must be outermost so preflight OPTIONS requests are handled correctly
+    # Support both explicit origins and Vercel preview deployments
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
+        allow_origin_regex=r"https://.*\.vercel\.app",
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
