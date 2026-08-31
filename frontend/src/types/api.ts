@@ -322,6 +322,7 @@ export interface ReviewHistoryEntry {
   findings: ReviewFinding[];
   determinism: DeterminismContext;
   dispositions: FindingDisposition[];
+  finding_to_requirement_map: Record<number, string>; // For delta: flattened index -> requirement_id
 }
 
 export interface ReviewHistoryListResponse {

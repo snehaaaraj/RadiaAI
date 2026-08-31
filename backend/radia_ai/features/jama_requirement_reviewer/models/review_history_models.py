@@ -65,6 +65,8 @@ class ReviewHistoryEntry(BaseModel):
     findings: list[ReviewFinding] = Field(default_factory=list)
     determinism: DeterminismContext
     dispositions: list[FindingDisposition] = Field(default_factory=list)
+    # For delta reviews: map flattened finding index -> requirement_id
+    finding_to_requirement_map: dict[int, str] = Field(default_factory=dict)
 
 
 class ReviewHistoryListResponse(BaseModel):
@@ -103,7 +105,13 @@ def create_delta_history_entry(
     """Create a normalized history entry from delta response."""
     findings = []
     category_results = []
+    finding_to_requirement_map: dict[int, str] = {}
+    global_index = 0
+
     for requirement_result in response.reviewed_requirements:
+        for _ in requirement_result.findings:
+            finding_to_requirement_map[global_index] = requirement_result.requirement_id
+            global_index += 1
         findings.extend(requirement_result.findings)
         category_results.extend(requirement_result.category_results)
 
@@ -117,4 +125,5 @@ def create_delta_history_entry(
         category_results=category_results,
         findings=findings,
         determinism=response.determinism,
+        finding_to_requirement_map=finding_to_requirement_map,
     )

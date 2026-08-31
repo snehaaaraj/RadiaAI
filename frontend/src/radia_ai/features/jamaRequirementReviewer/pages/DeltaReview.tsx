@@ -27,56 +27,64 @@ import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 import { isReviewFailed, isReviewIncomplete } from '@/utils/reviewCompletion';
 
-const BASELINE_SAMPLE = JSON.stringify(
-  [
-    {
-      requirement_id: 'REQ-001',
-      text: 'The subsystem shall enable diagnostics within 2 seconds.',
-      requirement_level: 'System',
-      metadata: { parent_id: 'P-100', verification_method: 'test' },
-    },
-    {
-      requirement_id: 'REQ-002',
-      text: 'The subsystem shall provide telemetry every 1 second.',
-      requirement_level: 'System',
-      metadata: { parent_id: 'P-100', verification_method: 'analysis' },
-    },
-  ],
-  null,
-  2
-);
+// Simple text format: one requirement per line (REQ-ID: requirement text)
+const BASELINE_SAMPLE = `REQ-SYS-001: The flight control system shall maintain altitude within ±50 feet of the commanded altitude during cruise flight.
+REQ-SYS-002: The telemetry system shall transmit position data to ground control at intervals not exceeding 1.0 seconds.`;
 
-const UPDATED_SAMPLE = JSON.stringify(
-  [
-    {
-      requirement_id: 'REQ-001',
-      text: 'The subsystem shall enable diagnostics within 1 second.',
-      requirement_level: 'System',
-      metadata: { parent_id: 'P-100', verification_method: 'test' },
-    },
-    {
-      requirement_id: 'REQ-003',
-      text: 'The subsystem shall provide built-in test under nominal conditions.',
-      requirement_level: 'System',
-      metadata: { parent_id: 'P-110', verification_method: 'inspection' },
-    },
-  ],
-  null,
-  2
-);
+const UPDATED_SAMPLE = `REQ-SYS-001: The flight control system shall maintain altitude within ±25 feet of the commanded altitude during cruise flight under nominal conditions.
+REQ-SYS-003: The diagnostic system shall execute a complete self-test sequence within 5.0 seconds of system power-on.`;
 
 const TRACE_SAMPLE = JSON.stringify(
   [
     {
-      requirement_id: 'REQ-001',
+      requirement_id: 'REQ-SYS-001',
       change_type: 'modified',
-      previous_parent_id: 'P-090',
-      current_parent_id: 'P-100',
+      previous_parent_id: 'SYS-FC-090',
+      current_parent_id: 'SYS-FC-100',
     },
   ],
   null,
   2
 );
+
+/**
+ * Parse simple text format (one requirement per line) into RequirementReviewInput array.
+ * Format: REQ-ID: requirement text
+ * Example: REQ-001: The system shall respond within 100ms.
+ */
+function parseRequirementsFromText(text: string): Array<{
+  requirement_id: string;
+  text: string;
+  requirement_level?: string;
+  metadata?: Record<string, unknown>;
+}> {
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const colonIndex = line.indexOf(':');
+      if (colonIndex === -1) {
+        throw new Error(`Invalid format: "${line}". Expected "REQ-ID: requirement text"`);
+      }
+      const requirementId = line.substring(0, colonIndex).trim();
+      const requirementText = line.substring(colonIndex + 1).trim();
+      
+      if (!requirementId) {
+        throw new Error(`Missing requirement ID in line: "${line}"`);
+      }
+      if (!requirementText) {
+        throw new Error(`Missing requirement text in line: "${line}"`);
+      }
+
+      return {
+        requirement_id: requirementId,
+        text: requirementText,
+        requirement_level: 'System',
+        metadata: {},
+      };
+    });
+}
 
 type JsonInputMode = 'paste' | 'upload';
 type DeltaReviewFormState = {
@@ -276,8 +284,8 @@ export default function DeltaReview() {
                   }
                 }}
               >
-                <ToggleButton value="paste">Paste JSON</ToggleButton>
-                <ToggleButton value="upload">Upload .json</ToggleButton>
+                <ToggleButton value="paste">Paste text</ToggleButton>
+                <ToggleButton value="upload">Upload .txt</ToggleButton>
               </ToggleButtonGroup>
               <Button variant="outlined" color="inherit" onClick={handleClearAll}>
                 Clear Review
@@ -294,11 +302,13 @@ export default function DeltaReview() {
                   setBaselineJson(nextValue);
                   updateFormState({ baselineJson: nextValue });
                 }}
+                placeholder="REQ-SYS-001: The system shall...&#10;REQ-SYS-002: The subsystem shall..."
+                helperText="Enter one requirement per line in format: REQ-ID: requirement text"
               />
             ) : (
               <FileUploadZone
-                accept=".json"
-                label="Upload baseline requirements as a .json file"
+                accept=".txt,.json"
+                label="Upload baseline requirements as a .txt or .json file"
                 onFileContent={(content, filename) => {
                   setBaselineJson(content);
                   setBaselineFilename(filename);
@@ -336,8 +346,8 @@ export default function DeltaReview() {
               }}
               sx={{ mb: 1 }}
             >
-              <ToggleButton value="paste">Paste JSON</ToggleButton>
-              <ToggleButton value="upload">Upload .json</ToggleButton>
+              <ToggleButton value="paste">Paste text</ToggleButton>
+              <ToggleButton value="upload">Upload .txt</ToggleButton>
             </ToggleButtonGroup>
             {updatedMode === 'paste' ? (
               <TextField
@@ -350,11 +360,13 @@ export default function DeltaReview() {
                   setUpdatedJson(nextValue);
                   updateFormState({ updatedJson: nextValue });
                 }}
+                placeholder="REQ-SYS-001: The system shall...&#10;REQ-SYS-003: The subsystem shall..."
+                helperText="Enter one requirement per line in format: REQ-ID: requirement text"
               />
             ) : (
               <FileUploadZone
-                accept=".json"
-                label="Upload updated requirements as a .json file"
+                accept=".txt,.json"
+                label="Upload updated requirements as a .txt or .json file"
                 onFileContent={(content, filename) => {
                   setUpdatedJson(content);
                   setUpdatedFilename(filename);
@@ -433,8 +445,8 @@ export default function DeltaReview() {
                 try {
                   const payload: DeltaReviewInput = {
                     specification_id: specificationId || undefined,
-                    baseline_requirements: JSON.parse(baselineJson),
-                    updated_requirements: JSON.parse(updatedJson),
+                    baseline_requirements: parseRequirementsFromText(baselineJson),
+                    updated_requirements: parseRequirementsFromText(updatedJson),
                     changed_trace_links: traceJson.trim() ? JSON.parse(traceJson) : [],
                   };
                   setParseError('');
@@ -509,41 +521,57 @@ export default function DeltaReview() {
               {activeResult.reviewed_requirements.length === 0 ? (
                 <Alert severity="success">No changed requirements to review.</Alert>
               ) : (
-                activeResult.reviewed_requirements.map((reviewedRequirement) => (
-                  <Paper key={reviewedRequirement.requirement_id} variant="outlined" sx={{ p: 1.75, borderRadius: 3 }}>
-                    <Stack spacing={1.5}>
-                      <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
-                        <Typography variant="h6" fontWeight={800}>
-                          {reviewedRequirement.requirement_id}
-                        </Typography>
-                        <ReviewStatusChip status={reviewedRequirement.overall} />
-                      </Box>
-                      {isReviewFailed(reviewedRequirement.completion) ? (
-                        <ReviewIncompleteNotice completion={reviewedRequirement.completion} />
-                      ) : (
-                        <>
-                          <ReviewQualityBand
-                            label="Requirement score"
-                            score={getReviewQualityScore(
-                              reviewedRequirement.overall,
-                              reviewedRequirement.findings
-                            )}
-                          />
-                          <CategoryScoreGrid categories={reviewedRequirement.category_results} />
-                          <ReviewChangeSet
-                            findings={reviewedRequirement.findings}
-                            reviewId={activeResult.review_id}
-                            onApplyDisposition={(reviewId, payload) => {
-                              sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
-                              applyDisposition({ reviewId, payload });
-                            }}
-                            isApplyingDisposition={isApplyingDisposition}
-                          />
-                        </>
-                      )}
-                    </Stack>
-                  </Paper>
-                ))
+                (() => {
+                  // Build a map from requirement_id -> starting flattened finding index
+                  const requirementToStartIndex: Record<string, number> = {};
+                  let globalIndex = 0;
+                  for (const req of activeResult.reviewed_requirements) {
+                    requirementToStartIndex[req.requirement_id] = globalIndex;
+                    globalIndex += req.findings.length;
+                  }
+
+                  return activeResult.reviewed_requirements.map((reviewedRequirement) => (
+                    <Paper key={reviewedRequirement.requirement_id} variant="outlined" sx={{ p: 1.75, borderRadius: 3 }}>
+                      <Stack spacing={1.5}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
+                          <Typography variant="h6" fontWeight={800}>
+                            {reviewedRequirement.requirement_id}
+                          </Typography>
+                          <ReviewStatusChip status={reviewedRequirement.overall} />
+                        </Box>
+                        {isReviewFailed(reviewedRequirement.completion) ? (
+                          <ReviewIncompleteNotice completion={reviewedRequirement.completion} />
+                        ) : (
+                          <>
+                            <ReviewQualityBand
+                              label="Requirement score"
+                              score={getReviewQualityScore(
+                                reviewedRequirement.overall,
+                                reviewedRequirement.findings
+                              )}
+                            />
+                            <CategoryScoreGrid categories={reviewedRequirement.category_results} />
+                            <ReviewChangeSet
+                              findings={reviewedRequirement.findings}
+                              reviewId={activeResult.review_id}
+                              onApplyDisposition={(reviewId, payload) => {
+                                // Translate per-requirement finding index to global flattened index
+                                const startIndex = requirementToStartIndex[reviewedRequirement.requirement_id] ?? 0;
+                                const globalFindingIndex = startIndex + payload.finding_index;
+                                sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
+                                applyDisposition({
+                                  reviewId,
+                                  payload: { ...payload, finding_index: globalFindingIndex },
+                                });
+                              }}
+                              isApplyingDisposition={isApplyingDisposition}
+                            />
+                          </>
+                        )}
+                      </Stack>
+                    </Paper>
+                  ));
+                })()
               )}
             </Stack>
           </Paper>
