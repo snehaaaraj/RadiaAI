@@ -33,6 +33,7 @@ import {
   type ParsedRequirement,
 } from '@/radia_ai/features/jamaRequirementReviewer/utils/pdfRequirementParser';
 import type { RequirementReviewResponse } from '@/types/api';
+import { normalizeRequirementText, prepareFlatTextForNormalization } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
 type ReviewState = 'pending' | 'reviewing' | 'done' | 'error';
@@ -103,7 +104,7 @@ export default function SetReview() {
     runReview(
       {
         requirement_id: req.id,
-        text: req.text,
+        text: normalizeRequirementText(prepareFlatTextForNormalization(req.rawText)),
         requirement_level: 'Aircraft',
       },
       {
@@ -194,9 +195,14 @@ export default function SetReview() {
               <Chip label={uploadedFilename} onDelete={handleClearAll} size="small" />
             )}
             {requirements.length > 0 && (
-              <Typography variant="body2" color="text.secondary">
-                {requirements.length} requirement{requirements.length !== 1 ? 's' : ''} found
-              </Typography>
+              <>
+                <Typography variant="body2" color="text.secondary">
+                  {requirements.length} requirement{requirements.length !== 1 ? 's' : ''} found
+                </Typography>
+                <Button variant="outlined" color="inherit" size="small" onClick={handleClearAll}>
+                  Clear
+                </Button>
+              </>
             )}
           </Box>
 
@@ -268,7 +274,7 @@ export default function SetReview() {
           <Stack spacing={2}>
             <Box display="flex" justifyContent="space-between" alignItems="center">
               <Box>
-                <Typography variant="h6" fontWeight={700}>
+                <Typography variant="h6" fontWeight={400}>
                   {activeReq.id} — {activeReq.title}
                 </Typography>
                 {activeReq.section && (
@@ -289,7 +295,7 @@ export default function SetReview() {
               sx={{ p: 2, bgcolor: 'action.hover', maxHeight: 200, overflow: 'auto' }}
             >
               <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
-                {activeReq.text}
+                {normalizeRequirementText(prepareFlatTextForNormalization(activeReq.rawText))}
               </Typography>
             </Paper>
 
