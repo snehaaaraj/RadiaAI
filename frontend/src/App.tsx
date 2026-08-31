@@ -14,6 +14,7 @@ import Settings from '@/pages/Settings';
 import Home from '@/radia_ai/features/jamaRequirementReviewer/pages/Home';
 import RequirementReview from '@/radia_ai/features/jamaRequirementReviewer/pages/RequirementReview';
 import DeltaReview from '@/radia_ai/features/jamaRequirementReviewer/pages/DeltaReview';
+import SetReview from '@/radia_ai/features/jamaRequirementReviewer/pages/SetReview';
 import ReviewHistory from '@/radia_ai/features/jamaRequirementReviewer/pages/ReviewHistory';
 import Standards from '@/radia_ai/features/jamaRequirementReviewer/pages/Standards';
 import JamaRoundtripHome from '@/radia_ai/features/jamaRoundtrip/pages/JamaRoundtripHome';
@@ -47,6 +48,7 @@ export default function App() {
               <Route element={<AppLayout />}>
                 <Route path={ROUTES.HOME} element={<Home />} />
                 <Route path={ROUTES.REVIEW_REQUIREMENT} element={<RequirementReview />} />
+                <Route path={ROUTES.REVIEW_SET} element={<SetReview />} />
                 <Route path={ROUTES.REVIEW_DELTA} element={<DeltaReview />} />
                 <Route path={ROUTES.REVIEW_HISTORY} element={<ReviewHistory />} />
                 <Route path={ROUTES.STANDARDS} element={<Standards />} />

@@ -11,6 +11,7 @@ import Typography from '@mui/material/Typography';
 import HomeIcon from '@mui/icons-material/Home';
 import RuleIcon from '@mui/icons-material/Rule';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import HistoryIcon from '@mui/icons-material/History';
 import MenuBookIcon from '@mui/icons-material/MenuBook';
 import PaletteIcon from '@mui/icons-material/Palette';
@@ -29,6 +30,7 @@ import { useActiveScrollSection } from '@/hooks/useActiveScrollSection';
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
   { label: 'Single Review', icon: <RuleIcon />, path: ROUTES.REVIEW_REQUIREMENT },
+  { label: 'Set Review', icon: <PlaylistAddCheckIcon />, path: ROUTES.REVIEW_SET },
   { label: 'Delta Review', icon: <CompareArrowsIcon />, path: ROUTES.REVIEW_DELTA },
   { label: 'Review History', icon: <HistoryIcon />, path: ROUTES.REVIEW_HISTORY },
   { label: 'Standards', icon: <MenuBookIcon />, path: ROUTES.STANDARDS },

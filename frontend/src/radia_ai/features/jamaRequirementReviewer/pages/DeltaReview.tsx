@@ -56,7 +56,7 @@ function parseRequirementsFromText(text: string): Array<{
   requirement_id: string;
   text: string;
   requirement_level?: string;
-  metadata?: Record<string, unknown>;
+  metadata?: Record<string, string>;
 }> {
   return text
     .split('\n')
