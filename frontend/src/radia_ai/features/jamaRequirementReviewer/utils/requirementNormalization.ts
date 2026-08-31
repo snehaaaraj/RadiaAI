@@ -129,7 +129,6 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
       if (!fields[fieldKey]) fields[fieldKey] = [];
       const content = truncateAtTrailingMetadata(inlineValue);
       if (content) fields[fieldKey].push(content);
-      if (containsTrailingMetadata(inlineValue)) stopParsing = true;
       continue;
     }
 
