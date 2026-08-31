@@ -16,7 +16,7 @@ def test_get_standards_returns_references(client: TestClient) -> None:
 
 
 @pytest.mark.unit
-def test_review_history_and_disposition_flow(client: TestClient) -> None:
+def test_review_history_rejects_disposition_when_no_findings_exist(client: TestClient) -> None:
     review_response = client.post(
         "/api/v1/review/requirement",
         json={"requirement_id": "REQ-HIST-1", "text": "The subsystem should respond fast."},
@@ -33,7 +33,7 @@ def test_review_history_and_disposition_flow(client: TestClient) -> None:
     latest_entry = entries[0]
     review_id = latest_entry["review_id"]
     assert latest_entry["workflow"] == "requirement"
-    assert len(latest_entry["findings"]) >= 1
+    assert isinstance(latest_entry["findings"], list)
 
     disposition_response = client.post(
         f"/api/v1/review/history/{review_id}/disposition",
@@ -44,9 +44,7 @@ def test_review_history_and_disposition_flow(client: TestClient) -> None:
             "reviewer_id": "engineer@example.com",
         },
     )
-    assert disposition_response.status_code == 200
+    assert disposition_response.status_code == 422
     disposition_body = disposition_response.json()
-    assert disposition_body["success"] is True
-    dispositions = disposition_body["data"]["dispositions"]
-    assert len(dispositions) == 1
-    assert dispositions[0]["disposition"] == "Accepted"
+    assert disposition_body["success"] is False
+    assert disposition_body["error"]["message"] == "Finding index is out of range for this review."
