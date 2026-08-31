@@ -1,8 +1,8 @@
 # Radia AI 2.0
 
 AI-powered Requirements Engineering platform for aerospace and systems teams.
-Combines deterministic, rule-based requirement quality checks with Retrieval-Augmented Generation (RAG) 
-against indexed standards documents to provide grounded, traceable, and explainable requirement reviews.
+Uses Retrieval-Augmented Generation (RAG) against indexed standards documents to provide 
+grounded, traceable, and explainable requirement reviews.
 
 ---
 
@@ -29,11 +29,10 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 │            FastAPI + Python 3.12 + Pydantic v2             │
 │                       port 8000                            │
 │                                                            │
-│  Hybrid review pipeline:                                   │
-│    1. Deterministic rules (regex, word lists) — instant    │
-│    2. RAG retrieval (Azure AI Search) — ~5s               │
-│    3. GPT-5 consolidated review — runs in parallel         │
-│    4. Merge + enrich with SharePoint URLs                  │
+│  LLM-based review pipeline:                                   │
+│    1. RAG retrieval (Azure AI Search) — ~5s                   │
+│    2. GPT-5 consolidated review                               │
+│    3. Enrich with SharePoint URLs                             │
 │                                                            │
 │  Auto-ingestion at startup:                                │
 │    SharePoint → extract text → chunk → embed → index       │
@@ -63,15 +62,11 @@ RadiaAi-2.0/
 │   │       │   ├── dependencies/      # DI container + lifespan (Azure client init)
 │   │       │   ├── models/            # Pydantic domain models (review, standards)
 │   │       │   ├── repositories/      # review history persistence
-│   │       │   ├── reviewers/         # hybrid reviewer modules:
+│   │       │   ├── reviewers/         # LLM-based reviewer modules:
 │   │       │   │   ├── base.py        #   abstract reviewer interface
-│   │       │   │   ├── orchestrator.py#   parallel deterministic + LLM orchestration
-│   │       │   │   ├── language/      #   modal verbs, ambiguity, banned words
-│   │       │   │   ├── structure/     #   compound reqs, EARS syntax, levels
-│   │       │   │   ├── verifiability/ #   measurability, operating conditions
+│   │       │   │   ├── orchestrator.py#   LLM review orchestration
 │   │       │   │   ├── traceability/  #   parent/child, allocation (LLM-powered)
 │   │       │   │   └── certification/ #   DO-178, DAL, safety (LLM-powered)
-│   │       │   ├── rules/             # deterministic rule constants (word lists)
 │   │       │   ├── schemas/           # API request/response schemas
 │   │       │   ├── services/          # review, delta, history, standards services
 │   │       │   ├── standards/         # standards registry (fallback)
@@ -130,25 +125,22 @@ RadiaAi-2.0/
 
 ## Review Pipeline
 
-The review system uses a **hybrid architecture** — deterministic rules run in parallel
-with a single consolidated GPT-5 + RAG call:
+The review system uses **LLM-based architecture** with GPT-5 + RAG:
 
 ```
                         ┌─────────────────────────┐
-    Input Requirement   │    ThreadPoolExecutor    │
+    Input Requirement   │   LLM Review Pipeline    │
     ─────────────────►  │                         │
-                        │  Thread 1: Deterministic │  ← regex rules (~1ms)
-                        │    language/structure/   │
-                        │    verifiability checks  │
-                        │                         │
-                        │  Thread 2: LLM + RAG    │  ← GPT-5 (~60s)
-                        │    1. Embed query        │
-                        │    2. Search (diverse)   │
-                        │    3. GPT-5 consolidated │
-                        │       review prompt      │
+                        │  1. Embed query          │
+                        │  2. Search (diverse)     │  ← Azure AI Search (~5s)
+                        │  3. GPT-5 consolidated   │  ← GPT-5 (~60s)
+                        │     review prompt        │
+                        │     (language/structure/ │
+                        │      verifiability/      │
+                        │      traceability/       │
+                        │      certification)      │
                         └────────────┬────────────┘
                                      │
-                              Merge findings
                               Enrich references
                               (SharePoint URLs)
                                      │
@@ -157,7 +149,6 @@ with a single consolidated GPT-5 + RAG call:
 ```
 
 **Key behaviors:**
-- Deterministic rules provide instant feedback for common issues
 - GPT-5 provides deeper analysis grounded in indexed standards documents
 - All findings include a `suggested_rewrite` (full improved requirement text)
 - References point to actual SharePoint document URLs, not hardcoded names

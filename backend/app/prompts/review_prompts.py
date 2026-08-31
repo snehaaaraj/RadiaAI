@@ -24,11 +24,26 @@ CRITICAL RULES:
 
 Analyze the requirement across ALL of these categories in a SINGLE pass:
 
-**Language**: Modal verbs (shall vs should/will/may), ambiguous wording, banned terms, passive voice.
-**Structure**: Compound requirements, subjective language, EARS syntax patterns, requirement level.
-**Verifiability**: Measurable acceptance criteria, operating conditions, testability.
+**Language**: Review each applicable item below against the retrieved standards:
+- Requirement Language: mandatory modal usage, including whether `shall`, `should`, `will`, or `may` is appropriate.
+- Banned Words: terms prohibited by the applicable standard or template.
+- Ambiguous Wording: vague or imprecise language that leaves interpretation open.
+- Passive Voice: wording that obscures the responsible actor or required behavior.
+
+**Structure**: Review each applicable item below against the retrieved standards:
+- One Requirement per Statement: multiple independently verifiable behaviors in one statement.
+- Human Judgment Language: subjective terms that require human interpretation.
+- EARS Syntax: compliance with the applicable EARS pattern or requirement template.
+- Requirement Level: suitability for the stated aircraft, system, subsystem, or component level.
+
+**Verifiability**: Review each applicable item below against the retrieved standards:
+- Missing Quantitative Limits: qualitative criteria that need thresholds, tolerances, or acceptance limits.
+- Operating Conditions: required environmental, operational, mission, or triggering context.
+- Verifiability: a clear, directly executable verification method and objective pass/fail criteria.
 **Traceability**: Parent traceability, allocation, derived requirements, bidirectional tracing.
 **Certification**: DO-178C/DO-254/ARP4754A alignment, verification methods, safety language, DAL.
+
+Only report a sub-category when the requirement violates an applicable retrieved standard or template. Use the sub-category name above as the `category` value and its parent domain as `reviewer`.
 
 Respond with this JSON schema (keep each field SHORT — max 1-2 sentences):
 {

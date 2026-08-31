@@ -1,4 +1,4 @@
-"""Hybrid (deterministic + LLM) requirements review domain models."""
+"""Requirements review domain models."""
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ class DeterminismConfigSnapshot(BaseModel):
     """
 
     temperature: float = Field(
-        description="Model sampling temperature. Must stay at 0.0 for deterministic reviews."
+        description="Model sampling temperature."
     )
     max_tokens: int = Field(description="Maximum completion token budget.")
     retrieval_top_k: int = Field(description="Configured retrieval depth used by review engines.")
@@ -106,7 +106,7 @@ class ReviewerResult(BaseModel):
 
 
 class RequirementReviewInput(BaseModel):
-    """Input payload for single-requirement deterministic review."""
+    """Input payload for single-requirement review."""
 
     requirement_id: str | None = None
     text: str = Field(min_length=1, description="Requirement text to review.")

@@ -1,9 +1,8 @@
 """
 Consolidated LLM review enhancer — single GPT-5 call for all categories.
 
-Makes ONE LLM call covering language, structure, verifiability, traceability,
-and certification. Runs in parallel with deterministic rule checks via the
-orchestrator. Merges LLM findings with deterministic ones.
+Makes one standards-grounded RAG and LLM call covering language, structure,
+verifiability, traceability, and certification.
 """
 
 from __future__ import annotations

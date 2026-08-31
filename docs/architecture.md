@@ -1,11 +1,11 @@
 # Radia AI Architecture
 
-Radia AI is a deterministic, explainable requirements-engineering platform for aerospace and systems teams. It combines a React frontend with a FastAPI backend to support requirement quality review, delta review, standards lookup, review history, and document-oriented workflows.
+Radia AI is an explainable requirements-engineering platform for aerospace and systems teams. It combines a React frontend with a FastAPI backend to support requirement quality review, delta review, standards lookup, review history, and document-oriented workflows.
 
 ## 1. System goals
 
 - Make requirement review repeatable and explainable
-- Keep every finding grounded in deterministic rules
+- Keep every finding grounded in standards
 - Preserve review history and disposition decisions
 - Provide clear references back to engineering standards
 - Support a modern, usable workflow for technical reviewers
@@ -24,7 +24,7 @@ Radia AI is a deterministic, explainable requirements-engineering platform for a
 │                   FastAPI + Python 3.12                     │
 │  api/      → HTTP route handlers                             │
 │  services/  → orchestration and business rules               │
-│  reviewers/ → deterministic review engines                  │
+│  reviewers/ → LLM-based review engines                      │
 │  standards/ → standards catalog and reference resolution    │
 │  diff/     → delta computation for revision review          │
 │  repositories/ → review history persistence and dispositions│
@@ -98,9 +98,9 @@ The backend is a layered FastAPI application.
 - **repositories**: history persistence abstraction
 - **connectors**: external source adapters
 
-## 5. Deterministic review workflow
+## 5. Review workflow
 
-The review engine is built to be reproducible.
+The review engine provides explainable, LLM-based requirement analysis.
 
 ### Single requirement review
 
@@ -112,7 +112,7 @@ The review engine is built to be reproducible.
    - overall status
    - category results
    - findings
-   - determinism metadata
+   - version metadata
    - review ID
 
 ### Delta review

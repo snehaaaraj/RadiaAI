@@ -6,7 +6,7 @@ abstract interfaces. Endpoint handlers declare what they need via type annotatio
 and Depends(); this module provides the actual instances.
 
 Initialises Azure OpenAI, Azure AI Search, and Blob Storage clients at startup.
-Wires the LLM review enhancer into all reviewers for hybrid (rules + AI) review.
+Wires the LLM review enhancer into all reviewers for LLM-based review.
 """
 
 from collections.abc import AsyncGenerator
@@ -30,16 +30,9 @@ from radia_ai.features.jama_requirement_reviewer.repositories.review_history_rep
 from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import (
     CertificationReviewer,
 )
-from radia_ai.features.jama_requirement_reviewer.reviewers.language.reviewer import LanguageReviewer
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
-from radia_ai.features.jama_requirement_reviewer.reviewers.structure.reviewer import (
-    StructureReviewer,
-)
 from radia_ai.features.jama_requirement_reviewer.reviewers.traceability.reviewer import (
     TraceabilityReviewer,
-)
-from radia_ai.features.jama_requirement_reviewer.reviewers.verifiability.reviewer import (
-    VerifiabilityReviewer,
 )
 from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import (
     RequirementDeltaReviewService,
@@ -128,7 +121,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Use manual ingestion via POST /api/v1/ingest endpoint or UI button instead.
     logger.info("ingestion_service_ready", message="Manual ingestion available via /api/v1/ingest")
 
-    # Review orchestrator (hybrid: deterministic rules + LLM+RAG)
+    # Review orchestrator (LLM-based review)
     app.state.review_orchestrator = _build_review_orchestrator(
         settings,
         app.state.standards_service,
@@ -160,13 +153,10 @@ def _build_review_orchestrator(
     standards_service: StandardsService | None = None,
     llm_enhancer: LLMReviewEnhancer | None = None,
 ) -> ReviewOrchestrator:
-    """Construct the hybrid review orchestrator with registered reviewers."""
+    """Construct the LLM-based review orchestrator with registered reviewers."""
     return ReviewOrchestrator(
         settings=settings,
         reviewers=[
-            LanguageReviewer(),
-            StructureReviewer(),
-            VerifiabilityReviewer(),
             TraceabilityReviewer(),
             CertificationReviewer(),
         ],

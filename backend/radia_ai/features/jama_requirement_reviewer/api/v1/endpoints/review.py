@@ -31,10 +31,10 @@ logger = get_logger(__name__)
 @router.get(
     "/version",
     response_model=APIResponse[ReviewVersionResponse],
-    summary="Get deterministic review engine version metadata",
+    summary="Get review engine version metadata",
     description=(
         "Returns reviewer bundle version, prompt versions, standards versions, and "
-        "determinism configuration hash needed for reproducibility."
+        "configuration hash needed for reproducibility."
     ),
     status_code=status.HTTP_200_OK,
 )
@@ -50,7 +50,7 @@ async def get_review_version(
 @router.post(
     "/requirement",
     response_model=APIResponse[RequirementReviewResponse],
-    summary="Run deterministic review for a single requirement",
+    summary="Run review for a single requirement",
     description=(
         "Runs language, structure, and verifiability reviewers and returns "
         "structured category status plus explainable findings."
@@ -75,7 +75,7 @@ async def review_requirement(
 @router.post(
     "/delta",
     response_model=APIResponse[DeltaReviewResponse],
-    summary="Run deterministic delta review between requirement revisions",
+    summary="Run delta review between requirement revisions",
     description=(
         "Detects new, modified, deleted requirements and changed trace links. "
         "Reviews only changed requirement items during incremental execution."

@@ -11,17 +11,17 @@ interface CategoryScoreGridProps {
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
-  syntax: 'Syntax',
-  language: 'Syntax',
-  correctness: 'Correctness',
-  structure: 'Correctness',
+  language: 'Language',
+  structure: 'Structure',
   verifiability: 'Verifiability',
+  certification: 'Certification',
 };
 
 const CATEGORY_SORT_PRIORITY: Record<string, number> = {
-  syntax: 0,
-  correctness: 1,
+  language: 0,
+  structure: 1,
   verifiability: 2,
+  certification: 3,
 };
 
 function toCategoryKey(value: string): string {
@@ -46,11 +46,15 @@ type DisplayCategory = {
 
 export function CategoryScoreGrid({
   categories,
-  expectedCategories = ['Syntax', 'Correctness', 'Verifiability'],
+  expectedCategories = ['Language', 'Structure', 'Verifiability', 'Certification'],
 }: CategoryScoreGridProps) {
   const merged = new Map<string, DisplayCategory>();
 
   for (const item of categories) {
+    if (toCategoryKey(item.category) === 'traceability') {
+      continue;
+    }
+
     const key = toCategoryKey(toDisplayLabel(item.category));
     merged.set(key, {
       key,
