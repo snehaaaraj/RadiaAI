@@ -10,9 +10,12 @@ is exercised end-to-end without network access. Tests that need a specific engin
 behaviour (a failure, a per-requirement outcome) call `review_engine.install(...)`.
 """
 
-from collections.abc import Callable
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
 
 import pytest
+from azure.core.exceptions import ResourceNotFoundError
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
 
@@ -27,6 +30,12 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     ReviewFinding,
     ReviewStatus,
 )
+from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
+    ReviewHistoryRepository,
+)
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
 
 # Services cached on app.state that must be dropped when the engine is swapped,
 # so the DI container rebuilds them against the new enhancer.
@@ -37,6 +46,42 @@ _CACHED_REVIEW_STATE = (
     "requirement_review_service",
     "requirement_delta_review_service",
 )
+
+
+class InMemoryBlobClient:
+    """In-memory drop-in for ``BlobStorageClient`` used in tests."""
+
+    def __init__(self) -> None:
+        self._blobs: dict[str, bytes] = {}
+
+    def upload_blob(
+        self, blob_name: str, data: bytes, content_type: str = "application/octet-stream"
+    ) -> str:
+        self._blobs[blob_name] = data
+        return f"https://test.blob.core.windows.net/test/{blob_name}"
+
+    def download_blob(self, blob_name: str) -> bytes:
+        if blob_name not in self._blobs:
+            raise ResourceNotFoundError("Blob not found")
+        return self._blobs[blob_name]
+
+    def delete_blob(self, blob_name: str) -> None:
+        self._blobs.pop(blob_name, None)
+
+    def list_blobs(self, prefix: str = "") -> list[dict[str, Any]]:
+        from datetime import UTC, datetime
+
+        return [
+            {
+                "name": name,
+                "size": len(data),
+                "last_modified": datetime.now(UTC).isoformat(),
+                "content_type": "application/json",
+                "etag": None,
+            }
+            for name, data in self._blobs.items()
+            if name.startswith(prefix)
+        ]
 
 
 def build_stub_finding(
@@ -74,7 +119,7 @@ class StubLLMReviewEnhancer:
     def __init__(
         self,
         result: ConsolidatedReviewResult
-        | Callable[[RequirementReviewInput], ConsolidatedReviewResult],
+        | Callable[[RequirementReviewInput], ConsolidatedReviewResult],  # type: ignore[name-defined]
     ) -> None:
         self._result = result
 
@@ -93,7 +138,7 @@ class ReviewEngineHarness:
     def install(
         self,
         result: ConsolidatedReviewResult
-        | Callable[[RequirementReviewInput], ConsolidatedReviewResult],
+        | Callable[[RequirementReviewInput], ConsolidatedReviewResult],  # type: ignore[name-defined]
     ) -> None:
         """Install an enhancer returning *result* and drop cached review services."""
         self.reset()
@@ -174,6 +219,14 @@ def review_engine(test_app) -> ReviewEngineHarness:
     Autouse so no unit test ever calls Azure OpenAI or Azure AI Search, and so a
     review that is expected to produce findings actually does.
     """
+    # Provide an in-memory blob client so ReviewHistoryRepository works in tests
+    blob = InMemoryBlobClient()
+    test_app.state.blob_client = blob
+    test_app.state.review_history_repository = ReviewHistoryRepository(blob)
+    # Clear cached history service so it's rebuilt with the fresh repo
+    if hasattr(test_app.state, "review_history_service"):
+        delattr(test_app.state, "review_history_service")
+
     harness = ReviewEngineHarness(test_app)
     harness.install_default()
     yield harness

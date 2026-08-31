@@ -129,7 +129,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
-    app.state.review_history_repository = ReviewHistoryRepository()
+    app.state.review_history_repository = ReviewHistoryRepository(blob_client)
     app.state.review_history_service = ReviewHistoryService(app.state.review_history_repository)
     app.state.requirement_delta_review_service = RequirementDeltaReviewService(
         app.state.requirement_review_service,
@@ -276,7 +276,13 @@ def get_review_history_service(request: Request) -> ReviewHistoryService:
     if service is None:
         repository = getattr(request.app.state, "review_history_repository", None)
         if repository is None:
-            repository = ReviewHistoryRepository()
+            blob_client = getattr(request.app.state, "blob_client", None)
+            if blob_client is None:
+                settings = get_settings()
+                from app.core.azure_clients import BlobStorageClient as _Blob
+
+                blob_client = _Blob(settings.azure_blob)
+            repository = ReviewHistoryRepository(blob_client)
             request.app.state.review_history_repository = repository
         service = ReviewHistoryService(repository)
         request.app.state.review_history_service = service

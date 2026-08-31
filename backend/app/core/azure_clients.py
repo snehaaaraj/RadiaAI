@@ -370,6 +370,11 @@ class BlobStorageClient:
             for blob in blobs
         ]
 
+    def delete_blob(self, blob_name: str) -> None:
+        """Delete a blob by name."""
+        blob_client = self._container_client.get_blob_client(blob_name)
+        blob_client.delete_blob()
+
 
 # ---------------------------------------------------------------------------
 # Helpers
