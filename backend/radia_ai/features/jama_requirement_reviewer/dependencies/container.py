@@ -179,13 +179,59 @@ def get_review_version_service(request: Request) -> ReviewVersionService:
 ReviewVersionServiceDep = Annotated[ReviewVersionService, Depends(get_review_version_service)]
 
 
+def get_llm_enhancer(request: Request) -> LLMReviewEnhancer | None:
+    """
+    Resolve the LLM review enhancer, rebuilding the Azure chain if needed.
+
+    Normally the enhancer is created during lifespan startup. When app state is
+    missing it (a request served by a process that never ran lifespan — e.g. a
+    cold serverless invocation), rebuild it from settings rather than handing the
+    orchestrator a None enhancer, which would make every review silently return
+    zero findings.
+
+    Returns None only when the Azure clients cannot be constructed at all; the
+    orchestrator then reports REVIEW_ENGINE_UNAVAILABLE instead of a clean review.
+    """
+    enhancer = getattr(request.app.state, "llm_enhancer", None)
+    if enhancer is not None:
+        return cast(LLMReviewEnhancer, enhancer)
+
+    rag_service = getattr(request.app.state, "rag_service", None)
+    if rag_service is None:
+        settings = _resolve_settings(request.app)
+        try:
+            openai_client = getattr(request.app.state, "openai_client", None) or OpenAIClient(
+                settings.azure_openai
+            )
+            search_service = getattr(request.app.state, "search_service", None) or SearchService(
+                settings.azure_search, openai_client, settings
+            )
+        except Exception:
+            logger.exception("llm_enhancer_bootstrap_failed")
+            return None
+
+        rag_service = RAGService(settings, openai_client, search_service)
+        request.app.state.openai_client = openai_client
+        request.app.state.search_service = search_service
+        request.app.state.rag_service = rag_service
+        logger.warning("llm_enhancer_rebuilt_outside_lifespan")
+
+    enhancer = LLMReviewEnhancer(rag_service)
+    request.app.state.llm_enhancer = enhancer
+    return enhancer
+
+
 def get_review_orchestrator(request: Request) -> ReviewOrchestrator:
     """Resolve review orchestrator from application state."""
     orchestrator = getattr(request.app.state, "review_orchestrator", None)
     if orchestrator is None:
         settings = _resolve_settings(request.app)
         standards_service = get_standards_service(request)
-        orchestrator = _build_review_orchestrator(settings, standards_service)
+        orchestrator = _build_review_orchestrator(
+            settings,
+            standards_service,
+            get_llm_enhancer(request),
+        )
         request.app.state.review_orchestrator = orchestrator
     return orchestrator
 

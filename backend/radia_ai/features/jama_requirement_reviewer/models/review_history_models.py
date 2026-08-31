@@ -12,6 +12,7 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     DeltaReviewResponse,
     DeterminismContext,
     RequirementReviewResponse,
+    ReviewCompletion,
     ReviewFinding,
     ReviewStatus,
 )
@@ -59,6 +60,7 @@ class ReviewHistoryEntry(BaseModel):
     subject_id: str | None = None
     created_at: str
     overall: ReviewStatus
+    completion: ReviewCompletion = Field(default_factory=ReviewCompletion.complete)
     category_results: list[CategoryResult] = Field(default_factory=list)
     findings: list[ReviewFinding] = Field(default_factory=list)
     determinism: DeterminismContext
@@ -85,6 +87,7 @@ def create_requirement_history_entry(
         subject_id=subject_id,
         created_at=created_at,
         overall=response.overall,
+        completion=response.completion,
         category_results=response.category_results,
         findings=response.findings,
         determinism=response.determinism,
@@ -110,6 +113,7 @@ def create_delta_history_entry(
         subject_id=subject_id,
         created_at=created_at,
         overall=response.overall,
+        completion=response.completion,
         category_results=category_results,
         findings=findings,
         determinism=response.determinism,

@@ -10,6 +10,10 @@ const STATUS_BASE_SCORE: Record<ReviewStatus, number> = {
   Acceptable: 9.5,
   'Revision Recommended': 6.5,
   Unacceptable: 3,
+  // An unevaluated subject has no quality score. Callers should check the review
+  // completion record and render the incomplete notice instead of a score; this
+  // entry only keeps the lookup total.
+  'Not Evaluated': 0,
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -20,6 +24,11 @@ export function getReviewQualityScore(
   overall: ReviewStatus,
   findings: ReviewFinding[]
 ): number {
+  // A review that never ran has no score — never fall through to a passing value.
+  if (overall === 'Not Evaluated') {
+    return 0;
+  }
+
   if (findings.length === 0) {
     return overall === 'Acceptable' ? 10 : overall === 'Revision Recommended' ? 7 : 4;
   }

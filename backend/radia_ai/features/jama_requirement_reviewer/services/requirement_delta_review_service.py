@@ -12,11 +12,14 @@ from radia_ai.features.jama_requirement_reviewer.services.requirement_review_ser
 from radia_ai.features.jama_requirement_reviewer.services.review_version_service import (
     ReviewVersionService,
 )
-from radia_ai.features.jama_requirement_reviewer.utils.review_utils import overall_from_statuses
+from radia_ai.features.jama_requirement_reviewer.utils.review_utils import (
+    aggregate_completions,
+    overall_from_statuses,
+)
 
 
 class RequirementDeltaReviewService:
-    """Runs changed-item-only deterministic delta review workflow."""
+    """Runs changed-item-only delta review workflow."""
 
     def __init__(
         self,
@@ -40,15 +43,18 @@ class RequirementDeltaReviewService:
                 DeltaRequirementReviewResult(
                     requirement_id=requirement.requirement_id or "<missing-id>",
                     overall=single_result.overall,
+                    completion=single_result.completion,
                     category_results=single_result.category_results,
                     findings=single_result.findings,
                 )
             )
 
         overall = overall_from_statuses([result.overall for result in reviewed_requirements])
+        completion = aggregate_completions([result.completion for result in reviewed_requirements])
         determinism = self._review_version_service.get_review_version().determinism
         return DeltaReviewResponse(
             overall=overall,
+            completion=completion,
             change_summary=delta_result.change_summary,
             reviewed_requirements=reviewed_requirements,
             determinism=determinism,

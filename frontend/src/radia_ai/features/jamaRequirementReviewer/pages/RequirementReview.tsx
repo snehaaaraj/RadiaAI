@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
 import { FileUploadZone } from '@/radia_ai/features/jamaRequirementReviewer/components/FileUploadZone';
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
+import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
 import { useRequirementReview } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
@@ -24,6 +25,7 @@ import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
+import { isReviewFailed } from '@/utils/reviewCompletion';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
 type InputMode = 'paste' | 'upload';
@@ -149,6 +151,28 @@ export default function RequirementReview() {
     resetResult();
   };
 
+  const submitReview = () => {
+    if (!text.trim()) return;
+    runReview(
+      {
+        requirement_id: requirementId || undefined,
+        requirement_level: requirementLevel,
+        text: text.trim(),
+      },
+      {
+        onSuccess: (response) => {
+          setPersistedResult(response);
+          // Don't signal "review complete" for a review that never ran.
+          if (!isReviewFailed(response.completion)) {
+            playReviewCompleteSound();
+          }
+        },
+      }
+    );
+  };
+
+  const reviewFailed = activeResult ? isReviewFailed(activeResult.completion) : false;
+
   return (
     <Stack spacing={3}>
       <Box>
@@ -266,22 +290,7 @@ export default function RequirementReview() {
           )}
 
           <Box sx={requirementReviewStyles.actionRow}>
-            <Button
-              variant="contained"
-              disabled={!canSubmit || isPending}
-              onClick={() =>
-                runReview({
-                  requirement_id: requirementId || undefined,
-                  requirement_level: requirementLevel,
-                  text: text.trim(),
-                }, {
-                  onSuccess: (response) => {
-                    setPersistedResult(response);
-                    playReviewCompleteSound();
-                  },
-                })
-              }
-            >
+            <Button variant="contained" disabled={!canSubmit || isPending} onClick={submitReview}>
               Run AI review
             </Button>
           </Box>
@@ -289,27 +298,24 @@ export default function RequirementReview() {
       </Paper>
 
       {isError && (
-        <ErrorDisplay
-          error={error}
-          context="Requirement Review"
-          onRetry={() => {
-            if (text.trim()) {
-              runReview({
-                requirement_id: requirementId || undefined,
-                requirement_level: requirementLevel,
-                text: text.trim(),
-              }, {
-                onSuccess: (response) => {
-                  setPersistedResult(response);
-                  playReviewCompleteSound();
-                },
-              });
-            }
-          }}
-        />
+        <ErrorDisplay error={error} context="Requirement Review" onRetry={submitReview} />
       )}
 
-      {activeResult && (
+      {/*
+        A failed review has no score, no categories and no findings — show why it
+        did not run instead of a result that would read as a clean pass.
+      */}
+      {activeResult && reviewFailed && (
+        <Stack spacing={2} ref={resultRef}>
+          <ReviewIncompleteNotice
+            completion={activeResult.completion}
+            onRetry={submitReview}
+            isRetrying={isPending}
+          />
+        </Stack>
+      )}
+
+      {activeResult && !reviewFailed && (
         <Stack spacing={2} ref={resultRef}>
           <ReviewResultHero
             title="Requirement score"

@@ -33,8 +33,9 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 │    1. RAG retrieval (Azure AI Search) — ~5s                   │
 │    2. GPT-5 consolidated review                               │
 │    3. Enrich with SharePoint URLs                             │
+│    4. Report completion status (or why it failed)             │
 │                                                            │
-│  Auto-ingestion at startup:                                │
+│  On-demand ingestion (POST /api/v1/ingest):                │
 │    SharePoint → extract text → chunk → embed → index       │
 │    File-hash caching skips unchanged documents             │
 └──────────┬──────────┬────────────────┬─────────────────────┘
@@ -62,11 +63,11 @@ RadiaAi-2.0/
 │   │       │   ├── dependencies/      # DI container + lifespan (Azure client init)
 │   │       │   ├── models/            # Pydantic domain models (review, standards)
 │   │       │   ├── repositories/      # review history persistence
-│   │       │   ├── reviewers/         # LLM-based reviewer modules:
+│   │       │   ├── reviewers/         # review orchestration:
 │   │       │   │   ├── base.py        #   abstract reviewer interface
-│   │       │   │   ├── orchestrator.py#   LLM review orchestration
-│   │       │   │   ├── traceability/  #   parent/child, allocation (LLM-powered)
-│   │       │   │   └── certification/ #   DO-178, DAL, safety (LLM-powered)
+│   │       │   │   ├── orchestrator.py#   LLM review + completion status
+│   │       │   │   ├── traceability/  #   version metadata (analysis lives in prompt)
+│   │       │   │   └── certification/ #   version metadata (analysis lives in prompt)
 │   │       │   ├── schemas/           # API request/response schemas
 │   │       │   ├── services/          # review, delta, history, standards services
 │   │       │   ├── standards/         # standards registry (fallback)
@@ -95,7 +96,7 @@ RadiaAi-2.0/
 │   │   └── main.py                    # FastAPI app factory + middleware
 │   │
 │   ├── tests/
-│   │   └── unit/                      # 19 unit tests
+│   │   └── unit/                      # 55 unit tests
 │   ├── pyproject.toml
 │   └── requirements.txt
 │
@@ -153,12 +154,28 @@ The review system uses **LLM-based architecture** with GPT-5 + RAG:
 - All findings include a `suggested_rewrite` (full improved requirement text)
 - References point to actual SharePoint document URLs, not hardcoded names
 - File-hash caching: unchanged documents are not re-embedded on restart
+- Every response carries a **completion record** — a review that could not run
+  reports `overall: "Not Evaluated"` plus the specific reason, so a failure is
+  never presented as a clean requirement
+
+### Review completion
+
+Each response includes `completion: { status, reason, message }`.
+
+| status | meaning |
+|--------|---------|
+| `complete` | the requirement was evaluated; an empty findings list means it passed |
+| `partial` | batch review where only some requirements were evaluated |
+| `failed` | nothing was evaluated; `reason` says why |
+
+Failure reasons: `review_engine_unavailable`, `no_standards_context`,
+`retrieval_failed`, `llm_call_failed`, `invalid_llm_response`.
 
 ---
 
 ## Ingestion Pipeline
 
-Standards documents are automatically ingested from SharePoint at server startup:
+Standards documents are ingested from SharePoint on demand via `POST /api/v1/ingest`:
 
 1. **Download** from SharePoint via Microsoft Graph API
 2. **Extract text** using PyMuPDF (PDF), python-docx (DOCX), or UTF-8 (TXT/MD)
@@ -167,7 +184,7 @@ Standards documents are automatically ingested from SharePoint at server startup
 5. **Index** into Azure AI Search with vector + keyword + semantic search
 6. **Cache** file hashes — skip re-processing unchanged documents
 
-Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
+Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
 
 ---
 
@@ -181,6 +198,8 @@ Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
 - [x] Sub-category scoring displayed directly below overall score
 - [x] Persistent review state across navigation with explicit **Clear Review**
 - [x] Findings grounded in indexed standards with source document links
+- [x] Explicit reporting when a review could not run, with the reason and a retry
+      action for transient failures
 
 ### AI-assisted modification workflow
 
@@ -193,7 +212,7 @@ Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
 
 ### Document ingestion
 
-- [x] Auto-sync from SharePoint at startup
+- [x] On-demand sync from SharePoint via `POST /api/v1/ingest`
 - [x] Manual upload via API endpoint
 - [x] File-hash deduplication (skip unchanged)
 - [x] PDF, TXT extraction
@@ -228,11 +247,14 @@ pip install -r requirements.txt
 uvicorn radia_ai.main:app --reload --port 8000
 ```
 
-On first start, the server will:
-1. Create/update the Azure AI Search index
-2. Download standards from SharePoint
-3. Extract, chunk, embed, and index all documents
-4. Subsequent starts skip unchanged documents (~10s startup)
+On start, the server creates/updates the Azure AI Search index.
+
+Standards are **not** ingested at startup — that keeps cold starts viable on
+serverless hosting. Populate the index once via `POST /api/v1/ingest` (or the UI
+button); file-hash caching means unchanged documents are skipped on later runs.
+
+The review pipeline needs a populated index: with an empty index every review
+returns `no_standards_context` instead of findings.
 
 ### 3. Local frontend development
 
@@ -313,7 +335,7 @@ the full reference with descriptions.
 
 ```bash
 cd backend
-pytest                          # all tests (19 unit tests)
+pytest                          # all tests (55 unit tests)
 pytest -m unit                  # unit tests only
 pytest -m integration           # integration tests only (requires Azure)
 pytest --cov=app --cov=radia_ai # with coverage report
@@ -330,5 +352,19 @@ pytest --cov=app --cov=radia_ai # with coverage report
 **AI/ML:** Azure OpenAI (GPT-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
 
 **Infrastructure:** Azure App Service / Container Apps, Azure OpenAI, Azure AI Search, Azure Blob Storage
+
+---
+
+## Known Limitations
+
+- **Review history is not durable.** It lives in an in-memory repository, so on
+  serverless hosting each invocation starts empty and disposition writes will not
+  find their review. Durable storage is needed before history is production-ready.
+- **Delta dispositions target the wrong finding.** Delta history flattens findings
+  across all reviewed requirements, while the UI sends a per-requirement index.
+- **A cleanly passing category shows as "Not evaluated"** — category results are
+  only emitted for categories that produced a finding.
+- **The category grid hides traceability**, although the review pipeline produces
+  traceability findings.
 
 **Note:** Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.

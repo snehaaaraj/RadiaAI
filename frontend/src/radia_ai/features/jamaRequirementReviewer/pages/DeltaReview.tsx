@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
 import { FileUploadZone } from '@/radia_ai/features/jamaRequirementReviewer/components/FileUploadZone';
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
+import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewQualityBand } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewQualityBand';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
 import { ReviewStatusChip } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewStatusChip';
@@ -24,6 +25,7 @@ import { useApplyFindingDisposition } from '@/radia_ai/features/jamaRequirementR
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
+import { isReviewFailed, isReviewIncomplete } from '@/utils/reviewCompletion';
 
 const BASELINE_SAMPLE = JSON.stringify(
   [
@@ -440,7 +442,10 @@ export default function DeltaReview() {
                   runDeltaReview(payload, {
                     onSuccess: (response) => {
                       setPersistedResult(response);
-                      playReviewCompleteSound();
+                      // Don't signal "review complete" for a run that never evaluated anything.
+                      if (!isReviewFailed(response.completion)) {
+                        playReviewCompleteSound();
+                      }
                     },
                   });
                 } catch (parseException) {
@@ -459,8 +464,19 @@ export default function DeltaReview() {
 
       {isError && <Alert severity="error">Delta review failed: {getApiErrorMessage(error)}</Alert>}
 
-      {activeResult && (
+      {/* Nothing was evaluated — explain why instead of showing an empty result. */}
+      {activeResult && isReviewFailed(activeResult.completion) && (
         <Stack spacing={2} ref={resultRef}>
+          <ReviewIncompleteNotice completion={activeResult.completion} />
+        </Stack>
+      )}
+
+      {activeResult && !isReviewFailed(activeResult.completion) && (
+        <Stack spacing={2} ref={resultRef}>
+          {/* Some requirements were evaluated and some were not — say so up front. */}
+          {isReviewIncomplete(activeResult.completion) && (
+            <ReviewIncompleteNotice completion={activeResult.completion} />
+          )}
           <ReviewResultHero
             title="Delta review score"
             score={getReviewQualityScore(activeResult.overall, activeResult.reviewed_requirements.flatMap(r => r.findings))}
@@ -502,23 +518,29 @@ export default function DeltaReview() {
                         </Typography>
                         <ReviewStatusChip status={reviewedRequirement.overall} />
                       </Box>
-                      <ReviewQualityBand
-                        label="Requirement score"
-                        score={getReviewQualityScore(
-                          reviewedRequirement.overall,
-                          reviewedRequirement.findings
-                        )}
-                      />
-                      <CategoryScoreGrid categories={reviewedRequirement.category_results} />
-                      <ReviewChangeSet
-                        findings={reviewedRequirement.findings}
-                        reviewId={activeResult.review_id}
-                        onApplyDisposition={(reviewId, payload) => {
-                          sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
-                          applyDisposition({ reviewId, payload });
-                        }}
-                        isApplyingDisposition={isApplyingDisposition}
-                      />
+                      {isReviewFailed(reviewedRequirement.completion) ? (
+                        <ReviewIncompleteNotice completion={reviewedRequirement.completion} />
+                      ) : (
+                        <>
+                          <ReviewQualityBand
+                            label="Requirement score"
+                            score={getReviewQualityScore(
+                              reviewedRequirement.overall,
+                              reviewedRequirement.findings
+                            )}
+                          />
+                          <CategoryScoreGrid categories={reviewedRequirement.category_results} />
+                          <ReviewChangeSet
+                            findings={reviewedRequirement.findings}
+                            reviewId={activeResult.review_id}
+                            onApplyDisposition={(reviewId, payload) => {
+                              sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
+                              applyDisposition({ reviewId, payload });
+                            }}
+                            isApplyingDisposition={isApplyingDisposition}
+                          />
+                        </>
+                      )}
                     </Stack>
                   </Paper>
                 ))

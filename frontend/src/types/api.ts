@@ -156,12 +156,38 @@ export interface IngestResponse {
 // Requirements review
 // ---------------------------------------------------------------------------
 
-export type ReviewStatus = 'Acceptable' | 'Revision Recommended' | 'Unacceptable';
+export type ReviewStatus =
+  | 'Acceptable'
+  | 'Revision Recommended'
+  | 'Unacceptable'
+  | 'Not Evaluated';
 export type PassFail = 'Pass' | 'Fail';
 export type FindingSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
 export type ReviewWorkflow = 'requirement' | 'delta';
 export type FindingDispositionStatus = 'Accepted' | 'Rejected' | 'Deferred';
 export type TraceLinkChangeType = 'added' | 'removed' | 'modified';
+
+export type ReviewCompletionStatus = 'complete' | 'partial' | 'failed';
+
+export type ReviewFailureReason =
+  | 'review_engine_unavailable'
+  | 'no_standards_context'
+  | 'retrieval_failed'
+  | 'llm_call_failed'
+  | 'invalid_llm_response';
+
+/**
+ * Outcome of the review *process*, separate from the review *verdict*.
+ *
+ * Zero findings with status 'complete' means the requirement passed. Zero findings
+ * with status 'failed' means it was never evaluated — the UI must never present
+ * those two the same way.
+ */
+export interface ReviewCompletion {
+  status: ReviewCompletionStatus;
+  reason: ReviewFailureReason | null;
+  message: string;
+}
 
 export interface DeterminismConfigSnapshot {
   temperature: number;
@@ -222,6 +248,7 @@ export interface DeltaReviewInput {
 export interface RequirementReviewResponse {
   review_id: string | null;
   overall: ReviewStatus;
+  completion: ReviewCompletion;
   category_results: CategoryResult[];
   findings: ReviewFinding[];
   determinism: DeterminismContext;
@@ -237,6 +264,7 @@ export interface DeltaChangeSummary {
 export interface DeltaRequirementReviewResult {
   requirement_id: string;
   overall: ReviewStatus;
+  completion: ReviewCompletion;
   category_results: CategoryResult[];
   findings: ReviewFinding[];
 }
@@ -244,6 +272,7 @@ export interface DeltaRequirementReviewResult {
 export interface DeltaReviewResponse {
   review_id: string | null;
   overall: ReviewStatus;
+  completion: ReviewCompletion;
   change_summary: DeltaChangeSummary;
   reviewed_requirements: DeltaRequirementReviewResult[];
   determinism: DeterminismContext;
@@ -288,6 +317,7 @@ export interface ReviewHistoryEntry {
   subject_id: string | null;
   created_at: string;
   overall: ReviewStatus;
+  completion: ReviewCompletion;
   category_results: CategoryResult[];
   findings: ReviewFinding[];
   determinism: DeterminismContext;

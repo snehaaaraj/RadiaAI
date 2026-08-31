@@ -80,7 +80,11 @@ export function CategoryScoreGrid({
   return (
     <Grid container spacing={1} columns={displayCategories.length}>
       {displayCategories.map((category) => {
-        const score = category.status ? getCategoryStatusScore(category.status) : null;
+        // 'Not Evaluated' carries no score — show it the same as a missing category.
+        const score =
+          category.status && category.status !== 'Not Evaluated'
+            ? getCategoryStatusScore(category.status)
+            : null;
         return (
           <Grid key={`${category.key}-${category.status ?? 'missing'}`} size={{ xs: displayCategories.length, sm: 1 }}>
             <Paper

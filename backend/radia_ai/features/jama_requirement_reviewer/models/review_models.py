@@ -13,6 +13,7 @@ class ReviewStatus(StrEnum):
     ACCEPTABLE = "Acceptable"
     REVISION_RECOMMENDED = "Revision Recommended"
     UNACCEPTABLE = "Unacceptable"
+    NOT_EVALUATED = "Not Evaluated"
 
 
 class PassFail(StrEnum):
@@ -31,6 +32,104 @@ class FindingSeverity(StrEnum):
     CRITICAL = "Critical"
 
 
+class ReviewCompletionStatus(StrEnum):
+    """Whether the review engine actually managed to evaluate the requirement(s)."""
+
+    COMPLETE = "complete"
+    PARTIAL = "partial"
+    FAILED = "failed"
+
+
+class ReviewFailureReason(StrEnum):
+    """Machine-readable cause for a review that did not complete."""
+
+    REVIEW_ENGINE_UNAVAILABLE = "review_engine_unavailable"
+    NO_STANDARDS_CONTEXT = "no_standards_context"
+    RETRIEVAL_FAILED = "retrieval_failed"
+    LLM_CALL_FAILED = "llm_call_failed"
+    INVALID_LLM_RESPONSE = "invalid_llm_response"
+
+
+_FAILURE_MESSAGES: dict[ReviewFailureReason, str] = {
+    ReviewFailureReason.REVIEW_ENGINE_UNAVAILABLE: (
+        "The AI review engine is not available, so this requirement was not evaluated. "
+        "Check the Azure OpenAI and Azure AI Search configuration and try again."
+    ),
+    ReviewFailureReason.NO_STANDARDS_CONTEXT: (
+        "No indexed standards documents matched this requirement, so there was nothing to "
+        "review it against. Ingest the standards library and run the review again."
+    ),
+    ReviewFailureReason.RETRIEVAL_FAILED: (
+        "Standards retrieval from Azure AI Search failed, so this requirement was not "
+        "evaluated. Try again in a moment."
+    ),
+    ReviewFailureReason.LLM_CALL_FAILED: (
+        "The AI review call did not complete, so this requirement was not evaluated. "
+        "Try again in a moment."
+    ),
+    ReviewFailureReason.INVALID_LLM_RESPONSE: (
+        "The AI review returned a response that could not be interpreted, so no findings "
+        "could be extracted. Running the review again usually resolves this."
+    ),
+}
+
+_PARTIAL_MESSAGE_TEMPLATE = (
+    "{failed_count} of {total_count} requirements could not be evaluated. "
+    "Results below are incomplete."
+)
+
+
+class ReviewCompletion(BaseModel):
+    """
+    Outcome of the review *process*, kept separate from the review *verdict*.
+
+    A requirement with no findings and ``status=COMPLETE`` genuinely passed. A
+    requirement with no findings and ``status=FAILED`` was never evaluated — the
+    two must never be presented to a reviewer as the same result.
+    """
+
+    status: ReviewCompletionStatus = ReviewCompletionStatus.COMPLETE
+    reason: ReviewFailureReason | None = Field(
+        default=None,
+        description="Machine-readable failure cause. Null when the review completed.",
+    )
+    message: str = Field(
+        default="",
+        description="Human-readable explanation shown to the reviewer when incomplete.",
+    )
+
+    @property
+    def is_complete(self) -> bool:
+        return self.status is ReviewCompletionStatus.COMPLETE
+
+    @classmethod
+    def complete(cls) -> ReviewCompletion:
+        """Build a successful completion record."""
+        return cls(status=ReviewCompletionStatus.COMPLETE)
+
+    @classmethod
+    def failed(cls, reason: ReviewFailureReason) -> ReviewCompletion:
+        """Build a failure record with the standard message for *reason*."""
+        return cls(
+            status=ReviewCompletionStatus.FAILED,
+            reason=reason,
+            message=_FAILURE_MESSAGES[reason],
+        )
+
+    @classmethod
+    def partial(
+        cls, reason: ReviewFailureReason, failed_count: int, total_count: int
+    ) -> ReviewCompletion:
+        """Build a record for a batch where only some items were evaluated."""
+        return cls(
+            status=ReviewCompletionStatus.PARTIAL,
+            reason=reason,
+            message=_PARTIAL_MESSAGE_TEMPLATE.format(
+                failed_count=failed_count, total_count=total_count
+            ),
+        )
+
+
 class DeterminismConfigSnapshot(BaseModel):
     """
     Immutable configuration values that influence deterministic output.
@@ -39,9 +138,7 @@ class DeterminismConfigSnapshot(BaseModel):
     reproducibility conditions for a specific reviewer bundle.
     """
 
-    temperature: float = Field(
-        description="Model sampling temperature."
-    )
+    temperature: float = Field(description="Model sampling temperature.")
     max_tokens: int = Field(description="Maximum completion token budget.")
     retrieval_top_k: int = Field(description="Configured retrieval depth used by review engines.")
 
@@ -94,6 +191,18 @@ class ReviewFinding(BaseModel):
     )
 
 
+class ConsolidatedReviewResult(BaseModel):
+    """
+    Return value of the consolidated LLM review call.
+
+    Carries the completion record alongside the findings so callers can tell an
+    empty-because-clean review apart from an empty-because-it-broke one.
+    """
+
+    findings: list[ReviewFinding] = Field(default_factory=list)
+    completion: ReviewCompletion = Field(default_factory=ReviewCompletion.complete)
+
+
 class ReviewerResult(BaseModel):
     """Result produced by an individual reviewer module."""
 
@@ -144,10 +253,11 @@ class CategoryResult(BaseModel):
 
 
 class RequirementReviewResponse(BaseModel):
-    """Aggregated deterministic response for single-requirement review."""
+    """Aggregated response for single-requirement review."""
 
     review_id: str | None = None
     overall: ReviewStatus
+    completion: ReviewCompletion = Field(default_factory=ReviewCompletion.complete)
     category_results: list[CategoryResult] = Field(default_factory=list)
     findings: list[ReviewFinding] = Field(default_factory=list)
     determinism: DeterminismContext
@@ -184,6 +294,7 @@ class DeltaRequirementReviewResult(BaseModel):
 
     requirement_id: str
     overall: ReviewStatus
+    completion: ReviewCompletion = Field(default_factory=ReviewCompletion.complete)
     category_results: list[CategoryResult] = Field(default_factory=list)
     findings: list[ReviewFinding] = Field(default_factory=list)
 
@@ -198,10 +309,11 @@ class DeltaReviewInput(BaseModel):
 
 
 class DeltaReviewResponse(BaseModel):
-    """Deterministic response for delta review mode."""
+    """Response for delta review mode."""
 
     review_id: str | None = None
     overall: ReviewStatus
+    completion: ReviewCompletion = Field(default_factory=ReviewCompletion.complete)
     change_summary: DeltaChangeSummary
     reviewed_requirements: list[DeltaRequirementReviewResult] = Field(default_factory=list)
     determinism: DeterminismContext

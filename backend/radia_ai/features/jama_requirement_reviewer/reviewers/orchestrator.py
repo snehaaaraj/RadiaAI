@@ -8,10 +8,13 @@ from typing import TYPE_CHECKING
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     CategoryResult,
+    ConsolidatedReviewResult,
     DeterminismConfigSnapshot,
     DeterminismContext,
     RequirementReviewInput,
     RequirementReviewResponse,
+    ReviewCompletion,
+    ReviewFailureReason,
     ReviewFinding,
     ReviewStatus,
     ReviewVersionEntry,
@@ -49,16 +52,35 @@ class ReviewOrchestrator:
         self._reviewer_bundle_version = reviewer_bundle_version
 
     def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
-        """Run LLM review only."""
+        """
+        Run the consolidated LLM review.
+
+        When the review engine cannot evaluate the requirement, the response
+        carries ``overall = NOT_EVALUATED`` and a failed completion record. An
+        unevaluated requirement is never reported as acceptable.
+        """
         normalized_payload = normalize_requirement_review_input(payload)
 
-        # Run LLM review only
-        llm_findings: list[ReviewFinding] = []
-        if self._llm_enhancer is not None:
-            llm_findings = self._llm_enhancer.consolidated_review(normalized_payload)
+        if self._llm_enhancer is None:
+            llm_result = ConsolidatedReviewResult(
+                completion=ReviewCompletion.failed(ReviewFailureReason.REVIEW_ENGINE_UNAVAILABLE),
+            )
+        else:
+            llm_result = self._llm_enhancer.consolidated_review(normalized_payload)
+
+        determinism = self.build_version_response().determinism
+
+        if not llm_result.completion.is_complete:
+            return RequirementReviewResponse(
+                overall=ReviewStatus.NOT_EVALUATED,
+                completion=llm_result.completion,
+                category_results=[],
+                findings=[],
+                determinism=determinism,
+            )
 
         # Enrich findings with standards references
-        enriched = self._enrich_findings(llm_findings)
+        enriched = self._enrich_findings(llm_result.findings)
 
         # Build category results from LLM findings
         category_statuses: dict[str, list[ReviewStatus]] = {}
@@ -76,9 +98,10 @@ class ReviewOrchestrator:
         overall = overall_from_statuses([cr.status for cr in category_results])
         return RequirementReviewResponse(
             overall=overall,
+            completion=llm_result.completion,
             category_results=category_results,
             findings=enriched,
-            determinism=self.build_version_response().determinism,
+            determinism=determinism,
         )
 
     def build_version_response(self) -> ReviewVersionResponse:
