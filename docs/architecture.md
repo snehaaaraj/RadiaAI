@@ -130,7 +130,6 @@ The review engine provides explainable, standards-grounded requirement analysis.
    - new requirements
    - modified requirements
    - deleted requirements
-   - changed trace links
 3. Only changed requirements are re-reviewed.
 4. Results are aggregated into a delta response with a change summary and a
    run-level completion record.

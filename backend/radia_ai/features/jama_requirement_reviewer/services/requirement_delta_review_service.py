@@ -33,7 +33,6 @@ class RequirementDeltaReviewService:
         delta_result = compute_delta(
             baseline_requirements=payload.baseline_requirements,
             updated_requirements=payload.updated_requirements,
-            changed_trace_links=payload.changed_trace_links,
         )
 
         reviewed_requirements = []

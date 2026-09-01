@@ -9,7 +9,6 @@ from dataclasses import dataclass
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     DeltaChangeSummary,
     RequirementReviewInput,
-    TraceLinkChange,
 )
 from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import (
     normalize_requirement_review_input,
@@ -27,9 +26,8 @@ class DeltaComputationResult:
 def compute_delta(
     baseline_requirements: list[RequirementReviewInput],
     updated_requirements: list[RequirementReviewInput],
-    changed_trace_links: list[TraceLinkChange],
 ) -> DeltaComputationResult:
-    """Compute new/modified/deleted requirements and trace link deltas."""
+    """Compute new/modified/deleted requirements between revisions."""
     baseline_requirements = [
         normalize_requirement_review_input(requirement) for requirement in baseline_requirements
     ]
@@ -53,13 +51,6 @@ def compute_delta(
         if _fingerprint(baseline_map[requirement_id]) != _fingerprint(updated_map[requirement_id])
     ]
 
-    changed_trace_ids = {link.requirement_id for link in changed_trace_links}
-    for requirement_id in shared_ids:
-        baseline_parent = baseline_map[requirement_id].metadata.get("parent_id", "").strip()
-        updated_parent = updated_map[requirement_id].metadata.get("parent_id", "").strip()
-        if baseline_parent != updated_parent:
-            changed_trace_ids.add(requirement_id)
-
     changed_ids = sorted(set(new_ids + modified_ids))
     changed_requirements = [updated_map[requirement_id] for requirement_id in changed_ids]
 
@@ -67,7 +58,6 @@ def compute_delta(
         new_requirement_ids=new_ids,
         modified_requirement_ids=sorted(modified_ids),
         deleted_requirement_ids=deleted_ids,
-        changed_trace_link_requirement_ids=sorted(changed_trace_ids),
     )
     return DeltaComputationResult(change_summary=summary, changed_requirements=changed_requirements)
 

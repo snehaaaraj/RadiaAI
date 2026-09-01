@@ -165,7 +165,6 @@ export type PassFail = 'Pass' | 'Fail';
 export type FindingSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
 export type ReviewWorkflow = 'requirement' | 'delta';
 export type FindingDispositionStatus = 'Accepted' | 'Rejected' | 'Deferred';
-export type TraceLinkChangeType = 'added' | 'removed' | 'modified';
 
 export type ReviewCompletionStatus = 'complete' | 'partial' | 'failed';
 
@@ -231,18 +230,10 @@ export interface RequirementReviewInput {
   metadata?: Record<string, string>;
 }
 
-export interface TraceLinkChange {
-  requirement_id: string;
-  change_type: TraceLinkChangeType;
-  previous_parent_id?: string | null;
-  current_parent_id?: string | null;
-}
-
 export interface DeltaReviewInput {
   specification_id?: string | null;
   baseline_requirements: RequirementReviewInput[];
   updated_requirements: RequirementReviewInput[];
-  changed_trace_links?: TraceLinkChange[];
 }
 
 export interface RequirementReviewResponse {
@@ -258,7 +249,6 @@ export interface DeltaChangeSummary {
   new_requirement_ids: string[];
   modified_requirement_ids: string[];
   deleted_requirement_ids: string[];
-  changed_trace_link_requirement_ids: string[];
 }
 
 export interface DeltaRequirementReviewResult {

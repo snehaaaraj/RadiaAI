@@ -263,30 +263,12 @@ class RequirementReviewResponse(BaseModel):
     determinism: DeterminismContext
 
 
-class TraceLinkChangeType(StrEnum):
-    """Supported trace-link delta operations."""
-
-    ADDED = "added"
-    REMOVED = "removed"
-    MODIFIED = "modified"
-
-
-class TraceLinkChange(BaseModel):
-    """Represents a changed traceability link during delta review."""
-
-    requirement_id: str
-    change_type: TraceLinkChangeType
-    previous_parent_id: str | None = None
-    current_parent_id: str | None = None
-
-
 class DeltaChangeSummary(BaseModel):
     """Changed item summary for delta review mode."""
 
     new_requirement_ids: list[str] = Field(default_factory=list)
     modified_requirement_ids: list[str] = Field(default_factory=list)
     deleted_requirement_ids: list[str] = Field(default_factory=list)
-    changed_trace_link_requirement_ids: list[str] = Field(default_factory=list)
 
 
 class DeltaRequirementReviewResult(BaseModel):
@@ -305,7 +287,6 @@ class DeltaReviewInput(BaseModel):
     specification_id: str | None = None
     baseline_requirements: list[RequirementReviewInput] = Field(default_factory=list)
     updated_requirements: list[RequirementReviewInput] = Field(default_factory=list)
-    changed_trace_links: list[TraceLinkChange] = Field(default_factory=list)
 
 
 class DeltaReviewResponse(BaseModel):

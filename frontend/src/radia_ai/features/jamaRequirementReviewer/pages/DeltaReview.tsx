@@ -27,58 +27,42 @@ import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 import { isReviewFailed, isReviewIncomplete } from '@/utils/reviewCompletion';
 
-// Simple text format: one requirement per line (REQ-ID: requirement text)
-const BASELINE_SAMPLE = `REQ-SYS-001: The flight control system shall maintain altitude within ±50 feet of the commanded altitude during cruise flight.
-REQ-SYS-002: The telemetry system shall transmit position data to ground control at intervals not exceeding 1.0 seconds.`;
+// Simple text format: one requirement per line (optional REQ-ID prefix)
+const BASELINE_SAMPLE = `The flight control system shall maintain altitude within ±50 feet of the commanded altitude during cruise flight.
+The telemetry system shall transmit position data to ground control at intervals not exceeding 1.0 seconds.`;
 
-const UPDATED_SAMPLE = `REQ-SYS-001: The flight control system shall maintain altitude within ±25 feet of the commanded altitude during cruise flight under nominal conditions.
-REQ-SYS-003: The diagnostic system shall execute a complete self-test sequence within 5.0 seconds of system power-on.`;
-
-const TRACE_SAMPLE = JSON.stringify(
-  [
-    {
-      requirement_id: 'REQ-SYS-001',
-      change_type: 'modified',
-      previous_parent_id: 'SYS-FC-090',
-      current_parent_id: 'SYS-FC-100',
-    },
-  ],
-  null,
-  2
-);
+const UPDATED_SAMPLE = `The flight control system shall maintain altitude within ±25 feet of the commanded altitude during cruise flight under nominal conditions.
+The diagnostic system shall execute a complete self-test sequence within 5.0 seconds of system power-on.`;
 
 /**
  * Parse simple text format (one requirement per line) into RequirementReviewInput array.
- * Format: REQ-ID: requirement text
- * Example: REQ-001: The system shall respond within 100ms.
+ * Supported formats:
+ * - requirement text
+ * - REQ-ID: requirement text
  */
 function parseRequirementsFromText(text: string): Array<{
-  requirement_id: string;
+  requirement_id?: string;
   text: string;
   requirement_level?: string;
   metadata?: Record<string, string>;
 }> {
+  const idPrefixedLinePattern = /^([A-Za-z0-9_.-]+):(.*)$/;
+
   return text
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .map((line) => {
-      const colonIndex = line.indexOf(':');
-      if (colonIndex === -1) {
-        throw new Error(`Invalid format: "${line}". Expected "REQ-ID: requirement text"`);
-      }
-      const requirementId = line.substring(0, colonIndex).trim();
-      const requirementText = line.substring(colonIndex + 1).trim();
-      
-      if (!requirementId) {
-        throw new Error(`Missing requirement ID in line: "${line}"`);
-      }
+      const prefixedMatch = line.match(idPrefixedLinePattern);
+      const requirementId = prefixedMatch?.[1]?.trim();
+      const requirementText = (prefixedMatch ? prefixedMatch[2] : line).trim();
+
       if (!requirementText) {
         throw new Error(`Missing requirement text in line: "${line}"`);
       }
 
       return {
-        requirement_id: requirementId,
+        requirement_id: requirementId || undefined,
         text: requirementText,
         requirement_level: 'System',
         metadata: {},
@@ -91,28 +75,22 @@ type DeltaReviewFormState = {
   specificationId: string;
   baselineJson: string;
   updatedJson: string;
-  traceJson: string;
   parseError: string;
   baselineMode: JsonInputMode;
   updatedMode: JsonInputMode;
-  traceMode: JsonInputMode;
   baselineFilename: string;
   updatedFilename: string;
-  traceFilename: string;
 };
 
 const DEFAULT_DELTA_FORM_STATE: DeltaReviewFormState = {
   specificationId: 'SPEC-DELTA-1',
   baselineJson: BASELINE_SAMPLE,
   updatedJson: UPDATED_SAMPLE,
-  traceJson: TRACE_SAMPLE,
   parseError: '',
   baselineMode: 'paste',
   updatedMode: 'paste',
-  traceMode: 'paste',
   baselineFilename: '',
   updatedFilename: '',
-  traceFilename: '',
 };
 
 export default function DeltaReview() {
@@ -127,14 +105,11 @@ export default function DeltaReview() {
   const [specificationId, setSpecificationId] = useState(formState.specificationId);
   const [baselineJson, setBaselineJson] = useState(formState.baselineJson);
   const [updatedJson, setUpdatedJson] = useState(formState.updatedJson);
-  const [traceJson, setTraceJson] = useState(formState.traceJson);
   const [parseError, setParseError] = useState(formState.parseError);
   const [baselineMode, setBaselineMode] = useState<JsonInputMode>(formState.baselineMode);
   const [updatedMode, setUpdatedMode] = useState<JsonInputMode>(formState.updatedMode);
-  const [traceMode, setTraceMode] = useState<JsonInputMode>(formState.traceMode);
   const [baselineFilename, setBaselineFilename] = useState(formState.baselineFilename);
   const [updatedFilename, setUpdatedFilename] = useState(formState.updatedFilename);
-  const [traceFilename, setTraceFilename] = useState(formState.traceFilename);
 
   const {
     mutate: runDeltaReview,
@@ -158,14 +133,11 @@ export default function DeltaReview() {
       setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
       setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
       setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
-      setTraceJson(DEFAULT_DELTA_FORM_STATE.traceJson);
       setParseError(DEFAULT_DELTA_FORM_STATE.parseError);
       setBaselineMode(DEFAULT_DELTA_FORM_STATE.baselineMode);
       setUpdatedMode(DEFAULT_DELTA_FORM_STATE.updatedMode);
-      setTraceMode(DEFAULT_DELTA_FORM_STATE.traceMode);
       setBaselineFilename(DEFAULT_DELTA_FORM_STATE.baselineFilename);
       setUpdatedFilename(DEFAULT_DELTA_FORM_STATE.updatedFilename);
-      setTraceFilename(DEFAULT_DELTA_FORM_STATE.traceFilename);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -181,7 +153,6 @@ export default function DeltaReview() {
   const isDirty = (
     baselineJson !== DEFAULT_DELTA_FORM_STATE.baselineJson ||
     updatedJson !== DEFAULT_DELTA_FORM_STATE.updatedJson ||
-    traceJson !== DEFAULT_DELTA_FORM_STATE.traceJson ||
     specificationId !== DEFAULT_DELTA_FORM_STATE.specificationId ||
     !!activeResult ||
     isPending
@@ -220,14 +191,11 @@ export default function DeltaReview() {
     setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
     setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
     setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
-    setTraceJson(DEFAULT_DELTA_FORM_STATE.traceJson);
     setParseError(DEFAULT_DELTA_FORM_STATE.parseError);
     setBaselineMode(DEFAULT_DELTA_FORM_STATE.baselineMode);
     setUpdatedMode(DEFAULT_DELTA_FORM_STATE.updatedMode);
-    setTraceMode(DEFAULT_DELTA_FORM_STATE.traceMode);
     setBaselineFilename(DEFAULT_DELTA_FORM_STATE.baselineFilename);
     setUpdatedFilename(DEFAULT_DELTA_FORM_STATE.updatedFilename);
-    setTraceFilename(DEFAULT_DELTA_FORM_STATE.traceFilename);
     resetResult();
   };
 
@@ -302,8 +270,8 @@ export default function DeltaReview() {
                   setBaselineJson(nextValue);
                   updateFormState({ baselineJson: nextValue });
                 }}
-                placeholder="REQ-SYS-001: The system shall...&#10;REQ-SYS-002: The subsystem shall..."
-                helperText="Enter one requirement per line in format: REQ-ID: requirement text"
+                placeholder="The system shall...&#10;The subsystem shall..."
+                helperText="Enter one requirement per line. Optional format: REQ-ID: requirement text"
               />
             ) : (
               <FileUploadZone
@@ -360,8 +328,8 @@ export default function DeltaReview() {
                   setUpdatedJson(nextValue);
                   updateFormState({ updatedJson: nextValue });
                 }}
-                placeholder="REQ-SYS-001: The system shall...&#10;REQ-SYS-003: The subsystem shall..."
-                helperText="Enter one requirement per line in format: REQ-ID: requirement text"
+                placeholder="The system shall...&#10;The subsystem shall..."
+                helperText="Enter one requirement per line. Optional format: REQ-ID: requirement text"
               />
             ) : (
               <FileUploadZone
@@ -382,61 +350,6 @@ export default function DeltaReview() {
             )}
           </Box>
 
-          {/* Trace links */}
-          <Box>
-            <Typography variant="subtitle2" fontWeight={600} mb={0.75}>
-              Changed trace links <Typography component="span" variant="caption" color="text.secondary">(optional)</Typography>
-            </Typography>
-            <ToggleButtonGroup
-              size="small"
-              value={traceMode}
-              exclusive
-              onChange={(_, value: JsonInputMode | null) => {
-                if (value) {
-                  setTraceMode(value);
-                  updateFormState({ traceMode: value });
-                  if (value === 'paste') {
-                    setTraceFilename('');
-                    setTraceJson(TRACE_SAMPLE);
-                    updateFormState({ traceFilename: '', traceJson: TRACE_SAMPLE });
-                  }
-                }
-              }}
-              sx={{ mb: 1 }}
-            >
-              <ToggleButton value="paste">Paste JSON</ToggleButton>
-              <ToggleButton value="upload">Upload .json</ToggleButton>
-            </ToggleButtonGroup>
-            {traceMode === 'paste' ? (
-              <TextField
-                fullWidth
-                multiline
-                minRows={5}
-                value={traceJson}
-                onChange={(event) => {
-                  const nextValue = event.target.value;
-                  setTraceJson(nextValue);
-                  updateFormState({ traceJson: nextValue });
-                }}
-              />
-            ) : (
-              <FileUploadZone
-                accept=".json"
-                label="Upload changed trace links as a .json file"
-                onFileContent={(content, filename) => {
-                  setTraceJson(content);
-                  setTraceFilename(filename);
-                  updateFormState({ traceJson: content, traceFilename: filename });
-                }}
-                filename={traceFilename}
-                onClear={() => {
-                  setTraceJson('');
-                  setTraceFilename('');
-                  updateFormState({ traceJson: '', traceFilename: '' });
-                }}
-              />
-            )}
-          </Box>
           <Box>
             <Button
               variant="contained"
@@ -447,7 +360,6 @@ export default function DeltaReview() {
                     specification_id: specificationId || undefined,
                     baseline_requirements: parseRequirementsFromText(baselineJson),
                     updated_requirements: parseRequirementsFromText(updatedJson),
-                    changed_trace_links: traceJson.trim() ? JSON.parse(traceJson) : [],
                   };
                   setParseError('');
                   updateFormState({ parseError: '' });
@@ -470,7 +382,7 @@ export default function DeltaReview() {
               Run delta review
             </Button>
           </Box>
-          {parseError && <Alert severity="error">Invalid JSON input: {parseError}</Alert>}
+          {parseError && <Alert severity="error">Invalid requirement input: {parseError}</Alert>}
         </Stack>
       </Paper>
 
@@ -509,10 +421,6 @@ export default function DeltaReview() {
                   size="small"
                 />
                 <Chip label={`Deleted: ${activeResult.change_summary.deleted_requirement_ids.length}`} size="small" />
-                <Chip
-                  label={`Trace changes: ${activeResult.change_summary.changed_trace_link_requirement_ids.length}`}
-                  size="small"
-                />
               </Box>
               <Divider />
               <Typography variant="h6" fontWeight={800}>

@@ -77,7 +77,7 @@ async def review_requirement(
     response_model=APIResponse[DeltaReviewResponse],
     summary="Run delta review between requirement revisions",
     description=(
-        "Detects new, modified, deleted requirements and changed trace links. "
+        "Detects new, modified, and deleted requirements. "
         "Reviews only changed requirement items during incremental execution."
     ),
     status_code=status.HTTP_200_OK,
