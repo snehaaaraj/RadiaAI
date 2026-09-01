@@ -9,6 +9,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { FindingCard } from '@/radia_ai/features/jamaRequirementReviewer/components/FindingCard';
+import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewQualityBand } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewQualityBand';
 import { ReviewStatusChip } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewStatusChip';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
@@ -16,6 +17,7 @@ import { useReviewHistory } from '@/radia_ai/features/jamaRequirementReviewer/ho
 import type { FindingDispositionStatus, ReviewWorkflow } from '@/types/api';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
+import { isReviewFailed, isReviewIncomplete } from '@/utils/reviewCompletion';
 import { reviewHistoryStyles } from './ReviewHistory.styles';
 
 const WORKFLOW_OPTIONS: Array<{ label: string; value: ReviewWorkflow | 'all' }> = [
@@ -130,19 +132,27 @@ export default function ReviewHistory() {
                   Workflow: {entry.workflow} • Subject: {entry.subject_id ?? 'N/A'} •{' '}
                   {new Date(entry.created_at).toLocaleString()}
                 </Typography>
-                <ReviewQualityBand
-                  score={getReviewQualityScore(entry.overall, entry.findings)}
-                />
-                <Box sx={reviewHistoryStyles.categoryRow}>
-                  {entry.category_results.map((category, index) => (
-                    <Chip
-                      key={`${entry.review_id}-${category.category}-${index}`}
-                      label={`${category.category}: ${category.status}`}
-                      size="small"
-                      variant="outlined"
+                {isReviewIncomplete(entry.completion) && (
+                  <ReviewIncompleteNotice completion={entry.completion} />
+                )}
+                {/* A run that never evaluated anything has no score to show. */}
+                {!isReviewFailed(entry.completion) && (
+                  <>
+                    <ReviewQualityBand
+                      score={getReviewQualityScore(entry.overall, entry.findings)}
                     />
-                  ))}
-                </Box>
+                    <Box sx={reviewHistoryStyles.categoryRow}>
+                      {entry.category_results.map((category, index) => (
+                        <Chip
+                          key={`${entry.review_id}-${category.category}-${index}`}
+                          label={`${category.category}: ${category.status}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      ))}
+                    </Box>
+                  </>
+                )}
                 <Stack spacing={1}>
                   {entry.findings.map((finding, index) => {
                     const disposition = entry.dispositions.find((item) => item.finding_index === index);

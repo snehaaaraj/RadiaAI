@@ -87,11 +87,58 @@ class AzureServiceError(RadiaBaseException):
     http_status = HTTPStatus.BAD_GATEWAY
     error_code = "AZURE_SERVICE_ERROR"
 
+    def __init__(
+        self,
+        message: str,
+        service: str | None = None,
+        operation: str | None = None,
+        original_error: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Initialize Azure service error with context.
+
+        Args:
+            message: Human-readable error message
+            service: Azure service name (e.g., "Azure OpenAI", "Azure AI Search")
+            operation: Operation that failed (e.g., "generate_embedding", "search_index")
+            original_error: Original error from Azure SDK
+            detail: Additional context dictionary
+        """
+        enhanced_detail = detail or {}
+        if service:
+            enhanced_detail["service"] = service
+        if operation:
+            enhanced_detail["operation"] = operation
+        if original_error:
+            enhanced_detail["original_error"] = str(original_error)
+
+        super().__init__(message, enhanced_detail)
+
 
 class EmbeddingError(AzureServiceError):
     """Raised when embedding generation fails."""
 
     error_code = "EMBEDDING_ERROR"
+
+    def __init__(
+        self,
+        message: str = "Failed to generate embeddings",
+        model: str | None = None,
+        original_error: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        enhanced_detail = detail or {}
+        if model:
+            enhanced_detail["model"] = model
+
+        super().__init__(
+            message=message,
+            service="Azure OpenAI",
+            operation="generate_embedding",
+            original_error=original_error,
+            detail=enhanced_detail,
+        )
 
 
 class SearchError(AzureServiceError):
@@ -99,11 +146,54 @@ class SearchError(AzureServiceError):
 
     error_code = "SEARCH_ERROR"
 
+    def __init__(
+        self,
+        message: str = "Search query failed",
+        index_name: str | None = None,
+        query: str | None = None,
+        original_error: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        enhanced_detail = detail or {}
+        if index_name:
+            enhanced_detail["index_name"] = index_name
+        if query:
+            # Truncate long queries for logging
+            enhanced_detail["query"] = query[:100] + ("..." if len(query) > 100 else "")
+
+        super().__init__(
+            message=message,
+            service="Azure AI Search",
+            operation="search_index",
+            original_error=original_error,
+            detail=enhanced_detail,
+        )
+
 
 class LLMError(AzureServiceError):
     """Raised when a chat completion call fails."""
 
     error_code = "LLM_ERROR"
+
+    def __init__(
+        self,
+        message: str = "LLM completion request failed",
+        model: str | None = None,
+        operation: str = "chat_completion",
+        original_error: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        enhanced_detail = detail or {}
+        if model:
+            enhanced_detail["model"] = model
+
+        super().__init__(
+            message=message,
+            service="Azure OpenAI",
+            operation=operation,
+            original_error=original_error,
+            detail=enhanced_detail,
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -135,3 +225,31 @@ class IngestionError(RadiaBaseException):
 
     http_status = HTTPStatus.INTERNAL_SERVER_ERROR
     error_code = "INGESTION_ERROR"
+
+    def __init__(
+        self,
+        message: str = "Document ingestion failed",
+        filename: str | None = None,
+        stage: str | None = None,
+        original_error: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        """
+        Initialize ingestion error with context.
+
+        Args:
+            message: Human-readable error message
+            filename: Document filename that failed to ingest
+            stage: Ingestion stage where failure occurred (e.g., "extraction", "chunking", "embedding", "indexing")
+            original_error: Original error from underlying service
+            detail: Additional context dictionary
+        """
+        enhanced_detail = detail or {}
+        if filename:
+            enhanced_detail["filename"] = filename
+        if stage:
+            enhanced_detail["stage"] = stage
+        if original_error:
+            enhanced_detail["original_error"] = str(original_error)
+
+        super().__init__(message, enhanced_detail)

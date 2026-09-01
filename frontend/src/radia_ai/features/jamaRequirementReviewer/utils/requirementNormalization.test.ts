@@ -45,6 +45,7 @@ describe('normalizeRequirementText', () => {
       'of 9 or greater, without requiring ground support equipment for maneuvering.',
       '',
       'Project ID WR-ACR-732',
+      'Release Rev B',
       'Title Semi-Prepared Runway Operations (SPRO)',
       'Rationale Ensures mission compatibility with SPRO sites',
       'Requirement Volatility Low',

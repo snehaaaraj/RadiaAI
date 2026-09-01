@@ -129,7 +129,6 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
       if (!fields[fieldKey]) fields[fieldKey] = [];
       const content = truncateAtTrailingMetadata(inlineValue);
       if (content) fields[fieldKey].push(content);
-      if (containsTrailingMetadata(inlineValue)) stopParsing = true;
       continue;
     }
 
@@ -158,6 +157,16 @@ function extractFields(raw: string): { body: string; title: string; rationale: s
   return { body, title, rationale };
 }
 
+/** Clean up pdfjs artifacts: orphaned punctuation from hyperlink extraction. */
+function cleanFieldValue(value: string): string {
+  return value
+    .replace(/\(\s*\)/g, '')         // empty parens from extracted hyperlinks
+    .replace(/\(\s*$/g, '')          // trailing orphaned open paren
+    .replace(/\s*\)\s*:/g, ':')      // orphaned close paren before colon
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
 /**
  * Normalize a Jama PDF export into a structured string containing
  * Title, Description, and Rationale — the fields the AI uses for review.
@@ -180,9 +189,26 @@ export function normalizeRequirementText(raw: string): string {
   }
 
   const parts: string[] = [];
-  if (title) parts.push(`Title: ${title}`);
-  if (body) parts.push(`Description: ${body}`);
-  if (rationale) parts.push(`Rationale: ${rationale}`);
+  if (title) parts.push(`Title: ${cleanFieldValue(title)}`);
+  if (body) parts.push(`Description: ${cleanFieldValue(body)}`);
+  if (rationale) parts.push(`Rationale: ${cleanFieldValue(rationale)}`);
 
   return parts.join('\n\n');
+}
+
+/**
+ * Pre-process flat pdfjs-extracted text (no newlines) by inserting line breaks
+ * before known Jama metadata field labels, so that normalizeRequirementText()
+ * can parse the structure correctly.
+ *
+ * Use this for Set Review where pdfjs joins all text items with spaces.
+ */
+export function prepareFlatTextForNormalization(flat: string): string {
+  // Build a regex that matches any field label preceded by a space/word-boundary.
+  // Insert a newline before each label so extractFields can split on lines.
+  const labelPatterns = FIELD_LABELS.map(([label]) => escapeRegex(label));
+  // Sort longest first to match greedily
+  labelPatterns.sort((a, b) => b.length - a.length);
+  const labelRegex = new RegExp(`\\s+(${labelPatterns.join('|')})\\b`, 'gi');
+  return flat.replace(labelRegex, '\n$1');
 }

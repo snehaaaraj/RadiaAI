@@ -35,14 +35,6 @@ def _build_delta_payload() -> dict:
                 "metadata": {"parent_id": "P-110", "verification_method": "inspection"},
             },
         ],
-        "changed_trace_links": [
-            {
-                "requirement_id": "REQ-001",
-                "change_type": "modified",
-                "previous_parent_id": "P-090",
-                "current_parent_id": "P-100",
-            }
-        ],
     }
 
 
@@ -61,7 +53,6 @@ def test_delta_review_returns_expected_change_summary(client: TestClient) -> Non
     assert data["change_summary"]["new_requirement_ids"] == ["REQ-003"]
     assert data["change_summary"]["modified_requirement_ids"] == ["REQ-001"]
     assert data["change_summary"]["deleted_requirement_ids"] == ["REQ-002"]
-    assert data["change_summary"]["changed_trace_link_requirement_ids"] == ["REQ-001"]
     reviewed_ids = [item["requirement_id"] for item in data["reviewed_requirements"]]
     assert reviewed_ids == ["REQ-001", "REQ-003"]
 

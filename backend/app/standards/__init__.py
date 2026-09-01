@@ -1,1 +1,0 @@
-"""Standards registry package."""

@@ -2,7 +2,7 @@
  * Application context — global state that needs to be accessible
  * across multiple pages without prop drilling.
  *
- * Intentionally minimal in Phase 1. Phase 2 will add auth state (user, token).
+ * Manages theme preferences, UI settings.
  */
 
 import { createContext, useEffect, useMemo, useState, type ReactNode } from 'react';

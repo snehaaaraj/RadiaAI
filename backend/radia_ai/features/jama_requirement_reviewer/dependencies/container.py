@@ -6,7 +6,7 @@ abstract interfaces. Endpoint handlers declare what they need via type annotatio
 and Depends(); this module provides the actual instances.
 
 Initialises Azure OpenAI, Azure AI Search, and Blob Storage clients at startup.
-Wires the LLM review enhancer into all reviewers for hybrid (rules + AI) review.
+Wires the LLM review enhancer into all reviewers for LLM-based review.
 """
 
 from collections.abc import AsyncGenerator
@@ -27,20 +27,10 @@ from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client im
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
     ReviewHistoryRepository,
 )
-from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import (
-    CertificationReviewer,
+from radia_ai.features.jama_requirement_reviewer.reviewers.consolidated import (
+    build_category_reviewers,
 )
-from radia_ai.features.jama_requirement_reviewer.reviewers.language.reviewer import LanguageReviewer
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
-from radia_ai.features.jama_requirement_reviewer.reviewers.structure.reviewer import (
-    StructureReviewer,
-)
-from radia_ai.features.jama_requirement_reviewer.reviewers.traceability.reviewer import (
-    TraceabilityReviewer,
-)
-from radia_ai.features.jama_requirement_reviewer.reviewers.verifiability.reviewer import (
-    VerifiabilityReviewer,
-)
 from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import (
     RequirementDeltaReviewService,
 )
@@ -128,7 +118,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Use manual ingestion via POST /api/v1/ingest endpoint or UI button instead.
     logger.info("ingestion_service_ready", message="Manual ingestion available via /api/v1/ingest")
 
-    # Review orchestrator (hybrid: deterministic rules + LLM+RAG)
+    # Review orchestrator (LLM-based review)
     app.state.review_orchestrator = _build_review_orchestrator(
         settings,
         app.state.standards_service,
@@ -136,10 +126,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
-    app.state.review_history_repository = ReviewHistoryRepository()
+    app.state.review_history_repository = ReviewHistoryRepository(blob_client)
     app.state.review_history_service = ReviewHistoryService(app.state.review_history_repository)
     app.state.requirement_delta_review_service = RequirementDeltaReviewService(
-        app.state.requirement_review_service,
+        app.state.review_orchestrator,
         app.state.review_version_service,
     )
 
@@ -160,16 +150,10 @@ def _build_review_orchestrator(
     standards_service: StandardsService | None = None,
     llm_enhancer: LLMReviewEnhancer | None = None,
 ) -> ReviewOrchestrator:
-    """Construct the hybrid review orchestrator with registered reviewers."""
+    """Construct the LLM-based review orchestrator with registered reviewers."""
     return ReviewOrchestrator(
         settings=settings,
-        reviewers=[
-            LanguageReviewer(),
-            StructureReviewer(),
-            VerifiabilityReviewer(),
-            TraceabilityReviewer(),
-            CertificationReviewer(),
-        ],
+        reviewers=build_category_reviewers(),
         standards_service=standards_service,
         llm_enhancer=llm_enhancer,
         reviewer_bundle_version="2.0.0",
@@ -189,13 +173,59 @@ def get_review_version_service(request: Request) -> ReviewVersionService:
 ReviewVersionServiceDep = Annotated[ReviewVersionService, Depends(get_review_version_service)]
 
 
+def get_llm_enhancer(request: Request) -> LLMReviewEnhancer | None:
+    """
+    Resolve the LLM review enhancer, rebuilding the Azure chain if needed.
+
+    Normally the enhancer is created during lifespan startup. When app state is
+    missing it (a request served by a process that never ran lifespan — e.g. a
+    cold serverless invocation), rebuild it from settings rather than handing the
+    orchestrator a None enhancer, which would make every review silently return
+    zero findings.
+
+    Returns None only when the Azure clients cannot be constructed at all; the
+    orchestrator then reports REVIEW_ENGINE_UNAVAILABLE instead of a clean review.
+    """
+    enhancer = getattr(request.app.state, "llm_enhancer", None)
+    if enhancer is not None:
+        return cast(LLMReviewEnhancer, enhancer)
+
+    rag_service = getattr(request.app.state, "rag_service", None)
+    if rag_service is None:
+        settings = _resolve_settings(request.app)
+        try:
+            openai_client = getattr(request.app.state, "openai_client", None) or OpenAIClient(
+                settings.azure_openai
+            )
+            search_service = getattr(request.app.state, "search_service", None) or SearchService(
+                settings.azure_search, openai_client, settings
+            )
+        except Exception:
+            logger.exception("llm_enhancer_bootstrap_failed")
+            return None
+
+        rag_service = RAGService(settings, openai_client, search_service)
+        request.app.state.openai_client = openai_client
+        request.app.state.search_service = search_service
+        request.app.state.rag_service = rag_service
+        logger.warning("llm_enhancer_rebuilt_outside_lifespan")
+
+    enhancer = LLMReviewEnhancer(rag_service)
+    request.app.state.llm_enhancer = enhancer
+    return enhancer
+
+
 def get_review_orchestrator(request: Request) -> ReviewOrchestrator:
     """Resolve review orchestrator from application state."""
     orchestrator = getattr(request.app.state, "review_orchestrator", None)
     if orchestrator is None:
         settings = _resolve_settings(request.app)
         standards_service = get_standards_service(request)
-        orchestrator = _build_review_orchestrator(settings, standards_service)
+        orchestrator = _build_review_orchestrator(
+            settings,
+            standards_service,
+            get_llm_enhancer(request),
+        )
         request.app.state.review_orchestrator = orchestrator
     return orchestrator
 
@@ -219,11 +249,9 @@ def get_requirement_delta_review_service(request: Request) -> RequirementDeltaRe
     """Resolve requirement delta review service from application state."""
     service = getattr(request.app.state, "requirement_delta_review_service", None)
     if service is None:
-        requirement_service = get_requirement_review_service(request)
-        version_service = get_review_version_service(request)
         service = RequirementDeltaReviewService(
-            requirement_review_service=requirement_service,
-            review_version_service=version_service,
+            orchestrator=get_review_orchestrator(request),
+            review_version_service=get_review_version_service(request),
         )
         request.app.state.requirement_delta_review_service = service
     return service
@@ -240,7 +268,13 @@ def get_review_history_service(request: Request) -> ReviewHistoryService:
     if service is None:
         repository = getattr(request.app.state, "review_history_repository", None)
         if repository is None:
-            repository = ReviewHistoryRepository()
+            blob_client = getattr(request.app.state, "blob_client", None)
+            if blob_client is None:
+                settings = get_settings()
+                from app.core.azure_clients import BlobStorageClient as _Blob
+
+                blob_client = _Blob(settings.azure_blob)
+            repository = ReviewHistoryRepository(blob_client)
             request.app.state.review_history_repository = repository
         service = ReviewHistoryService(repository)
         request.app.state.review_history_service = service
