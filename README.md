@@ -65,9 +65,9 @@ RadiaAi-2.0/
 │   │       │   ├── repositories/      # review history persistence
 │   │       │   ├── reviewers/         # review orchestration:
 │   │       │   │   ├── base.py        #   abstract reviewer interface
-│   │       │   │   ├── orchestrator.py#   LLM review + completion status
-│   │       │   │   ├── traceability/  #   version metadata (analysis lives in prompt)
-│   │       │   │   └── certification/ #   version metadata (analysis lives in prompt)
+│   │       │   │   ├── orchestrator.py#   LLM review + category scoring + completion
+│   │       │   │   └── consolidated.py#   per-category version metadata
+│   │       │   │                      #   (analysis lives in the prompt)
 │   │       │   ├── schemas/           # API request/response schemas
 │   │       │   ├── services/          # review, delta, history, standards services
 │   │       │   ├── standards/         # standards registry (fallback)
@@ -138,7 +138,6 @@ The review system uses **LLM-based architecture** with GPT-5 + RAG:
                         │     review prompt        │
                         │     (language/structure/ │
                         │      verifiability/      │
-                        │      traceability/       │
                         │      certification)      │
                         └────────────┬────────────┘
                                      │
@@ -193,9 +192,11 @@ Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
 ### Requirements review workflow
 
 - [x] Upload or copy/paste requirement content
-- [x] AI-powered review across 5 categories (language, structure, verifiability, traceability, certification)
+- [x] AI-powered review across 4 categories (language, structure, verifiability, certification)
 - [x] Color-coded overall scoring
-- [x] Sub-category scoring displayed directly below overall score
+- [x] Sub-category scoring displayed directly below overall score, with every
+      category scored on a completed review — a clean category reads as a pass,
+      not as "not evaluated"
 - [x] Persistent review state across navigation with explicit **Clear Review**
 - [x] Findings grounded in indexed standards with source document links
 - [x] Explicit reporting when a review could not run, with the reason and a retry
@@ -209,6 +210,18 @@ Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
   - [x] Source-of-truth standard reference with direct SharePoint link
   - [x] Supporting evidence/context for each finding
   - [x] Full suggested rewrite (changeset)
+
+### Delta (verification) review workflow
+
+- [x] Baseline vs updated comparison with a new/modified/deleted change summary
+- [x] Requirements without an ID are paired by position, so pasting an original
+      and its revision reads as one **modified** requirement rather than an
+      unrelated add plus delete
+- [x] Only changed requirements are re-scored; each is compared against the
+      baseline text it replaces
+- [x] Scoring only — no rewrites are proposed, because the requirement under
+      review has already been revised
+- [x] Read-only findings explaining what a category still leaves unmet
 
 ### Document ingestion
 
@@ -290,7 +303,7 @@ Quick validation after deploy:
 | GET | `/api/v1/review/version` | Reviewer bundle version + determinism metadata |
 | GET | `/api/v1/standards` | Standards/reference libraries (SharePoint or fallback) |
 | POST | `/api/v1/review/requirement` | AI-powered individual requirement review |
-| POST | `/api/v1/review/delta` | Incremental delta review for changed requirements |
+| POST | `/api/v1/review/delta` | Score changed requirements against their baseline (no rewrites proposed) |
 | GET | `/api/v1/review/history` | List stored review runs and findings |
 | POST | `/api/v1/review/history/{id}/disposition` | Apply finding disposition (Accepted/Rejected/Deferred) |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
@@ -360,11 +373,5 @@ pytest --cov=app --cov=radia_ai # with coverage report
 - **Review history is not durable.** It lives in an in-memory repository, so on
   serverless hosting each invocation starts empty and disposition writes will not
   find their review. Durable storage is needed before history is production-ready.
-- **Delta dispositions target the wrong finding.** Delta history flattens findings
-  across all reviewed requirements, while the UI sends a per-requirement index.
-- **A cleanly passing category shows as "Not evaluated"** — category results are
-  only emitted for categories that produced a finding.
-- **The category grid hides traceability**, although the review pipeline produces
-  traceability findings.
 
 **Note:** Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.

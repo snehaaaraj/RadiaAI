@@ -2,7 +2,7 @@
 Consolidated LLM review enhancer — single GPT-5 call for all categories.
 
 Makes one standards-grounded RAG and LLM call covering language, structure,
-verifiability, traceability, and certification.
+verifiability, and certification.
 """
 
 from __future__ import annotations
@@ -10,13 +10,16 @@ from __future__ import annotations
 import json
 
 from app.core.logging import get_logger
-from app.prompts.review_prompts import CONSOLIDATED_REVIEW_SYSTEM
+from app.prompts.review_prompts import CONSOLIDATED_REVIEW_SYSTEM, DELTA_REVIEW_SYSTEM
 from app.rag.service import RAGService, RetrievedContext
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
+    REVIEW_CATEGORIES,
     ConsolidatedReviewResult,
     FindingSeverity,
     PassFail,
     RequirementReviewInput,
+    RequirementRevision,
+    ReviewCategory,
     ReviewCompletion,
     ReviewFailureReason,
     ReviewFinding,
@@ -39,7 +42,7 @@ _STATUS_FROM_SEVERITY = {
     FindingSeverity.CRITICAL: ReviewStatus.UNACCEPTABLE,
 }
 
-_VALID_REVIEWERS = {"language", "structure", "verifiability", "traceability", "certification"}
+_VALID_REVIEWERS = {category.value for category in REVIEW_CATEGORIES}
 
 
 class LLMReviewEnhancer:
@@ -47,7 +50,7 @@ class LLMReviewEnhancer:
     Single consolidated LLM call for all review categories.
 
     Retrieves diverse standards context via RAG, then makes ONE GPT-5 call
-    that produces findings across all 5 reviewer domains simultaneously.
+    that produces findings across all scored review categories simultaneously.
     """
 
     def __init__(self, rag_service: RAGService) -> None:
@@ -60,14 +63,59 @@ class LLMReviewEnhancer:
         """
         Run a single LLM call covering all review categories.
 
-        Returns findings spanning language, structure, verifiability, traceability,
-        and certification — all from one GPT-5 invocation — together with a
+        Returns findings spanning language, structure, verifiability, and
+        certification — all from one GPT-5 invocation — together with a
         completion record. Each pipeline stage is guarded separately so a failure
         is reported with its specific cause instead of collapsing into an empty
         result that would read as "this requirement is clean".
         """
+        user_message = (
+            f"Requirement ID: {payload.requirement_id or 'N/A'}\n"
+            f"Requirement Level: {payload.requirement_level or 'not specified'}\n"
+            f"Text: {payload.text}"
+        )
+        return self._run_review(
+            payload.text,
+            system_prompt=CONSOLIDATED_REVIEW_SYSTEM,
+            user_message=user_message,
+            allow_rewrite=True,
+        )
+
+    def score_revision(self, revision: RequirementRevision) -> ConsolidatedReviewResult:
+        """
+        Score an already-revised requirement without proposing further rewrites.
+
+        Delta review verifies a revision rather than authoring one, so findings
+        returned here never carry a ``suggested_rewrite``. The baseline text is
+        included when available so the model can confirm the revision resolved
+        the earlier problems instead of re-raising them.
+        """
+        payload = revision.requirement
+        previous = revision.baseline_text or "(none — this requirement is newly added)"
+        user_message = (
+            f"Requirement ID: {payload.requirement_id or 'N/A'}\n"
+            f"Requirement Level: {payload.requirement_level or 'not specified'}\n"
+            f"Previous version: {previous}\n"
+            f"Revised text to score: {payload.text}"
+        )
+        return self._run_review(
+            payload.text,
+            system_prompt=DELTA_REVIEW_SYSTEM,
+            user_message=user_message,
+            allow_rewrite=False,
+        )
+
+    def _run_review(
+        self,
+        requirement_text: str,
+        *,
+        system_prompt: str,
+        user_message: str,
+        allow_rewrite: bool,
+    ) -> ConsolidatedReviewResult:
+        """Retrieve standards context and run one guarded LLM review call."""
         try:
-            context = self._retrieve_context(payload.text)
+            context = self._retrieve_context(requirement_text)
         except Exception:
             logger.exception("consolidated_review_retrieval_failed")
             return _failure(ReviewFailureReason.RETRIEVAL_FAILED)
@@ -76,15 +124,9 @@ class LLMReviewEnhancer:
             logger.warning("no_rag_context_for_consolidated_review")
             return _failure(ReviewFailureReason.NO_STANDARDS_CONTEXT)
 
-        user_message = (
-            f"Requirement ID: {payload.requirement_id or 'N/A'}\n"
-            f"Requirement Level: {payload.requirement_level or 'not specified'}\n"
-            f"Text: {payload.text}"
-        )
-
         try:
             raw_response = self._rag.generate_with_context(
-                system_prompt=CONSOLIDATED_REVIEW_SYSTEM,
+                system_prompt=system_prompt,
                 user_message=user_message,
                 context=context,
             )
@@ -92,7 +134,7 @@ class LLMReviewEnhancer:
             logger.exception("consolidated_review_llm_call_failed")
             return _failure(ReviewFailureReason.LLM_CALL_FAILED)
 
-        findings = self._parse_response(raw_response, context)
+        findings = self._parse_response(raw_response, context, allow_rewrite=allow_rewrite)
         if findings is None:
             return _failure(ReviewFailureReason.INVALID_LLM_RESPONSE)
 
@@ -110,6 +152,8 @@ class LLMReviewEnhancer:
         self,
         raw: str,
         context: RetrievedContext,
+        *,
+        allow_rewrite: bool = True,
     ) -> list[ReviewFinding] | None:
         """
         Parse the JSON response from the consolidated LLM call.
@@ -147,7 +191,8 @@ class LLMReviewEnhancer:
             status = _STATUS_FROM_SEVERITY.get(severity, ReviewStatus.REVISION_RECOMMENDED)
             reviewer = f.get("reviewer", "").lower().strip()
             if reviewer not in _VALID_REVIEWERS:
-                reviewer = "language"
+                logger.warning("consolidated_llm_finding_reviewer_coerced", reviewer=reviewer)
+                reviewer = ReviewCategory.LANGUAGE.value
 
             reference = f.get("reference", "")
             if reference and reference not in source_filenames:
@@ -168,7 +213,9 @@ class LLMReviewEnhancer:
                     recommendation=f.get("recommendation", ""),
                     reference=reference,
                     reference_title=reference,
-                    suggested_rewrite=f.get("suggested_rewrite"),
+                    # A verification pass scores a revision; it must never hand back
+                    # replacement text, even if the model volunteers some.
+                    suggested_rewrite=f.get("suggested_rewrite") if allow_rewrite else None,
                 )
             )
 

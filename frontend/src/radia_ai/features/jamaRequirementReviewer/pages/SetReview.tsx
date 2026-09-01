@@ -376,7 +376,7 @@ export default function SetReview() {
                   Individual sub-category quality scoring helps you spot where the requirement is weakest.
                 </Typography>
               </Box>
-              <CategoryScoreGrid categories={activeResult.category_results} reviewCompleted />
+              <CategoryScoreGrid categories={activeResult.category_results} />
               <Divider />
               <ReviewChangeSet
                 findings={activeResult.findings}

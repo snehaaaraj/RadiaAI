@@ -27,13 +27,10 @@ from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client im
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
     ReviewHistoryRepository,
 )
-from radia_ai.features.jama_requirement_reviewer.reviewers.certification.reviewer import (
-    CertificationReviewer,
+from radia_ai.features.jama_requirement_reviewer.reviewers.consolidated import (
+    build_category_reviewers,
 )
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
-from radia_ai.features.jama_requirement_reviewer.reviewers.traceability.reviewer import (
-    TraceabilityReviewer,
-)
 from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import (
     RequirementDeltaReviewService,
 )
@@ -132,7 +129,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.review_history_repository = ReviewHistoryRepository(blob_client)
     app.state.review_history_service = ReviewHistoryService(app.state.review_history_repository)
     app.state.requirement_delta_review_service = RequirementDeltaReviewService(
-        app.state.requirement_review_service,
+        app.state.review_orchestrator,
         app.state.review_version_service,
     )
 
@@ -156,10 +153,7 @@ def _build_review_orchestrator(
     """Construct the LLM-based review orchestrator with registered reviewers."""
     return ReviewOrchestrator(
         settings=settings,
-        reviewers=[
-            TraceabilityReviewer(),
-            CertificationReviewer(),
-        ],
+        reviewers=build_category_reviewers(),
         standards_service=standards_service,
         llm_enhancer=llm_enhancer,
         reviewer_bundle_version="2.0.0",
@@ -255,11 +249,9 @@ def get_requirement_delta_review_service(request: Request) -> RequirementDeltaRe
     """Resolve requirement delta review service from application state."""
     service = getattr(request.app.state, "requirement_delta_review_service", None)
     if service is None:
-        requirement_service = get_requirement_review_service(request)
-        version_service = get_review_version_service(request)
         service = RequirementDeltaReviewService(
-            requirement_review_service=requirement_service,
-            review_version_service=version_service,
+            orchestrator=get_review_orchestrator(request),
+            review_version_service=get_review_version_service(request),
         )
         request.app.state.requirement_delta_review_service = service
     return service

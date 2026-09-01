@@ -7,12 +7,14 @@ import json
 from typing import TYPE_CHECKING
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
+    REVIEW_CATEGORIES,
     CategoryResult,
     ConsolidatedReviewResult,
     DeterminismConfigSnapshot,
     DeterminismContext,
     RequirementReviewInput,
     RequirementReviewResponse,
+    RequirementRevision,
     ReviewCompletion,
     ReviewFailureReason,
     ReviewFinding,
@@ -53,7 +55,7 @@ class ReviewOrchestrator:
 
     def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
         """
-        Run the consolidated LLM review.
+        Run the consolidated LLM review, proposing a rewrite for each finding.
 
         When the review engine cannot evaluate the requirement, the response
         carries ``overall = NOT_EVALUATED`` and a failed completion record. An
@@ -68,6 +70,31 @@ class ReviewOrchestrator:
         else:
             llm_result = self._llm_enhancer.consolidated_review(normalized_payload)
 
+        return self._to_response(llm_result)
+
+    def score_revision(self, revision: RequirementRevision) -> RequirementReviewResponse:
+        """
+        Score an already-revised requirement without proposing further changes.
+
+        Delta review verifies work that a previous review recommended, so this
+        path returns category scores and the reasons behind them, but no
+        replacement text.
+        """
+        normalized = revision.model_copy(
+            update={"requirement": normalize_requirement_review_input(revision.requirement)}
+        )
+
+        if self._llm_enhancer is None:
+            llm_result = ConsolidatedReviewResult(
+                completion=ReviewCompletion.failed(ReviewFailureReason.REVIEW_ENGINE_UNAVAILABLE),
+            )
+        else:
+            llm_result = self._llm_enhancer.score_revision(normalized)
+
+        return self._to_response(llm_result)
+
+    def _to_response(self, llm_result: ConsolidatedReviewResult) -> RequirementReviewResponse:
+        """Turn a raw LLM result into a scored, standards-enriched response."""
         determinism = self.build_version_response().determinism
 
         if not llm_result.completion.is_complete:
@@ -79,30 +106,35 @@ class ReviewOrchestrator:
                 determinism=determinism,
             )
 
-        # Enrich findings with standards references
         enriched = self._enrich_findings(llm_result.findings)
-
-        # Build category results from LLM findings
-        category_statuses: dict[str, list[ReviewStatus]] = {}
-        for f in enriched:
-            category_statuses.setdefault(f.reviewer, []).append(f.status)
-
-        category_results = [
-            CategoryResult(
-                category=name,
-                status=overall_from_statuses(statuses) if statuses else ReviewStatus.ACCEPTABLE,
-            )
-            for name, statuses in category_statuses.items()
-        ]
-
-        overall = overall_from_statuses([cr.status for cr in category_results])
+        category_results = self._build_category_results(enriched)
         return RequirementReviewResponse(
-            overall=overall,
+            overall=overall_from_statuses([cr.status for cr in category_results]),
             completion=llm_result.completion,
             category_results=category_results,
             findings=enriched,
             determinism=determinism,
         )
+
+    @staticmethod
+    def _build_category_results(findings: list[ReviewFinding]) -> list[CategoryResult]:
+        """
+        Score every review category, not just the ones that produced findings.
+
+        A category the review checked and found nothing wrong with is
+        ``ACCEPTABLE``. Omitting it would make a clean category indistinguishable
+        from one that was never evaluated.
+        """
+        statuses: dict[str, list[ReviewStatus]] = {category: [] for category in REVIEW_CATEGORIES}
+        for finding in findings:
+            # Findings from an unrecognized category are still scored, so an
+            # unexpected reviewer value can never silently drop a problem.
+            statuses.setdefault(finding.reviewer, []).append(finding.status)
+
+        return [
+            CategoryResult(category=category, status=overall_from_statuses(category_statuses))
+            for category, category_statuses in statuses.items()
+        ]
 
     def build_version_response(self) -> ReviewVersionResponse:
         """Return reviewer/prompt/standards version metadata."""

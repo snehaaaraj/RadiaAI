@@ -106,12 +106,14 @@ The review engine provides explainable, standards-grounded requirement analysis.
 
 ### Single requirement review
 
+Single review is an **authoring** pass: it flags violations and proposes replacement text.
+
 1. The user submits one requirement.
 2. The orchestrator normalizes the input (fielded Jama text is flattened to
    Title / Description / Rationale).
 3. `LLMReviewEnhancer` retrieves standards context from Azure AI Search, using
    source-diversified retrieval so several documents can be cited.
-4. One consolidated GPT-5 call produces findings across all five categories.
+4. One consolidated GPT-5 call produces findings across all four scored categories.
 5. Findings are enriched with standards references and SharePoint URLs.
 6. Category statuses are derived from the findings and aggregated into an overall
    status.
@@ -119,20 +121,52 @@ The review engine provides explainable, standards-grounded requirement analysis.
    - overall status
    - completion record (see §6)
    - category results
-   - findings
+   - findings, each carrying a `suggested_rewrite` (the changeset)
    - version metadata
    - review ID
 
+### Set review
+
+A parsed PDF yields many requirements. Each one runs through the single-requirement
+authoring pass independently, and the results are presented per requirement.
+
 ### Delta review
+
+Delta review is a **verification** pass. Its input is a requirement that a single
+or set review already caused to be revised, so it scores the revision instead of
+asking for another one.
 
 1. The system compares baseline and updated requirement sets.
 2. It identifies:
    - new requirements
    - modified requirements
    - deleted requirements
-3. Only changed requirements are re-reviewed.
-4. Results are aggregated into a delta response with a change summary and a
+3. Only changed requirements are re-reviewed. Each is paired with the baseline
+   text it replaces (`RequirementRevision`), so the model can confirm the revision
+   resolved the earlier findings rather than re-raising them.
+4. Scoring uses `DELTA_REVIEW_SYSTEM`, which explicitly forbids proposing new
+   requirement text. The parser also drops any `suggested_rewrite` the model
+   returns anyway, so the contract holds even if prompt compliance slips.
+5. Results are aggregated into a delta response with a change summary and a
    run-level completion record.
+
+### How baseline and updated requirements are paired
+
+| Input | Pairing key |
+|-------|-------------|
+| Requirement carries an ID | that ID |
+| Requirement has no ID | its **position** — the Nth unidentified baseline requirement pairs with the Nth unidentified updated requirement, labelled `Requirement N` |
+
+Position is the only usable signal for unidentified requirements. Keying them by
+their text cannot work, because a revision changes the text by definition: the
+revision would never match its baseline, so every edit would be reported as a
+deletion plus an addition and scored with no previous version to compare against.
+That is exactly the paste-the-original, paste-the-revision workflow this page
+exists for.
+
+Because a delta-reviewed requirement has already been corrected against the
+standards, its scores are expected to be high, and an empty findings list is the
+normal outcome for a good revision.
 
 ## 6. Review completion contract
 
@@ -162,17 +196,45 @@ the score, so an unevaluated requirement is never displayed as a passing one.
 
 ## 7. Reviewer modules
 
-All requirement analysis happens in a single consolidated GPT-5 call
-(`app/prompts/review_prompts.py`), covering five categories:
+Requirement analysis happens in one consolidated GPT-5 call per requirement
+(`app/prompts/review_prompts.py`). Two prompts share the same four scored
+categories:
+
+- `CONSOLIDATED_REVIEW_SYSTEM` — authoring review (single and set review); proposes rewrites
+- `DELTA_REVIEW_SYSTEM` — verification review (delta review); proposes nothing
+
+The scored categories are:
 
 - **Language**: mandatory modal usage, banned words, ambiguous wording, passive voice
 - **Structure**: one requirement per statement, human-judgment language, EARS syntax, requirement level
 - **Verifiability**: quantitative limits, operating conditions, verification method
-- **Traceability**: parent traceability, allocation, derived requirements, bidirectional tracing
 - **Certification**: DO-178C / DO-254 / ARP4754A alignment, verification methods, safety language, DAL
 
+`ReviewCategory` in `models/review_models.py` is the single source of truth for
+this list. The prompt, the response parser, the orchestrator's category scoring
+and the UI grid all derive from it, so a category cannot be produced by one layer
+and silently dropped by another. Traceability is deliberately out of scope.
+
+### Category scoring
+
+A completed review emits a `CategoryResult` for **every** category, not only the
+ones that produced findings:
+
+- findings in a category → that category takes the worst status among them
+- no findings in a category → `Acceptable`
+
+Omitting clean categories would make "checked and clean" indistinguishable from
+"never checked". A review that did not complete emits no category results at all,
+because nothing was scored (§6).
+
+The category grid mirrors this on the client: it always renders the four scored
+categories, showing "Not scored" for any the payload omits rather than dropping
+the tile or inventing a passing value. Persisted review results are keyed by a
+schema version so a result cached by an older build cannot be rendered against
+the current scorecard.
+
 The reviewer modules registered with the orchestrator
-(`reviewers/traceability/`, `reviewers/certification/`) no longer carry rule logic.
+(`reviewers/consolidated.py`, one per category) carry no rule logic.
 They exist to publish version metadata, so a result can be traced back to:
 
 - reviewer implementation version
@@ -275,7 +337,7 @@ Implemented and central to the product:
 
 - LLM-based requirement review grounded in indexed standards
 - explicit review completion reporting (§6)
-- delta review over changed requirements
+- delta review that verifies revisions without re-authoring them
 - standards catalog browsing
 - document ingestion, search, and chat over the index
 - workspace and launchpad UX
@@ -283,11 +345,6 @@ Implemented and central to the product:
 Known gaps:
 
 - **review history is not durable** — in-memory only (§9)
-- **delta dispositions target the wrong finding** — delta history flattens findings
-  across requirements while the UI sends a per-requirement index
-- category scoring only reports categories that produced a finding, so a category
-  that passed cleanly displays as "Not evaluated" rather than as a pass
-- the frontend category grid hides traceability, although the pipeline produces it
 
 ## 14. Summary
 

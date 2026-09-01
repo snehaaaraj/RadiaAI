@@ -21,18 +21,19 @@ import { useDeltaReview } from '@/radia_ai/features/jamaRequirementReviewer/hook
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useApplyFindingDisposition } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
+import {
+  DELTA_REVIEW_RESULT_KEY,
+  purgeLegacyReviewResults,
+} from '@/radia_ai/features/jamaRequirementReviewer/persistedReviewKeys';
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 import { isReviewFailed, isReviewIncomplete } from '@/utils/reviewCompletion';
 
 // Simple text format: one requirement per line (optional REQ-ID prefix)
-const BASELINE_SAMPLE = `The flight control system shall maintain altitude within ±50 feet of the commanded altitude during cruise flight.
-The telemetry system shall transmit position data to ground control at intervals not exceeding 1.0 seconds.`;
+const BASELINE_SAMPLE = ``;
 
-const UPDATED_SAMPLE = `The flight control system shall maintain altitude within ±25 feet of the commanded altitude during cruise flight under nominal conditions.
-The diagnostic system shall execute a complete self-test sequence within 5.0 seconds of system power-on.`;
+const UPDATED_SAMPLE = ``;
 
 /**
  * Parse simple text format (one requirement per line) into RequirementReviewInput array.
@@ -99,7 +100,7 @@ export default function DeltaReview() {
     initialValue: DEFAULT_DELTA_FORM_STATE,
   });
   const { state: persistedResult, setState: setPersistedResult, clear: clearPersistedResult } = usePersistentState<DeltaReviewResponse | null>({
-    key: 'delta-review-result',
+    key: DELTA_REVIEW_RESULT_KEY,
     initialValue: null,
   });
   const [specificationId, setSpecificationId] = useState(formState.specificationId);
@@ -119,13 +120,13 @@ export default function DeltaReview() {
     isError,
     error,
   } = useDeltaReview();
-  const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
   const playReviewCompleteSound = useReviewCompleteSound();
 
   const DISPOSITION_SAVED_KEY = 'delta-review-disposition-saved';
 
   // On mount: if disposition was saved last time, clear all review data
   useEffect(() => {
+    purgeLegacyReviewResults();
     if (sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true') {
       sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       clearFormState();
@@ -169,7 +170,7 @@ export default function DeltaReview() {
     return () => {
       if (isDirtyRef.current) {
         localStorage.removeItem('delta-review-form-state');
-        localStorage.removeItem('delta-review-result');
+        localStorage.removeItem(DELTA_REVIEW_RESULT_KEY);
         sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       }
     };
@@ -429,16 +430,7 @@ export default function DeltaReview() {
               {activeResult.reviewed_requirements.length === 0 ? (
                 <Alert severity="success">No changed requirements to review.</Alert>
               ) : (
-                (() => {
-                  // Build a map from requirement_id -> starting flattened finding index
-                  const requirementToStartIndex: Record<string, number> = {};
-                  let globalIndex = 0;
-                  for (const req of activeResult.reviewed_requirements) {
-                    requirementToStartIndex[req.requirement_id] = globalIndex;
-                    globalIndex += req.findings.length;
-                  }
-
-                  return activeResult.reviewed_requirements.map((reviewedRequirement) => (
+                activeResult.reviewed_requirements.map((reviewedRequirement) => (
                     <Paper key={reviewedRequirement.requirement_id} variant="outlined" sx={{ p: 1.75, borderRadius: 3 }}>
                       <Stack spacing={1.5}>
                         <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
@@ -453,33 +445,25 @@ export default function DeltaReview() {
                           <>
                             <ReviewQualityBand
                               label="Requirement score"
+                              showValue={false}
                               score={getReviewQualityScore(
                                 reviewedRequirement.overall,
                                 reviewedRequirement.findings
                               )}
                             />
-                            <CategoryScoreGrid categories={reviewedRequirement.category_results} reviewCompleted />
+                            <CategoryScoreGrid categories={reviewedRequirement.category_results} />
                             <ReviewChangeSet
                               findings={reviewedRequirement.findings}
-                              reviewId={activeResult.review_id}
-                              onApplyDisposition={(reviewId, payload) => {
-                                // Translate per-requirement finding index to global flattened index
-                                const startIndex = requirementToStartIndex[reviewedRequirement.requirement_id] ?? 0;
-                                const globalFindingIndex = startIndex + payload.finding_index;
-                                sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
-                                applyDisposition({
-                                  reviewId,
-                                  payload: { ...payload, finding_index: globalFindingIndex },
-                                });
-                              }}
-                              isApplyingDisposition={isApplyingDisposition}
+                              readOnly
+                              title="Why this scored the way it did"
+                              description="Delta review verifies an already-revised requirement, so it reports what is still unmet without proposing new text."
+                              emptyMessage="This revision satisfies every category — no issues remain."
                             />
                           </>
                         )}
                       </Stack>
                     </Paper>
-                  ));
-                })()
+                  ))
               )}
             </Stack>
           </Paper>

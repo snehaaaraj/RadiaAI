@@ -17,6 +17,10 @@ import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementRevie
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
 import { useRequirementReview } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
+import {
+  REQUIREMENT_REVIEW_RESULT_KEY,
+  purgeLegacyReviewResults,
+} from '@/radia_ai/features/jamaRequirementReviewer/persistedReviewKeys';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
@@ -53,7 +57,7 @@ export default function RequirementReview() {
     initialValue: DEFAULT_FORM_STATE,
   });
   const { state: persistedResult, setState: setPersistedResult, clear: clearPersistedResult } = usePersistentState<RequirementReviewResponse | null>({
-    key: 'requirement-review-result',
+    key: REQUIREMENT_REVIEW_RESULT_KEY,
     initialValue: null,
   });
   const [requirementId, setRequirementId] = useState(formState.requirementId);
@@ -77,6 +81,7 @@ export default function RequirementReview() {
 
   // On mount: if disposition was saved last time, clear all review data
   useEffect(() => {
+    purgeLegacyReviewResults();
     if (sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true') {
       sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       clearFormState();
@@ -111,7 +116,7 @@ export default function RequirementReview() {
     return () => {
       if (isDirtyRef.current) {
         localStorage.removeItem('requirement-review-form-state');
-        localStorage.removeItem('requirement-review-result');
+        localStorage.removeItem(REQUIREMENT_REVIEW_RESULT_KEY);
         sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       }
     };
@@ -180,7 +185,7 @@ export default function RequirementReview() {
           Individual Requirement Review
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          AI-powered review across language, structure, verifiability, traceability, and certification.
+          AI-powered review across language, structure, verifiability, and certification.
         </Typography>
       </Box>
 
@@ -338,7 +343,7 @@ export default function RequirementReview() {
               Individual sub-category quality scoring helps you spot where the requirement is weakest.
             </Typography>
               </Box>
-              <CategoryScoreGrid categories={activeResult.category_results} reviewCompleted />
+              <CategoryScoreGrid categories={activeResult.category_results} />
               <Divider />
               <ReviewChangeSet
                 findings={activeResult.findings}

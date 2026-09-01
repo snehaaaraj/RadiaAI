@@ -16,6 +16,30 @@ class ReviewStatus(StrEnum):
     NOT_EVALUATED = "Not Evaluated"
 
 
+class ReviewCategory(StrEnum):
+    """
+    The review categories the product scores.
+
+    This is the single source of truth for the scored categories: the prompt,
+    the response parser, the orchestrator and the UI grid all derive from it, so
+    a category can never be produced by one layer and dropped by another.
+    """
+
+    LANGUAGE = "language"
+    STRUCTURE = "structure"
+    VERIFIABILITY = "verifiability"
+    CERTIFICATION = "certification"
+
+
+REVIEW_CATEGORIES: tuple[ReviewCategory, ...] = (
+    ReviewCategory.LANGUAGE,
+    ReviewCategory.STRUCTURE,
+    ReviewCategory.VERIFIABILITY,
+    ReviewCategory.CERTIFICATION,
+)
+"""Scored categories in the order they are presented to a reviewer."""
+
+
 class PassFail(StrEnum):
     """Binary pass/fail result for an individual finding."""
 
@@ -164,8 +188,10 @@ class DeterminismContext(BaseModel):
 class ReviewFinding(BaseModel):
     """Single explainable review finding."""
 
-    category: str = Field(description="Finding category (language, structure, traceability, etc.).")
-    reviewer: str = Field(description="Reviewer module that produced this finding.")
+    category: str = Field(
+        description="Finding sub-category (e.g. Banned Words, EARS Syntax, Operating Conditions)."
+    )
+    reviewer: str = Field(description="Scored review category that produced this finding.")
     severity: FindingSeverity
     pass_fail: PassFail
     status: ReviewStatus
@@ -246,7 +272,13 @@ class ReviewVersionResponse(BaseModel):
 
 
 class CategoryResult(BaseModel):
-    """Normalized category-level status output for requirement review."""
+    """
+    Category-level status for a requirement review.
+
+    A completed review emits one of these for every category in
+    ``REVIEW_CATEGORIES``, so a category that produced no findings is reported
+    as ``ACCEPTABLE`` rather than being omitted and read as "never checked".
+    """
 
     category: str
     status: ReviewStatus
@@ -269,6 +301,22 @@ class DeltaChangeSummary(BaseModel):
     new_requirement_ids: list[str] = Field(default_factory=list)
     modified_requirement_ids: list[str] = Field(default_factory=list)
     deleted_requirement_ids: list[str] = Field(default_factory=list)
+
+
+class RequirementRevision(BaseModel):
+    """
+    A changed requirement paired with the baseline version it replaces.
+
+    Delta review scores a revision, so the reviewer needs the previous text to
+    confirm the revision actually resolved the earlier findings. ``baseline_text``
+    is null for a newly added requirement, which has nothing to compare against.
+    """
+
+    key: str = Field(
+        description="Identifier pairing this requirement with its baseline, and labelling the result."
+    )
+    requirement: RequirementReviewInput
+    baseline_text: str | None = None
 
 
 class DeltaRequirementReviewResult(BaseModel):

@@ -16,6 +16,7 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     ReviewFinding,
     ReviewStatus,
 )
+from radia_ai.features.jama_requirement_reviewer.utils.review_utils import overall_from_statuses
 
 
 class ReviewWorkflow(StrEnum):
@@ -104,7 +105,6 @@ def create_delta_history_entry(
 ) -> ReviewHistoryEntry:
     """Create a normalized history entry from delta response."""
     findings = []
-    category_results = []
     finding_to_requirement_map: dict[int, str] = {}
     global_index = 0
 
@@ -113,7 +113,6 @@ def create_delta_history_entry(
             finding_to_requirement_map[global_index] = requirement_result.requirement_id
             global_index += 1
         findings.extend(requirement_result.findings)
-        category_results.extend(requirement_result.category_results)
 
     return ReviewHistoryEntry(
         review_id=review_id,
@@ -122,8 +121,27 @@ def create_delta_history_entry(
         created_at=created_at,
         overall=response.overall,
         completion=response.completion,
-        category_results=category_results,
+        category_results=_merge_category_results(response),
         findings=findings,
         determinism=response.determinism,
         finding_to_requirement_map=finding_to_requirement_map,
     )
+
+
+def _merge_category_results(response: DeltaReviewResponse) -> list[CategoryResult]:
+    """
+    Roll per-requirement category results up into one row per category.
+
+    Each reviewed requirement reports every category, so concatenating them
+    would repeat each category once per requirement. The worst status across the
+    change set wins, matching how the overall verdict is aggregated.
+    """
+    statuses: dict[str, list[ReviewStatus]] = {}
+    for requirement_result in response.reviewed_requirements:
+        for category_result in requirement_result.category_results:
+            statuses.setdefault(category_result.category, []).append(category_result.status)
+
+    return [
+        CategoryResult(category=category, status=overall_from_statuses(category_statuses))
+        for category, category_statuses in statuses.items()
+    ]

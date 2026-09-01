@@ -26,6 +26,7 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     FindingSeverity,
     PassFail,
     RequirementReviewInput,
+    RequirementRevision,
     ReviewCompletion,
     ReviewFinding,
     ReviewStatus,
@@ -113,7 +114,8 @@ class StubLLMReviewEnhancer:
     Deterministic stand-in for the Azure-backed consolidated review enhancer.
 
     Accepts a callable so a test can vary the result per requirement — needed to
-    cover partially-failed delta runs.
+    cover partially-failed delta runs. It mirrors the real enhancer's two modes:
+    ``consolidated_review`` authors rewrites, ``score_revision`` only scores.
     """
 
     def __init__(
@@ -127,6 +129,18 @@ class StubLLMReviewEnhancer:
         if callable(self._result):
             return self._result(payload)
         return self._result
+
+    def score_revision(self, revision: RequirementRevision) -> ConsolidatedReviewResult:
+        """Score a revision, stripping rewrites exactly as the real enhancer does."""
+        result = self.consolidated_review(revision.requirement)
+        return result.model_copy(
+            update={
+                "findings": [
+                    finding.model_copy(update={"suggested_rewrite": None})
+                    for finding in result.findings
+                ]
+            }
+        )
 
 
 class ReviewEngineHarness:

@@ -7,9 +7,6 @@ import { getCategoryStatusScore, getReviewQualityColor } from '@/utils/reviewQua
 
 interface CategoryScoreGridProps {
   categories: CategoryResult[];
-  expectedCategories?: string[];
-  /** When true the review completed successfully — missing categories are treated as Acceptable. */
-  reviewCompleted?: boolean;
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
@@ -19,12 +16,13 @@ const CATEGORY_LABEL_MAP: Record<string, string> = {
   certification: 'Certification',
 };
 
-const CATEGORY_SORT_PRIORITY: Record<string, number> = {
-  language: 0,
-  structure: 1,
-  verifiability: 2,
-  certification: 3,
-};
+/**
+ * The categories every completed review scores, in presentation order.
+ *
+ * The grid always renders these, so a category can never silently vanish from
+ * the scorecard because a payload omitted it.
+ */
+const SCORED_CATEGORIES = ['language', 'structure', 'verifiability', 'certification'];
 
 function toCategoryKey(value: string): string {
   return value.trim().toLowerCase();
@@ -43,57 +41,41 @@ function toDisplayLabel(value: string): string {
 type DisplayCategory = {
   key: string;
   label: string;
+  /** Undefined when the payload carried no score for this category. */
   status?: ReviewStatus;
 };
 
-export function CategoryScoreGrid({
-  categories,
-  expectedCategories = ['Language', 'Structure', 'Verifiability', 'Certification'],
-  reviewCompleted = false,
-}: CategoryScoreGridProps) {
-  const merged = new Map<string, DisplayCategory>();
-
+export function CategoryScoreGrid({ categories }: CategoryScoreGridProps) {
+  const reported = new Map<string, ReviewStatus>();
   for (const item of categories) {
-    if (toCategoryKey(item.category) === 'traceability') {
-      continue;
-    }
-
-    const key = toCategoryKey(toDisplayLabel(item.category));
-    merged.set(key, {
-      key,
-      label: toDisplayLabel(item.category),
-      status: item.status,
-    });
+    reported.set(toCategoryKey(item.category), item.status);
   }
 
-  for (const expected of expectedCategories) {
-    const key = toCategoryKey(expected);
-    if (!merged.has(key)) {
-      merged.set(key, {
-        key,
-        label: expected,
-        status: reviewCompleted ? ('Acceptable' as ReviewStatus) : undefined,
-      });
+  const displayCategories: DisplayCategory[] = SCORED_CATEGORIES.map((key) => ({
+    key,
+    label: CATEGORY_LABEL_MAP[key],
+    status: reported.get(key),
+  }));
+
+  // Surface anything the backend scored outside the standard set rather than hiding it.
+  for (const item of categories) {
+    const key = toCategoryKey(item.category);
+    if (!SCORED_CATEGORIES.includes(key)) {
+      displayCategories.push({ key, label: toDisplayLabel(item.category), status: item.status });
     }
   }
-
-  const displayCategories = Array.from(merged.values()).sort((left, right) => {
-    const leftPriority = CATEGORY_SORT_PRIORITY[left.key] ?? 99;
-    const rightPriority = CATEGORY_SORT_PRIORITY[right.key] ?? 99;
-    if (leftPriority !== rightPriority) return leftPriority - rightPriority;
-    return left.label.localeCompare(right.label);
-  });
 
   return (
     <Grid container spacing={1} columns={displayCategories.length}>
       {displayCategories.map((category) => {
-        // 'Not Evaluated' carries no score — show it the same as a missing category.
+        // No status, or an explicitly unevaluated one, carries no score. Show a
+        // placeholder rather than inventing a passing value.
         const score =
           category.status && category.status !== 'Not Evaluated'
             ? getCategoryStatusScore(category.status)
             : null;
         return (
-          <Grid key={`${category.key}-${category.status ?? 'missing'}`} size={{ xs: displayCategories.length, sm: 1 }}>
+          <Grid key={category.key} size={{ xs: displayCategories.length, sm: 1 }}>
             <Paper
               variant="outlined"
               sx={{
@@ -112,7 +94,7 @@ export function CategoryScoreGrid({
                   {score == null ? '—' : score.toFixed(1)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
-                  {category.status ?? 'Not evaluated'}
+                  {category.status ?? 'Not scored'}
                 </Typography>
               </Stack>
             </Paper>
