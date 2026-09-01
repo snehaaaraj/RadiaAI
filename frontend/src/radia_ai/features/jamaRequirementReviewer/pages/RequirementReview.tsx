@@ -338,7 +338,7 @@ export default function RequirementReview() {
               Individual sub-category quality scoring helps you spot where the requirement is weakest.
             </Typography>
               </Box>
-              <CategoryScoreGrid categories={activeResult.category_results} />
+              <CategoryScoreGrid categories={activeResult.category_results} reviewCompleted />
               <Divider />
               <ReviewChangeSet
                 findings={activeResult.findings}

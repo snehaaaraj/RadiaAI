@@ -8,6 +8,8 @@ import { getCategoryStatusScore, getReviewQualityColor } from '@/utils/reviewQua
 interface CategoryScoreGridProps {
   categories: CategoryResult[];
   expectedCategories?: string[];
+  /** When true the review completed successfully — missing categories are treated as Acceptable. */
+  reviewCompleted?: boolean;
 }
 
 const CATEGORY_LABEL_MAP: Record<string, string> = {
@@ -47,6 +49,7 @@ type DisplayCategory = {
 export function CategoryScoreGrid({
   categories,
   expectedCategories = ['Language', 'Structure', 'Verifiability', 'Certification'],
+  reviewCompleted = false,
 }: CategoryScoreGridProps) {
   const merged = new Map<string, DisplayCategory>();
 
@@ -66,7 +69,11 @@ export function CategoryScoreGrid({
   for (const expected of expectedCategories) {
     const key = toCategoryKey(expected);
     if (!merged.has(key)) {
-      merged.set(key, { key, label: expected });
+      merged.set(key, {
+        key,
+        label: expected,
+        status: reviewCompleted ? ('Acceptable' as ReviewStatus) : undefined,
+      });
     }
   }
 

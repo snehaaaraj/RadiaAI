@@ -34,6 +34,7 @@ import {
 } from '@/radia_ai/features/jamaRequirementReviewer/utils/pdfRequirementParser';
 import type { RequirementReviewResponse } from '@/types/api';
 import { normalizeRequirementText, prepareFlatTextForNormalization } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
+import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
 type ReviewState = 'pending' | 'reviewing' | 'done' | 'error';
@@ -152,6 +153,10 @@ export default function SetReview() {
   const reviewedCount = requirements.filter((r) => r.reviewState === 'done').length;
   const progress = requirements.length > 0 ? (reviewedCount / requirements.length) * 100 : 0;
 
+  // Guard navigation: dirty while a set is loaded/parsing/reviewing.
+  const isDirty = requirements.length > 0 || isParsing || isReviewing;
+  useNavigationGuard(isDirty);
+
   const handleClearAll = () => {
     setRequirements([]);
     setActiveIndex(-1);
@@ -200,7 +205,7 @@ export default function SetReview() {
                   {requirements.length} requirement{requirements.length !== 1 ? 's' : ''} found
                 </Typography>
                 <Button variant="outlined" color="inherit" size="small" onClick={handleClearAll}>
-                  Clear
+                  Clear Review
                 </Button>
               </>
             )}
@@ -371,7 +376,7 @@ export default function SetReview() {
                   Individual sub-category quality scoring helps you spot where the requirement is weakest.
                 </Typography>
               </Box>
-              <CategoryScoreGrid categories={activeResult.category_results} />
+              <CategoryScoreGrid categories={activeResult.category_results} reviewCompleted />
               <Divider />
               <ReviewChangeSet
                 findings={activeResult.findings}

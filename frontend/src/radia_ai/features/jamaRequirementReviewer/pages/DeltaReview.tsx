@@ -550,7 +550,7 @@ export default function DeltaReview() {
                                 reviewedRequirement.findings
                               )}
                             />
-                            <CategoryScoreGrid categories={reviewedRequirement.category_results} />
+                            <CategoryScoreGrid categories={reviewedRequirement.category_results} reviewCompleted />
                             <ReviewChangeSet
                               findings={reviewedRequirement.findings}
                               reviewId={activeResult.review_id}
