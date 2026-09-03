@@ -370,8 +370,9 @@ pytest --cov=app --cov=radia_ai # with coverage report
 
 ## Known Limitations
 
-- **Review history is not durable.** It lives in an in-memory repository, so on
-  serverless hosting each invocation starts empty and disposition writes will not
-  find their review. Durable storage is needed before history is production-ready.
+- **Review history retention is limited.** Review entries and finding dispositions
+  are stored durably in Azure Blob Storage and persist across serverless
+  invocations, but entries are automatically deleted after 10 days. This requires
+  a valid `AZURE_BLOB_CONNECTION_STRING` configuration.
 
 **Note:** Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.
