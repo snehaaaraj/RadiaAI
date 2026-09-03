@@ -215,6 +215,30 @@ class ReviewFinding(BaseModel):
             "finding's recommendation. Intended for use in the Changeset UI section."
         ),
     )
+    source_page: int | None = Field(
+        default=None,
+        description=(
+            "Page number within the source document (reference_url) that this finding "
+            "was grounded on. Determined by matching the finding's evidence against the "
+            "retrieved standards chunks, not by trusting the LLM's own citation."
+        ),
+    )
+    source_section: str | None = Field(
+        default=None,
+        description="Section/heading within the source document, when detected.",
+    )
+    source_excerpt: str | None = Field(
+        default=None,
+        description=(
+            "The literal retrieved passage from the source document that most closely "
+            "matches this finding, shown so a reviewer can verify the suggestion without "
+            "leaving the app."
+        ),
+    )
+    source_chunk_id: str | None = Field(
+        default=None,
+        description="Identifier of the indexed chunk this finding was matched to, for audit/debug.",
+    )
 
 
 class ConsolidatedReviewResult(BaseModel):

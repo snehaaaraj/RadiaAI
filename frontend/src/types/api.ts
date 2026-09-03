@@ -221,6 +221,10 @@ export interface ReviewFinding {
   reference_title: string | null;
   reference_url: string | null;
   suggested_rewrite: string | null;
+  source_page: number | null;
+  source_section: string | null;
+  source_excerpt: string | null;
+  source_chunk_id: string | null;
 }
 
 export interface RequirementReviewInput {

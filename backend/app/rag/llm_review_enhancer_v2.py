@@ -8,6 +8,8 @@ verifiability, and certification.
 from __future__ import annotations
 
 import json
+import re
+from typing import Any
 
 from app.core.logging import get_logger
 from app.prompts.review_prompts import CONSOLIDATED_REVIEW_SYSTEM, DELTA_REVIEW_SYSTEM
@@ -124,6 +126,8 @@ class LLMReviewEnhancer:
             logger.warning("no_rag_context_for_consolidated_review")
             return _failure(ReviewFailureReason.NO_STANDARDS_CONTEXT)
 
+        _log_retrieved_context(context)
+
         try:
             raw_response = self._rag.generate_with_context(
                 system_prompt=system_prompt,
@@ -180,6 +184,7 @@ class LLMReviewEnhancer:
 
         raw_findings = data["findings"]
         source_filenames = {r["filename"] for r in context.source_references()}
+        chunk_refs = context.chunk_references()
         findings = []
 
         for f in raw_findings:
@@ -200,6 +205,10 @@ class LLMReviewEnhancer:
                 if matched:
                     reference = matched
 
+            evidence = f.get("evidence", "")
+            explanation = f.get("explanation", "")
+            matched_chunk = _match_best_chunk(reference, evidence, explanation, chunk_refs)
+
             findings.append(
                 ReviewFinding(
                     category=f.get("category", "General"),
@@ -208,14 +217,22 @@ class LLMReviewEnhancer:
                     pass_fail=PassFail.FAIL if status != ReviewStatus.ACCEPTABLE else PassFail.PASS,
                     status=status,
                     rule=f.get("rule", ""),
-                    explanation=f.get("explanation", ""),
-                    evidence=f.get("evidence", ""),
+                    explanation=explanation,
+                    evidence=evidence,
                     recommendation=f.get("recommendation", ""),
                     reference=reference,
                     reference_title=reference,
                     # A verification pass scores a revision; it must never hand back
                     # replacement text, even if the model volunteers some.
                     suggested_rewrite=f.get("suggested_rewrite") if allow_rewrite else None,
+                    source_page=matched_chunk.get("page_number") if matched_chunk else None,
+                    source_section=matched_chunk.get("section") or None if matched_chunk else None,
+                    source_excerpt=_trim_excerpt(matched_chunk.get("content", ""))
+                    if matched_chunk
+                    else None,
+                    source_chunk_id=matched_chunk.get("chunk_id") or None
+                    if matched_chunk
+                    else None,
                 )
             )
 
@@ -239,3 +256,114 @@ def _fuzzy_match_reference(reference: str, filenames: set[str]) -> str | None:
         if len(ref_words & fn_words) >= 2:
             return fn
     return None
+
+
+_EXCERPT_MAX_CHARS = 400
+_STOPWORDS = {
+    "the",
+    "a",
+    "an",
+    "and",
+    "or",
+    "of",
+    "to",
+    "in",
+    "on",
+    "for",
+    "shall",
+    "should",
+    "must",
+    "be",
+    "is",
+    "are",
+    "with",
+    "this",
+    "that",
+    "it",
+}
+
+
+def _match_best_chunk(
+    reference: str,
+    evidence: str,
+    explanation: str,
+    chunk_refs: list[dict[str, Any]],
+) -> dict[str, Any] | None:
+    """
+    Find the retrieved chunk whose content best matches a finding, deterministically.
+
+    The LLM is not trusted to self-report which page or chunk it used — its
+    citations can be plausible-sounding but wrong. Instead this scores every
+    chunk retrieved for this review by token overlap with the finding's
+    evidence/explanation text (and reference/filename as a tie-breaker), and
+    returns the best match. This is intentionally a simple, explainable
+    heuristic rather than a second LLM call, so it is fast, free, and its
+    result can be reasoned about by a human when questioned.
+    """
+    if not chunk_refs:
+        return None
+
+    query_text = f"{evidence} {explanation}".strip()
+    query_tokens = _tokenize(query_text)
+    if not query_tokens:
+        return None
+
+    candidates = chunk_refs
+    if reference:
+        ref_norm = reference.lower()
+        filtered = [c for c in chunk_refs if ref_norm in c.get("filename", "").lower()]
+        if filtered:
+            candidates = filtered
+
+    best_chunk: dict[str, Any] | None = None
+    best_score = 0
+    for chunk in candidates:
+        chunk_tokens = _tokenize(chunk.get("content", ""))
+        score = len(query_tokens & chunk_tokens)
+        if score > best_score:
+            best_score = score
+            best_chunk = chunk
+
+    return best_chunk if best_score > 0 else None
+
+
+def _tokenize(text: str) -> set[str]:
+    """Lowercase, split on non-alphanumerics, and drop stopwords/short tokens."""
+    words = re.findall(r"[a-z0-9]+", text.lower())
+    return {w for w in words if len(w) > 2 and w not in _STOPWORDS}
+
+
+def _trim_excerpt(content: str) -> str | None:
+    """Trim a chunk's content to a UI-friendly excerpt length."""
+    if not content:
+        return None
+    stripped = content.strip()
+    if len(stripped) <= _EXCERPT_MAX_CHARS:
+        return stripped
+    return stripped[:_EXCERPT_MAX_CHARS].rsplit(" ", 1)[0] + "…"
+
+
+def _log_retrieved_context(context: RetrievedContext) -> None:
+    """
+    Log the full retrieval set for this review call, for audit/dispute resolution.
+
+    Even when page/section isn't surfaced to the end user for a given finding,
+    this makes it possible to reconstruct exactly what was retrieved and shown
+    to the LLM for any review call, by grepping logs for the query text.
+    """
+    logger.info(
+        "consolidated_review_context_retrieved",
+        query=context.query,
+        mode=context.mode,
+        chunk_count=len(context.chunks),
+        chunks=[
+            {
+                "chunk_id": c.get("chunk_id", ""),
+                "filename": c.get("filename", ""),
+                "section": c.get("section", ""),
+                "page_number": c.get("page_number"),
+                "score": c.get("score"),
+            }
+            for c in context.chunks
+        ],
+    )
