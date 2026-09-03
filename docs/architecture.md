@@ -1,11 +1,11 @@
 # Radia AI Architecture
 
-Radia AI is a deterministic, explainable requirements-engineering platform for aerospace and systems teams. It combines a React frontend with a FastAPI backend to support requirement quality review, delta review, standards lookup, review history, and document-oriented workflows.
+Radia AI is an explainable requirements-engineering platform for aerospace and systems teams. It combines a React frontend with a FastAPI backend to support requirement quality review, delta review, standards lookup, review history, and document-oriented workflows.
 
 ## 1. System goals
 
 - Make requirement review repeatable and explainable
-- Keep every finding grounded in deterministic rules
+- Keep every finding grounded in standards
 - Preserve review history and disposition decisions
 - Provide clear references back to engineering standards
 - Support a modern, usable workflow for technical reviewers
@@ -24,7 +24,7 @@ Radia AI is a deterministic, explainable requirements-engineering platform for a
 │                   FastAPI + Python 3.12                     │
 │  api/      → HTTP route handlers                             │
 │  services/  → orchestration and business rules               │
-│  reviewers/ → deterministic review engines                  │
+│  reviewers/ → LLM-based review engines                      │
 │  standards/ → standards catalog and reference resolution    │
 │  diff/     → delta computation for revision review          │
 │  repositories/ → review history persistence and dispositions│
@@ -91,59 +91,162 @@ The backend is a layered FastAPI application.
 
 - **api/v1/endpoints**: thin request/response handlers
 - **services**: business logic and workflow orchestration
-- **reviewers**: deterministic quality engines
+- **reviewers**: LLM review orchestration and reviewer version metadata
+- **rag**: retrieval and the consolidated LLM review call
+- **prompts**: the consolidated review system prompt
 - **models / schemas**: validated API contracts
 - **standards**: standards registry and catalog lookup
 - **diff**: revision comparison logic
 - **repositories**: history persistence abstraction
 - **connectors**: external source adapters
 
-## 5. Deterministic review workflow
+## 5. Review workflow
 
-The review engine is built to be reproducible.
+The review engine provides explainable, standards-grounded requirement analysis.
 
 ### Single requirement review
 
+Single review is an **authoring** pass: it flags violations and proposes replacement text.
+
 1. The user submits one requirement.
-2. The orchestrator runs the enabled reviewer modules.
-3. Each reviewer returns findings and a category status.
-4. Findings are enriched with standards references when possible.
-5. The response includes:
+2. The orchestrator normalizes the input (fielded Jama text is flattened to
+   Title / Description / Rationale).
+3. `LLMReviewEnhancer` retrieves standards context from Azure AI Search, using
+   source-diversified retrieval so several documents can be cited.
+4. One consolidated GPT-5 call produces findings across all four scored categories.
+5. Findings are enriched with standards references and SharePoint URLs.
+6. Category statuses are derived from the findings and aggregated into an overall
+   status.
+7. The response includes:
    - overall status
+   - completion record (see §6)
    - category results
-   - findings
-   - determinism metadata
+   - findings, each carrying a `suggested_rewrite` (the changeset)
+   - version metadata
    - review ID
 
+### Set review
+
+A parsed PDF yields many requirements. Each one runs through the single-requirement
+authoring pass independently, and the results are presented per requirement.
+
 ### Delta review
+
+Delta review is a **verification** pass. Its input is a requirement that a single
+or set review already caused to be revised, so it scores the revision instead of
+asking for another one.
 
 1. The system compares baseline and updated requirement sets.
 2. It identifies:
    - new requirements
    - modified requirements
    - deleted requirements
-   - changed trace links
-3. Only changed requirements are re-reviewed.
-4. Results are aggregated into a delta response with a change summary.
+3. Only changed requirements are re-reviewed. Each is paired with the baseline
+   text it replaces (`RequirementRevision`), so the model can confirm the revision
+   resolved the earlier findings rather than re-raising them.
+4. Scoring uses `DELTA_REVIEW_SYSTEM`, which explicitly forbids proposing new
+   requirement text. The parser also drops any `suggested_rewrite` the model
+   returns anyway, so the contract holds even if prompt compliance slips.
+5. Results are aggregated into a delta response with a change summary and a
+   run-level completion record.
 
-## 6. Reviewer modules
+### How baseline and updated requirements are paired
 
-Radia AI currently uses modular reviewer engines:
+| Input | Pairing key |
+|-------|-------------|
+| Requirement carries an ID | that ID |
+| Requirement has no ID | its **position** — the Nth unidentified baseline requirement pairs with the Nth unidentified updated requirement, labelled `Requirement N` |
 
-- **Language reviewer**: mandatory wording, ambiguous phrasing, banned terms, passive voice
-- **Structure reviewer**: one requirement per statement, subjective wording, hierarchy level
-- **Verifiability reviewer**: measurable criteria and operating conditions
-- **Traceability reviewer**: registered in the orchestrator, currently a skeleton
-- **Certification reviewer**: registered in the orchestrator, currently a skeleton
+Position is the only usable signal for unidentified requirements. Keying them by
+their text cannot work, because a revision changes the text by definition: the
+revision would never match its baseline, so every edit would be reported as a
+deletion plus an addition and scored with no previous version to compare against.
+That is exactly the paste-the-original, paste-the-revision workflow this page
+exists for.
 
-Each reviewer is versioned so results can be traced back to:
+Because a delta-reviewed requirement has already been corrected against the
+standards, its scores are expected to be high, and an empty findings list is the
+normal outcome for a good revision.
+
+## 6. Review completion contract
+
+The review *verdict* and the review *process outcome* are separate fields, because
+an empty findings list is ambiguous on its own — it means either "this requirement
+is clean" or "the engine never ran".
+
+Every review response carries a `completion` record:
+
+| Field | Meaning |
+|-------|---------|
+| `status` | `complete`, `partial` (batch: some items evaluated), or `failed` |
+| `reason` | machine-readable cause, null when complete |
+| `message` | reviewer-facing explanation |
+
+Failure reasons are raised by the specific stage that broke:
+
+- `review_engine_unavailable` — no LLM enhancer could be constructed
+- `no_standards_context` — retrieval returned nothing to review against
+- `retrieval_failed` — Azure AI Search errored
+- `llm_call_failed` — the GPT-5 call errored
+- `invalid_llm_response` — the response was not parsable JSON of the expected shape
+
+When a review does not complete, `overall` is `Not Evaluated` and findings and
+category results are empty. The frontend renders the failure notice in place of
+the score, so an unevaluated requirement is never displayed as a passing one.
+
+## 7. Reviewer modules
+
+Requirement analysis happens in one consolidated GPT-5 call per requirement
+(`app/prompts/review_prompts.py`). Two prompts share the same four scored
+categories:
+
+- `CONSOLIDATED_REVIEW_SYSTEM` — authoring review (single and set review); proposes rewrites
+- `DELTA_REVIEW_SYSTEM` — verification review (delta review); proposes nothing
+
+The scored categories are:
+
+- **Language**: mandatory modal usage, banned words, ambiguous wording, passive voice
+- **Structure**: one requirement per statement, human-judgment language, EARS syntax, requirement level
+- **Verifiability**: quantitative limits, operating conditions, verification method
+- **Certification**: DO-178C / DO-254 / ARP4754A alignment, verification methods, safety language, DAL
+
+`ReviewCategory` in `models/review_models.py` is the single source of truth for
+this list. The prompt, the response parser, the orchestrator's category scoring
+and the UI grid all derive from it, so a category cannot be produced by one layer
+and silently dropped by another. Traceability is deliberately out of scope.
+
+### Category scoring
+
+A completed review emits a `CategoryResult` for **every** category, not only the
+ones that produced findings:
+
+- findings in a category → that category takes the worst status among them
+- no findings in a category → `Acceptable`
+
+Omitting clean categories would make "checked and clean" indistinguishable from
+"never checked". A review that did not complete emits no category results at all,
+because nothing was scored (§6).
+
+The category grid mirrors this on the client: it always renders the four scored
+categories, showing "Not scored" for any the payload omits rather than dropping
+the tile or inventing a passing value. Persisted review results are keyed by a
+schema version so a result cached by an older build cannot be rendered against
+the current scorecard.
+
+The reviewer modules registered with the orchestrator
+(`reviewers/consolidated.py`, one per category) carry no rule logic.
+They exist to publish version metadata, so a result can be traced back to:
 
 - reviewer implementation version
 - prompt version
 - standards version
 - runtime configuration snapshot
 
-## 7. Standards and reference resolution
+Note that "determinism" metadata records the reproducibility *conditions* of a run.
+Because analysis is LLM-based, identical input is not guaranteed to produce
+byte-identical output.
+
+## 8. Standards and reference resolution
 
 The standards service resolves reviewer references against a standards catalog.
 
@@ -154,7 +257,7 @@ Priority order:
 
 This allows findings to link back to a source document or guidance entry and keeps the review explainable.
 
-## 8. Review history
+## 9. Review history
 
 Completed reviews are stored in an in-memory history repository for now.
 
@@ -165,6 +268,7 @@ Stored data includes:
 - subject ID
 - timestamp
 - overall result
+- completion record
 - findings
 - category results
 - determinism snapshot
@@ -176,18 +280,30 @@ Users can apply dispositions to findings:
 - Rejected
 - Deferred
 
-## 9. Document and RAG surfaces
+**Known limitation:** the repository is process-local. On a serverless deployment
+each invocation starts a fresh process, so history will read as empty and
+disposition writes will not find their review. Durable storage is required before
+history can be relied on in production.
 
-Radia AI also includes the foundation for document-centric workflows:
+## 10. Document and RAG surfaces
+
+Radia AI also includes document-centric workflows:
 
 - chat over indexed content
-- document search
-- document ingestion
+- document search (keyword / vector / hybrid)
+- document ingestion (SharePoint or uploaded file)
 - document listing
 
-These endpoints are present as API contracts and partial stubs in the current codebase, supporting later expansion into a full retrieval-augmented knowledge workflow.
+Ingestion extracts text, chunks it, embeds it with `text-embedding-3-large`, and
+indexes it into Azure AI Search. File hashes are recorded so unchanged documents
+are not re-embedded.
 
-## 10. Configuration and deployment
+Ingestion runs on demand via `POST /api/v1/ingest` — it is deliberately not run at
+startup, which keeps cold starts viable on serverless hosting. The review pipeline
+depends on this index being populated: with an empty index, reviews return
+`no_standards_context` rather than findings.
+
+## 11. Configuration and deployment
 
 Runtime configuration is controlled through environment variables.
 
@@ -201,36 +317,38 @@ Key services:
 
 The project supports:
 
-- Docker Compose for local full-stack startup
 - local backend development with Uvicorn
 - local frontend development with Vite
+- frontend deployment to Vercel from the repo root (`vercel.json`)
 
-## 11. Security and operational notes
+## 12. Security and operational notes
 
 - Secrets are loaded from `.env`
 - API responses use a consistent error envelope
 - Request IDs are propagated across logs and responses
 - Input validation is handled with Pydantic
 - Production avoids exposing stack traces
+- A review that cannot run reports its failure cause instead of returning an
+  empty result that would read as a pass
 
-## 12. Current implementation status
+## 13. Current implementation status
 
 Implemented and central to the product:
 
-- deterministic requirement review
-- delta review
+- LLM-based requirement review grounded in indexed standards
+- explicit review completion reporting (§6)
+- delta review that verifies revisions without re-authoring them
 - standards catalog browsing
-- review history
+- document ingestion, search, and chat over the index
 - workspace and launchpad UX
 
-Partially implemented or scaffolded:
+Known gaps:
 
-- document search
-- ingestion
-- chat/RAG pipeline
-- traceability reviewer
-- certification reviewer
+- **review history is not durable** — in-memory only (§9)
 
-## 13. Summary
+## 14. Summary
 
-Radia AI is an enterprise requirements-quality platform that emphasizes deterministic behavior, structured findings, and audit-friendly review workflows. Its architecture cleanly separates UI, orchestration, reviewer logic, and standards resolution so the system can evolve without losing explainability or reproducibility.
+Radia AI is an enterprise requirements-quality platform that emphasizes explainable
+findings, standards grounding, and audit-friendly review workflows. Its architecture
+cleanly separates UI, orchestration, review execution, and standards resolution so
+the system can evolve without losing traceability of how a result was produced.

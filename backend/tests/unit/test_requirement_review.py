@@ -3,6 +3,7 @@
 import pytest
 from fastapi.testclient import TestClient
 
+from app.prompts.review_prompts import CONSOLIDATED_REVIEW_SYSTEM
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     RequirementReviewInput,
 )
@@ -38,12 +39,12 @@ def test_requirement_review_returns_structured_findings(client: TestClient) -> N
     assert "findings" in data
     assert "determinism" in data
     assert data["overall"] in ("Acceptable", "Revision Recommended", "Unacceptable")
-    assert any(result["category"] == "language" for result in data["category_results"])
-    assert any(finding["pass_fail"] in ("Pass", "Fail") for finding in data["findings"])
+    assert isinstance(data["category_results"], list)
+    assert isinstance(data["findings"], list)
 
 
 @pytest.mark.unit
-def test_requirement_review_is_deterministic_for_identical_input(client: TestClient) -> None:
+def test_requirement_review_accepts_identical_input(client: TestClient) -> None:
     payload = {
         "requirement_id": "REQ-001",
         "text": "The component should provide fast response.",
@@ -54,11 +55,27 @@ def test_requirement_review_is_deterministic_for_identical_input(client: TestCli
 
     assert first.status_code == 200
     assert second.status_code == 200
-    first_data = first.json()["data"]
-    second_data = second.json()["data"]
-    first_data["review_id"] = "<ignored>"
-    second_data["review_id"] = "<ignored>"
-    assert first_data == second_data
+    assert first.json()["data"]["review_id"] != second.json()["data"]["review_id"]
+
+
+@pytest.mark.unit
+def test_llm_prompt_covers_former_deterministic_subcategories() -> None:
+    expected_subcategories = (
+        "Requirement Language",
+        "Banned Words",
+        "Ambiguous Wording",
+        "Passive Voice",
+        "One Requirement per Statement",
+        "Human Judgment Language",
+        "EARS Syntax",
+        "Requirement Level",
+        "Missing Quantitative Limits",
+        "Operating Conditions",
+        "Verifiability",
+    )
+
+    for subcategory in expected_subcategories:
+        assert subcategory in CONSOLIDATED_REVIEW_SYSTEM
 
 
 @pytest.mark.unit

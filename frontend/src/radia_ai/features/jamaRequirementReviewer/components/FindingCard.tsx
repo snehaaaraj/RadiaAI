@@ -117,9 +117,29 @@ export function FindingCard({
             <Typography variant="body2" fontWeight={700}>
               {finding.reference_title ?? finding.reference}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {finding.reference}
-            </Typography>
+            <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap">
+              <Typography variant="body2" color="text.secondary">
+                {finding.reference}
+              </Typography>
+              {(finding.source_page || finding.source_section) && (
+                <Chip
+                  size="small"
+                  variant="outlined"
+                  label={
+                    finding.source_page
+                      ? `Page ${finding.source_page}`
+                      : finding.source_section
+                  }
+                />
+              )}
+            </Stack>
+            {finding.source_excerpt && (
+              <Box sx={findingCardStyles.sourceExcerptBox}>
+                <Typography variant="caption" color="text.secondary" fontStyle="italic">
+                  “{finding.source_excerpt}”
+                </Typography>
+              </Box>
+            )}
             {finding.reference_url && (
               <Link href={finding.reference_url} target="_blank" rel="noopener noreferrer" underline="hover">
                 Open source standard

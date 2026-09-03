@@ -13,6 +13,7 @@ import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
 import { FileUploadZone } from '@/radia_ai/features/jamaRequirementReviewer/components/FileUploadZone';
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
+import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewQualityBand } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewQualityBand';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
 import { ReviewStatusChip } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewStatusChip';
@@ -20,89 +21,77 @@ import { useDeltaReview } from '@/radia_ai/features/jamaRequirementReviewer/hook
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
-import { useApplyFindingDisposition } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
+import {
+  DELTA_REVIEW_RESULT_KEY,
+  purgeLegacyReviewResults,
+} from '@/radia_ai/features/jamaRequirementReviewer/persistedReviewKeys';
 import type { DeltaReviewInput, DeltaReviewResponse } from '@/types/api';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
+import { isReviewFailed, isReviewIncomplete } from '@/utils/reviewCompletion';
 
-const BASELINE_SAMPLE = JSON.stringify(
-  [
-    {
-      requirement_id: 'REQ-001',
-      text: 'The subsystem shall enable diagnostics within 2 seconds.',
-      requirement_level: 'System',
-      metadata: { parent_id: 'P-100', verification_method: 'test' },
-    },
-    {
-      requirement_id: 'REQ-002',
-      text: 'The subsystem shall provide telemetry every 1 second.',
-      requirement_level: 'System',
-      metadata: { parent_id: 'P-100', verification_method: 'analysis' },
-    },
-  ],
-  null,
-  2
-);
+// Simple text format: one requirement per line (optional REQ-ID prefix)
+const BASELINE_SAMPLE = ``;
 
-const UPDATED_SAMPLE = JSON.stringify(
-  [
-    {
-      requirement_id: 'REQ-001',
-      text: 'The subsystem shall enable diagnostics within 1 second.',
-      requirement_level: 'System',
-      metadata: { parent_id: 'P-100', verification_method: 'test' },
-    },
-    {
-      requirement_id: 'REQ-003',
-      text: 'The subsystem shall provide built-in test under nominal conditions.',
-      requirement_level: 'System',
-      metadata: { parent_id: 'P-110', verification_method: 'inspection' },
-    },
-  ],
-  null,
-  2
-);
+const UPDATED_SAMPLE = ``;
 
-const TRACE_SAMPLE = JSON.stringify(
-  [
-    {
-      requirement_id: 'REQ-001',
-      change_type: 'modified',
-      previous_parent_id: 'P-090',
-      current_parent_id: 'P-100',
-    },
-  ],
-  null,
-  2
-);
+/**
+ * Parse simple text format (one requirement per line) into RequirementReviewInput array.
+ * Supported formats:
+ * - requirement text
+ * - REQ-ID: requirement text
+ */
+function parseRequirementsFromText(text: string): Array<{
+  requirement_id?: string;
+  text: string;
+  requirement_level?: string;
+  metadata?: Record<string, string>;
+}> {
+  const idPrefixedLinePattern = /^([A-Za-z0-9_.-]+):(.*)$/;
+
+  return text
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line.length > 0)
+    .map((line) => {
+      const prefixedMatch = line.match(idPrefixedLinePattern);
+      const requirementId = prefixedMatch?.[1]?.trim();
+      const requirementText = (prefixedMatch ? prefixedMatch[2] : line).trim();
+
+      if (!requirementText) {
+        throw new Error(`Missing requirement text in line: "${line}"`);
+      }
+
+      return {
+        requirement_id: requirementId || undefined,
+        text: requirementText,
+        requirement_level: 'System',
+        metadata: {},
+      };
+    });
+}
 
 type JsonInputMode = 'paste' | 'upload';
 type DeltaReviewFormState = {
   specificationId: string;
   baselineJson: string;
   updatedJson: string;
-  traceJson: string;
   parseError: string;
   baselineMode: JsonInputMode;
   updatedMode: JsonInputMode;
-  traceMode: JsonInputMode;
   baselineFilename: string;
   updatedFilename: string;
-  traceFilename: string;
 };
 
 const DEFAULT_DELTA_FORM_STATE: DeltaReviewFormState = {
   specificationId: 'SPEC-DELTA-1',
   baselineJson: BASELINE_SAMPLE,
   updatedJson: UPDATED_SAMPLE,
-  traceJson: TRACE_SAMPLE,
   parseError: '',
   baselineMode: 'paste',
   updatedMode: 'paste',
-  traceMode: 'paste',
   baselineFilename: '',
   updatedFilename: '',
-  traceFilename: '',
 };
 
 export default function DeltaReview() {
@@ -111,20 +100,17 @@ export default function DeltaReview() {
     initialValue: DEFAULT_DELTA_FORM_STATE,
   });
   const { state: persistedResult, setState: setPersistedResult, clear: clearPersistedResult } = usePersistentState<DeltaReviewResponse | null>({
-    key: 'delta-review-result',
+    key: DELTA_REVIEW_RESULT_KEY,
     initialValue: null,
   });
   const [specificationId, setSpecificationId] = useState(formState.specificationId);
   const [baselineJson, setBaselineJson] = useState(formState.baselineJson);
   const [updatedJson, setUpdatedJson] = useState(formState.updatedJson);
-  const [traceJson, setTraceJson] = useState(formState.traceJson);
   const [parseError, setParseError] = useState(formState.parseError);
   const [baselineMode, setBaselineMode] = useState<JsonInputMode>(formState.baselineMode);
   const [updatedMode, setUpdatedMode] = useState<JsonInputMode>(formState.updatedMode);
-  const [traceMode, setTraceMode] = useState<JsonInputMode>(formState.traceMode);
   const [baselineFilename, setBaselineFilename] = useState(formState.baselineFilename);
   const [updatedFilename, setUpdatedFilename] = useState(formState.updatedFilename);
-  const [traceFilename, setTraceFilename] = useState(formState.traceFilename);
 
   const {
     mutate: runDeltaReview,
@@ -134,13 +120,13 @@ export default function DeltaReview() {
     isError,
     error,
   } = useDeltaReview();
-  const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
   const playReviewCompleteSound = useReviewCompleteSound();
 
   const DISPOSITION_SAVED_KEY = 'delta-review-disposition-saved';
 
   // On mount: if disposition was saved last time, clear all review data
   useEffect(() => {
+    purgeLegacyReviewResults();
     if (sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true') {
       sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       clearFormState();
@@ -148,14 +134,11 @@ export default function DeltaReview() {
       setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
       setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
       setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
-      setTraceJson(DEFAULT_DELTA_FORM_STATE.traceJson);
       setParseError(DEFAULT_DELTA_FORM_STATE.parseError);
       setBaselineMode(DEFAULT_DELTA_FORM_STATE.baselineMode);
       setUpdatedMode(DEFAULT_DELTA_FORM_STATE.updatedMode);
-      setTraceMode(DEFAULT_DELTA_FORM_STATE.traceMode);
       setBaselineFilename(DEFAULT_DELTA_FORM_STATE.baselineFilename);
       setUpdatedFilename(DEFAULT_DELTA_FORM_STATE.updatedFilename);
-      setTraceFilename(DEFAULT_DELTA_FORM_STATE.traceFilename);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -171,7 +154,6 @@ export default function DeltaReview() {
   const isDirty = (
     baselineJson !== DEFAULT_DELTA_FORM_STATE.baselineJson ||
     updatedJson !== DEFAULT_DELTA_FORM_STATE.updatedJson ||
-    traceJson !== DEFAULT_DELTA_FORM_STATE.traceJson ||
     specificationId !== DEFAULT_DELTA_FORM_STATE.specificationId ||
     !!activeResult ||
     isPending
@@ -188,7 +170,7 @@ export default function DeltaReview() {
     return () => {
       if (isDirtyRef.current) {
         localStorage.removeItem('delta-review-form-state');
-        localStorage.removeItem('delta-review-result');
+        localStorage.removeItem(DELTA_REVIEW_RESULT_KEY);
         sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       }
     };
@@ -210,14 +192,11 @@ export default function DeltaReview() {
     setSpecificationId(DEFAULT_DELTA_FORM_STATE.specificationId);
     setBaselineJson(DEFAULT_DELTA_FORM_STATE.baselineJson);
     setUpdatedJson(DEFAULT_DELTA_FORM_STATE.updatedJson);
-    setTraceJson(DEFAULT_DELTA_FORM_STATE.traceJson);
     setParseError(DEFAULT_DELTA_FORM_STATE.parseError);
     setBaselineMode(DEFAULT_DELTA_FORM_STATE.baselineMode);
     setUpdatedMode(DEFAULT_DELTA_FORM_STATE.updatedMode);
-    setTraceMode(DEFAULT_DELTA_FORM_STATE.traceMode);
     setBaselineFilename(DEFAULT_DELTA_FORM_STATE.baselineFilename);
     setUpdatedFilename(DEFAULT_DELTA_FORM_STATE.updatedFilename);
-    setTraceFilename(DEFAULT_DELTA_FORM_STATE.traceFilename);
     resetResult();
   };
 
@@ -274,8 +253,8 @@ export default function DeltaReview() {
                   }
                 }}
               >
-                <ToggleButton value="paste">Paste JSON</ToggleButton>
-                <ToggleButton value="upload">Upload .json</ToggleButton>
+                <ToggleButton value="paste">Paste text</ToggleButton>
+                <ToggleButton value="upload">Upload .txt</ToggleButton>
               </ToggleButtonGroup>
               <Button variant="outlined" color="inherit" onClick={handleClearAll}>
                 Clear Review
@@ -292,11 +271,13 @@ export default function DeltaReview() {
                   setBaselineJson(nextValue);
                   updateFormState({ baselineJson: nextValue });
                 }}
+                placeholder="The system shall...&#10;The subsystem shall..."
+                helperText="Enter one requirement per line. Optional format: REQ-ID: requirement text"
               />
             ) : (
               <FileUploadZone
-                accept=".json"
-                label="Upload baseline requirements as a .json file"
+                accept=".txt,.json"
+                label="Upload baseline requirements as a .txt or .json file"
                 onFileContent={(content, filename) => {
                   setBaselineJson(content);
                   setBaselineFilename(filename);
@@ -334,8 +315,8 @@ export default function DeltaReview() {
               }}
               sx={{ mb: 1 }}
             >
-              <ToggleButton value="paste">Paste JSON</ToggleButton>
-              <ToggleButton value="upload">Upload .json</ToggleButton>
+              <ToggleButton value="paste">Paste text</ToggleButton>
+              <ToggleButton value="upload">Upload .txt</ToggleButton>
             </ToggleButtonGroup>
             {updatedMode === 'paste' ? (
               <TextField
@@ -348,11 +329,13 @@ export default function DeltaReview() {
                   setUpdatedJson(nextValue);
                   updateFormState({ updatedJson: nextValue });
                 }}
+                placeholder="The system shall...&#10;The subsystem shall..."
+                helperText="Enter one requirement per line. Optional format: REQ-ID: requirement text"
               />
             ) : (
               <FileUploadZone
-                accept=".json"
-                label="Upload updated requirements as a .json file"
+                accept=".txt,.json"
+                label="Upload updated requirements as a .txt or .json file"
                 onFileContent={(content, filename) => {
                   setUpdatedJson(content);
                   setUpdatedFilename(filename);
@@ -368,61 +351,6 @@ export default function DeltaReview() {
             )}
           </Box>
 
-          {/* Trace links */}
-          <Box>
-            <Typography variant="subtitle2" fontWeight={600} mb={0.75}>
-              Changed trace links <Typography component="span" variant="caption" color="text.secondary">(optional)</Typography>
-            </Typography>
-            <ToggleButtonGroup
-              size="small"
-              value={traceMode}
-              exclusive
-              onChange={(_, value: JsonInputMode | null) => {
-                if (value) {
-                  setTraceMode(value);
-                  updateFormState({ traceMode: value });
-                  if (value === 'paste') {
-                    setTraceFilename('');
-                    setTraceJson(TRACE_SAMPLE);
-                    updateFormState({ traceFilename: '', traceJson: TRACE_SAMPLE });
-                  }
-                }
-              }}
-              sx={{ mb: 1 }}
-            >
-              <ToggleButton value="paste">Paste JSON</ToggleButton>
-              <ToggleButton value="upload">Upload .json</ToggleButton>
-            </ToggleButtonGroup>
-            {traceMode === 'paste' ? (
-              <TextField
-                fullWidth
-                multiline
-                minRows={5}
-                value={traceJson}
-                onChange={(event) => {
-                  const nextValue = event.target.value;
-                  setTraceJson(nextValue);
-                  updateFormState({ traceJson: nextValue });
-                }}
-              />
-            ) : (
-              <FileUploadZone
-                accept=".json"
-                label="Upload changed trace links as a .json file"
-                onFileContent={(content, filename) => {
-                  setTraceJson(content);
-                  setTraceFilename(filename);
-                  updateFormState({ traceJson: content, traceFilename: filename });
-                }}
-                filename={traceFilename}
-                onClear={() => {
-                  setTraceJson('');
-                  setTraceFilename('');
-                  updateFormState({ traceJson: '', traceFilename: '' });
-                }}
-              />
-            )}
-          </Box>
           <Box>
             <Button
               variant="contained"
@@ -431,16 +359,18 @@ export default function DeltaReview() {
                 try {
                   const payload: DeltaReviewInput = {
                     specification_id: specificationId || undefined,
-                    baseline_requirements: JSON.parse(baselineJson),
-                    updated_requirements: JSON.parse(updatedJson),
-                    changed_trace_links: traceJson.trim() ? JSON.parse(traceJson) : [],
+                    baseline_requirements: parseRequirementsFromText(baselineJson),
+                    updated_requirements: parseRequirementsFromText(updatedJson),
                   };
                   setParseError('');
                   updateFormState({ parseError: '' });
                   runDeltaReview(payload, {
                     onSuccess: (response) => {
                       setPersistedResult(response);
-                      playReviewCompleteSound();
+                      // Don't signal "review complete" for a run that never evaluated anything.
+                      if (!isReviewFailed(response.completion)) {
+                        playReviewCompleteSound();
+                      }
                     },
                   });
                 } catch (parseException) {
@@ -453,14 +383,25 @@ export default function DeltaReview() {
               Run delta review
             </Button>
           </Box>
-          {parseError && <Alert severity="error">Invalid JSON input: {parseError}</Alert>}
+          {parseError && <Alert severity="error">Invalid requirement input: {parseError}</Alert>}
         </Stack>
       </Paper>
 
       {isError && <Alert severity="error">Delta review failed: {getApiErrorMessage(error)}</Alert>}
 
-      {activeResult && (
+      {/* Nothing was evaluated — explain why instead of showing an empty result. */}
+      {activeResult && isReviewFailed(activeResult.completion) && (
         <Stack spacing={2} ref={resultRef}>
+          <ReviewIncompleteNotice completion={activeResult.completion} />
+        </Stack>
+      )}
+
+      {activeResult && !isReviewFailed(activeResult.completion) && (
+        <Stack spacing={2} ref={resultRef}>
+          {/* Some requirements were evaluated and some were not — say so up front. */}
+          {isReviewIncomplete(activeResult.completion) && (
+            <ReviewIncompleteNotice completion={activeResult.completion} />
+          )}
           <ReviewResultHero
             title="Delta review score"
             score={getReviewQualityScore(activeResult.overall, activeResult.reviewed_requirements.flatMap(r => r.findings))}
@@ -481,10 +422,6 @@ export default function DeltaReview() {
                   size="small"
                 />
                 <Chip label={`Deleted: ${activeResult.change_summary.deleted_requirement_ids.length}`} size="small" />
-                <Chip
-                  label={`Trace changes: ${activeResult.change_summary.changed_trace_link_requirement_ids.length}`}
-                  size="small"
-                />
               </Box>
               <Divider />
               <Typography variant="h6" fontWeight={800}>
@@ -494,34 +431,39 @@ export default function DeltaReview() {
                 <Alert severity="success">No changed requirements to review.</Alert>
               ) : (
                 activeResult.reviewed_requirements.map((reviewedRequirement) => (
-                  <Paper key={reviewedRequirement.requirement_id} variant="outlined" sx={{ p: 1.75, borderRadius: 3 }}>
-                    <Stack spacing={1.5}>
-                      <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
-                        <Typography variant="h6" fontWeight={800}>
-                          {reviewedRequirement.requirement_id}
-                        </Typography>
-                        <ReviewStatusChip status={reviewedRequirement.overall} />
-                      </Box>
-                      <ReviewQualityBand
-                        label="Requirement score"
-                        score={getReviewQualityScore(
-                          reviewedRequirement.overall,
-                          reviewedRequirement.findings
+                    <Paper key={reviewedRequirement.requirement_id} variant="outlined" sx={{ p: 1.75, borderRadius: 3 }}>
+                      <Stack spacing={1.5}>
+                        <Box display="flex" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
+                          <Typography variant="h6" fontWeight={800}>
+                            {reviewedRequirement.requirement_id}
+                          </Typography>
+                          <ReviewStatusChip status={reviewedRequirement.overall} />
+                        </Box>
+                        {isReviewFailed(reviewedRequirement.completion) ? (
+                          <ReviewIncompleteNotice completion={reviewedRequirement.completion} />
+                        ) : (
+                          <>
+                            <ReviewQualityBand
+                              label="Requirement score"
+                              showValue={false}
+                              score={getReviewQualityScore(
+                                reviewedRequirement.overall,
+                                reviewedRequirement.findings
+                              )}
+                            />
+                            <CategoryScoreGrid categories={reviewedRequirement.category_results} />
+                            <ReviewChangeSet
+                              findings={reviewedRequirement.findings}
+                              readOnly
+                              title="Why this scored the way it did"
+                              description="Delta review verifies an already-revised requirement, so it reports what is still unmet without proposing new text."
+                              emptyMessage="This revision satisfies every category — no issues remain."
+                            />
+                          </>
                         )}
-                      />
-                      <CategoryScoreGrid categories={reviewedRequirement.category_results} />
-                      <ReviewChangeSet
-                        findings={reviewedRequirement.findings}
-                        reviewId={activeResult.review_id}
-                        onApplyDisposition={(reviewId, payload) => {
-                          sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
-                          applyDisposition({ reviewId, payload });
-                        }}
-                        isApplyingDisposition={isApplyingDisposition}
-                      />
-                    </Stack>
-                  </Paper>
-                ))
+                      </Stack>
+                    </Paper>
+                  ))
               )}
             </Stack>
           </Paper>

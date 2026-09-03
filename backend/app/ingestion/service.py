@@ -13,8 +13,8 @@ from typing import Any, TypedDict, cast
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService, compute_file_hash
 from app.core.config import AppSettings
 from app.core.logging import get_logger
-from app.ingestion.chunker import chunk_text
-from app.ingestion.extractor import extract_text
+from app.ingestion.chunker import chunk_pages
+from app.ingestion.extractor import extract_pages
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointFileContent,
     SharePointStandardsClient,
@@ -180,13 +180,13 @@ class IngestionService:
         sharepoint_url: str = "",
     ) -> None:
         """Core pipeline: extract → chunk → embed → index."""
-        text = extract_text(data, filename)
-        if not text.strip():
+        pages: list[tuple[int | None, str]] = list(extract_pages(data, filename))
+        if not any(text.strip() for _page_number, text in pages):
             logger.warning("empty_document_skipped", filename=filename)
             return
 
-        chunks = chunk_text(
-            text,
+        chunks = chunk_pages(
+            pages,
             chunk_size=self._settings.chunk_size,
             chunk_overlap=self._settings.chunk_overlap,
             source=source,

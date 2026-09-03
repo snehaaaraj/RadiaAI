@@ -49,7 +49,7 @@ class RetrievedContext:
         return "\n\n---\n\n".join(parts)
 
     def source_references(self) -> list[dict[str, str]]:
-        """Return deduplicated source references for citation."""
+        """Return deduplicated source references (one per filename) for citation."""
         seen: set[str] = set()
         refs = []
         for chunk in self.chunks:
@@ -65,6 +65,25 @@ class RetrievedContext:
                     }
                 )
         return refs
+
+    def chunk_references(self) -> list[dict[str, Any]]:
+        """
+        Return per-chunk provenance, undeduplicated, for fine-grained citation.
+
+        Unlike ``source_references`` (one entry per document), this keeps every
+        retrieved chunk so a finding can be traced back to the specific page,
+        section, and excerpt that produced it, not just the document it came from.
+        """
+        return [
+            {
+                "chunk_id": chunk.get("chunk_id", ""),
+                "filename": chunk.get("filename", ""),
+                "section": chunk.get("section", ""),
+                "page_number": chunk.get("page_number"),
+                "content": chunk.get("content", ""),
+            }
+            for chunk in self.chunks
+        ]
 
 
 class RAGService:

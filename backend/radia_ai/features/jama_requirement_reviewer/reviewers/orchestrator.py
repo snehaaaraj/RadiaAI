@@ -1,18 +1,22 @@
-"""Reviewer orchestration — parallel deterministic + LLM pipeline."""
+"""Reviewer orchestration — LLM-based review pipeline."""
 
 from __future__ import annotations
 
 import hashlib
 import json
-from concurrent.futures import ThreadPoolExecutor
 from typing import TYPE_CHECKING
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
+    REVIEW_CATEGORIES,
     CategoryResult,
+    ConsolidatedReviewResult,
     DeterminismConfigSnapshot,
     DeterminismContext,
     RequirementReviewInput,
     RequirementReviewResponse,
+    RequirementRevision,
+    ReviewCompletion,
+    ReviewFailureReason,
     ReviewFinding,
     ReviewStatus,
     ReviewVersionEntry,
@@ -33,7 +37,7 @@ if TYPE_CHECKING:
 
 
 class ReviewOrchestrator:
-    """Coordinates deterministic reviewers + a single parallel LLM call."""
+    """Coordinates LLM-based requirement reviews."""
 
     def __init__(
         self,
@@ -50,119 +54,90 @@ class ReviewOrchestrator:
         self._reviewer_bundle_version = reviewer_bundle_version
 
     def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
-        """Run deterministic rules and LLM review in parallel, then merge."""
+        """
+        Run the consolidated LLM review, proposing a rewrite for each finding.
+
+        When the review engine cannot evaluate the requirement, the response
+        carries ``overall = NOT_EVALUATED`` and a failed completion record. An
+        unevaluated requirement is never reported as acceptable.
+        """
         normalized_payload = normalize_requirement_review_input(payload)
 
-        # Run deterministic checks + 1 LLM call concurrently
-        deterministic_findings: list[ReviewFinding] = []
-        llm_findings: list[ReviewFinding] = []
-
-        with ThreadPoolExecutor(max_workers=2) as executor:
-            det_future = executor.submit(self._run_deterministic, normalized_payload)
-
-            llm_future = None
-            if self._llm_enhancer is not None:
-                llm_future = executor.submit(
-                    self._llm_enhancer.consolidated_review, normalized_payload
-                )
-
-            deterministic_findings = det_future.result()
-            if llm_future is not None:
-                llm_findings = llm_future.result()
-
-        # Merge: LLM enhances deterministic findings + adds new categories
-        merged = self._merge_findings(deterministic_findings, llm_findings)
-        enriched = self._enrich_findings(merged)
-
-        # Build category results from merged findings
-        category_statuses: dict[str, list[ReviewStatus]] = {}
-        for f in enriched:
-            category_statuses.setdefault(f.reviewer, []).append(f.status)
-
-        # Ensure all 5 reviewer categories appear
-        for reviewer in self._reviewers:
-            if reviewer.name not in category_statuses:
-                category_statuses[reviewer.name] = []
-
-        category_results = [
-            CategoryResult(
-                category=name,
-                status=overall_from_statuses(statuses) if statuses else ReviewStatus.ACCEPTABLE,
+        if self._llm_enhancer is None:
+            llm_result = ConsolidatedReviewResult(
+                completion=ReviewCompletion.failed(ReviewFailureReason.REVIEW_ENGINE_UNAVAILABLE),
             )
-            for name, statuses in category_statuses.items()
-        ]
+        else:
+            llm_result = self._llm_enhancer.consolidated_review(normalized_payload)
 
-        overall = overall_from_statuses([cr.status for cr in category_results])
-        return RequirementReviewResponse(
-            overall=overall,
-            category_results=category_results,
-            findings=enriched,
-            determinism=self.build_version_response().determinism,
+        return self._to_response(llm_result)
+
+    def score_revision(self, revision: RequirementRevision) -> RequirementReviewResponse:
+        """
+        Score an already-revised requirement without proposing further changes.
+
+        Delta review verifies work that a previous review recommended, so this
+        path returns category scores and the reasons behind them, but no
+        replacement text.
+        """
+        normalized = revision.model_copy(
+            update={"requirement": normalize_requirement_review_input(revision.requirement)}
         )
 
-    def _run_deterministic(self, payload: RequirementReviewInput) -> list[ReviewFinding]:
-        """Run all deterministic reviewer rules (fast, no LLM)."""
-        findings = []
-        for reviewer in self._reviewers:
-            if reviewer.supports_individual_review:
-                result = reviewer.review_requirement(payload)
-                findings.extend(result.findings)
-        return findings
+        if self._llm_enhancer is None:
+            llm_result = ConsolidatedReviewResult(
+                completion=ReviewCompletion.failed(ReviewFailureReason.REVIEW_ENGINE_UNAVAILABLE),
+            )
+        else:
+            llm_result = self._llm_enhancer.score_revision(normalized)
 
-    def _merge_findings(
-        self,
-        deterministic: list[ReviewFinding],
-        llm: list[ReviewFinding],
-    ) -> list[ReviewFinding]:
+        return self._to_response(llm_result)
+
+    def _to_response(self, llm_result: ConsolidatedReviewResult) -> RequirementReviewResponse:
+        """Turn a raw LLM result into a scored, standards-enriched response."""
+        determinism = self.build_version_response().determinism
+
+        if not llm_result.completion.is_complete:
+            return RequirementReviewResponse(
+                overall=ReviewStatus.NOT_EVALUATED,
+                completion=llm_result.completion,
+                category_results=[],
+                findings=[],
+                determinism=determinism,
+            )
+
+        enriched = self._enrich_findings(llm_result.findings)
+        category_results = self._build_category_results(enriched)
+        return RequirementReviewResponse(
+            overall=overall_from_statuses([cr.status for cr in category_results]),
+            completion=llm_result.completion,
+            category_results=category_results,
+            findings=enriched,
+            determinism=determinism,
+        )
+
+    @staticmethod
+    def _build_category_results(findings: list[ReviewFinding]) -> list[CategoryResult]:
         """
-        Merge deterministic and LLM findings.
+        Score every review category, not just the ones that produced findings.
 
-        - For each deterministic finding, if the LLM produced a matching category,
-          use the LLM's suggested_rewrite and reference (grounded in standards).
-        - Add LLM-only findings for categories not covered by deterministic rules
-          (e.g., traceability, certification).
+        A category the review checked and found nothing wrong with is
+        ``ACCEPTABLE``. Omitting it would make a clean category indistinguishable
+        from one that was never evaluated.
         """
-        if not llm:
-            return deterministic
+        statuses: dict[str, list[ReviewStatus]] = {category: [] for category in REVIEW_CATEGORIES}
+        for finding in findings:
+            # Findings from an unrecognized category are still scored, so an
+            # unexpected reviewer value can never silently drop a problem.
+            statuses.setdefault(finding.reviewer, []).append(finding.status)
 
-        llm_by_key: dict[str, ReviewFinding] = {}
-        for f in llm:
-            key = f"{f.reviewer}:{f.category}".lower().strip()
-            if key not in llm_by_key:
-                llm_by_key[key] = f
-
-        merged = []
-        used_keys: set[str] = set()
-
-        for det in deterministic:
-            det_key = f"{det.reviewer}:{det.category}".lower().strip()
-            used_keys.add(det_key)
-
-            llm_match = llm_by_key.get(det_key)
-            if llm_match:
-                updates: dict[str, str | None] = {}
-                if llm_match.suggested_rewrite:
-                    updates["suggested_rewrite"] = llm_match.suggested_rewrite
-                if llm_match.reference:
-                    updates["reference"] = llm_match.reference
-                    updates["reference_title"] = llm_match.reference_title
-                if llm_match.recommendation:
-                    updates["recommendation"] = llm_match.recommendation
-                merged.append(det.model_copy(update=updates) if updates else det)
-            else:
-                merged.append(det)
-
-        # Add LLM-only findings (traceability, certification, etc.)
-        for f in llm:
-            key = f"{f.reviewer}:{f.category}".lower().strip()
-            if key not in used_keys:
-                merged.append(f)
-                used_keys.add(key)
-
-        return merged
+        return [
+            CategoryResult(category=category, status=overall_from_statuses(category_statuses))
+            for category, category_statuses in statuses.items()
+        ]
 
     def build_version_response(self) -> ReviewVersionResponse:
-        """Return deterministic reviewer/prompt/standards version metadata."""
+        """Return reviewer/prompt/standards version metadata."""
         prompt_versions = {reviewer.name: reviewer.prompt_version for reviewer in self._reviewers}
         standards_versions = {
             reviewer.name: reviewer.standards_version for reviewer in self._reviewers
