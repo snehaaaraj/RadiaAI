@@ -6,7 +6,7 @@
  *   - Base URL configuration
  *   - Default headers
  *   - Request ID injection
- *   - Auth token injection (Phase 2 — Entra ID)
+ *   - TODO: Auth token injection (Entra ID)
  *   - Error response normalisation
  */
 
@@ -35,7 +35,7 @@ apiClient.interceptors.request.use((config) => {
   // Attach a unique ID to every outbound request for distributed tracing
   config.headers['X-Request-ID'] = generateRequestId();
 
-  // Phase 2: Inject Entra ID bearer token here, e.g.:
+  // TODO: Inject Entra ID bearer token here, e.g.:
   // const token = await getAccessToken();
   // config.headers['Authorization'] = `Bearer ${token}`;
 

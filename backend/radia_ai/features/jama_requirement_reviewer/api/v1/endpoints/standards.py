@@ -12,7 +12,7 @@ router = APIRouter()
 @router.get(
     "",
     response_model=APIResponse[StandardsResponse],
-    summary="List standards references used by deterministic reviewers",
+    summary="List standards references used by reviewers",
     status_code=status.HTTP_200_OK,
 )
 async def list_standards(

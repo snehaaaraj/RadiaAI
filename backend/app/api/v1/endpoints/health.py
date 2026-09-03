@@ -3,9 +3,6 @@ Health check endpoint.
 
 GET /api/v1/health — Returns the application status and the health of
 each external dependency (Azure OpenAI, Azure AI Search, Blob Storage).
-
-In Phase 1 the dependency checks are stubs. Phase 2 will replace them with
-real connectivity probes once the Azure wrappers exist.
 """
 
 import time
@@ -40,7 +37,8 @@ async def health_check(
     """
     start = time.monotonic()
 
-    # Phase 1: stub dependency checks — replaced in Phase 2
+    # TODO: Implement real connectivity probes for each dependency
+    # Stub dependency checks - to be replaced with real connectivity probes
     dependencies = [
         DependencyHealth(name="azure_openai", status=ServiceStatus.OK, message="stub"),
         DependencyHealth(name="azure_search", status=ServiceStatus.OK, message="stub"),

@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Divider from '@mui/material/Divider';
@@ -14,17 +13,23 @@ import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
 import { FileUploadZone } from '@/radia_ai/features/jamaRequirementReviewer/components/FileUploadZone';
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
+import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
 import { useRequirementReview } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useRequirementReview';
 import { useApplyFindingDisposition } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
+import {
+  REQUIREMENT_REVIEW_RESULT_KEY,
+  purgeLegacyReviewResults,
+} from '@/radia_ai/features/jamaRequirementReviewer/persistedReviewKeys';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
-import { getApiErrorMessage } from '@/utils/apiErrorMessage';
+import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
+import { isReviewFailed } from '@/utils/reviewCompletion';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
 type InputMode = 'paste' | 'upload';
@@ -52,7 +57,7 @@ export default function RequirementReview() {
     initialValue: DEFAULT_FORM_STATE,
   });
   const { state: persistedResult, setState: setPersistedResult, clear: clearPersistedResult } = usePersistentState<RequirementReviewResponse | null>({
-    key: 'requirement-review-result',
+    key: REQUIREMENT_REVIEW_RESULT_KEY,
     initialValue: null,
   });
   const [requirementId, setRequirementId] = useState(formState.requirementId);
@@ -76,6 +81,7 @@ export default function RequirementReview() {
 
   // On mount: if disposition was saved last time, clear all review data
   useEffect(() => {
+    purgeLegacyReviewResults();
     if (sessionStorage.getItem(DISPOSITION_SAVED_KEY) === 'true') {
       sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       clearFormState();
@@ -110,7 +116,7 @@ export default function RequirementReview() {
     return () => {
       if (isDirtyRef.current) {
         localStorage.removeItem('requirement-review-form-state');
-        localStorage.removeItem('requirement-review-result');
+        localStorage.removeItem(REQUIREMENT_REVIEW_RESULT_KEY);
         sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       }
     };
@@ -150,6 +156,28 @@ export default function RequirementReview() {
     resetResult();
   };
 
+  const submitReview = () => {
+    if (!text.trim()) return;
+    runReview(
+      {
+        requirement_id: requirementId || undefined,
+        requirement_level: requirementLevel,
+        text: text.trim(),
+      },
+      {
+        onSuccess: (response) => {
+          setPersistedResult(response);
+          // Don't signal "review complete" for a review that never ran.
+          if (!isReviewFailed(response.completion)) {
+            playReviewCompleteSound();
+          }
+        },
+      }
+    );
+  };
+
+  const reviewFailed = activeResult ? isReviewFailed(activeResult.completion) : false;
+
   return (
     <Stack spacing={3}>
       <Box>
@@ -157,7 +185,7 @@ export default function RequirementReview() {
           Individual Requirement Review
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          AI-powered review across language, structure, verifiability, traceability, and certification.
+          AI-powered review across language, structure, verifiability, and certification.
         </Typography>
       </Box>
 
@@ -267,31 +295,32 @@ export default function RequirementReview() {
           )}
 
           <Box sx={requirementReviewStyles.actionRow}>
-            <Button
-              variant="contained"
-              disabled={!canSubmit || isPending}
-              onClick={() =>
-                runReview({
-                  requirement_id: requirementId || undefined,
-                  requirement_level: requirementLevel,
-                  text: text.trim(),
-                }, {
-                  onSuccess: (response) => {
-                    setPersistedResult(response);
-                    playReviewCompleteSound();
-                  },
-                })
-              }
-            >
+            <Button variant="contained" disabled={!canSubmit || isPending} onClick={submitReview}>
               Run AI review
             </Button>
           </Box>
         </Stack>
       </Paper>
 
-      {isError && <Alert severity="error">Review failed: {getApiErrorMessage(error)}</Alert>}
+      {isError && (
+        <ErrorDisplay error={error} context="Requirement Review" onRetry={submitReview} />
+      )}
 
-      {activeResult && (
+      {/*
+        A failed review has no score, no categories and no findings — show why it
+        did not run instead of a result that would read as a clean pass.
+      */}
+      {activeResult && reviewFailed && (
+        <Stack spacing={2} ref={resultRef}>
+          <ReviewIncompleteNotice
+            completion={activeResult.completion}
+            onRetry={submitReview}
+            isRetrying={isPending}
+          />
+        </Stack>
+      )}
+
+      {activeResult && !reviewFailed && (
         <Stack spacing={2} ref={resultRef}>
           <ReviewResultHero
             title="Requirement score"

@@ -1,4 +1,4 @@
-"""Reviewer interfaces for hybrid (deterministic + LLM) review engines."""
+"""Reviewer interfaces for LLM-based review engines."""
 
 from __future__ import annotations
 
@@ -23,4 +23,4 @@ class RequirementReviewer(ABC):
 
     @abstractmethod
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
-        """Review a single requirement (deterministic rules only)."""
+        """Review a single requirement."""

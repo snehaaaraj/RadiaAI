@@ -4,8 +4,6 @@ Documents endpoint — list and manage indexed documents.
 GET  /api/v1/documents          — list documents
 GET  /api/v1/documents/{id}     — get document details
 DELETE /api/v1/documents/{id}   — delete document and its chunks
-
-Phase 1: Stubs only. Phase 2+ will wire in DocumentService and repository layer.
 """
 
 from fastapi import APIRouter, Request, status
@@ -29,7 +27,7 @@ async def list_documents(
     page: int = 1,
     page_size: int = 20,
 ) -> PaginatedResponse[DocumentSummary]:
-    """List documents — Phase 1 stub."""
+    """TODO: Implement listing of documents."""
     logger.info("list_documents", page=page, page_size=page_size)
     return PaginatedResponse(
         data=[],

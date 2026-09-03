@@ -1,8 +1,8 @@
 # Radia AI 2.0
 
 AI-powered Requirements Engineering platform for aerospace and systems teams.
-Combines deterministic, rule-based requirement quality checks with Retrieval-Augmented Generation (RAG) 
-against indexed standards documents to provide grounded, traceable, and explainable requirement reviews.
+Uses Retrieval-Augmented Generation (RAG) against indexed standards documents to provide 
+grounded, traceable, and explainable requirement reviews.
 
 ---
 
@@ -29,13 +29,13 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 │            FastAPI + Python 3.12 + Pydantic v2             │
 │                       port 8000                            │
 │                                                            │
-│  Hybrid review pipeline:                                   │
-│    1. Deterministic rules (regex, word lists) — instant    │
-│    2. RAG retrieval (Azure AI Search) — ~5s               │
-│    3. GPT-5 consolidated review — runs in parallel         │
-│    4. Merge + enrich with SharePoint URLs                  │
+│  LLM-based review pipeline:                                   │
+│    1. RAG retrieval (Azure AI Search) — ~5s                   │
+│    2. GPT-5 consolidated review                               │
+│    3. Enrich with SharePoint URLs                             │
+│    4. Report completion status (or why it failed)             │
 │                                                            │
-│  Auto-ingestion at startup:                                │
+│  On-demand ingestion (POST /api/v1/ingest):                │
 │    SharePoint → extract text → chunk → embed → index       │
 │    File-hash caching skips unchanged documents             │
 └──────────┬──────────┬────────────────┬─────────────────────┘
@@ -63,15 +63,11 @@ RadiaAi-2.0/
 │   │       │   ├── dependencies/      # DI container + lifespan (Azure client init)
 │   │       │   ├── models/            # Pydantic domain models (review, standards)
 │   │       │   ├── repositories/      # review history persistence
-│   │       │   ├── reviewers/         # hybrid reviewer modules:
+│   │       │   ├── reviewers/         # review orchestration:
 │   │       │   │   ├── base.py        #   abstract reviewer interface
-│   │       │   │   ├── orchestrator.py#   parallel deterministic + LLM orchestration
-│   │       │   │   ├── language/      #   modal verbs, ambiguity, banned words
-│   │       │   │   ├── structure/     #   compound reqs, EARS syntax, levels
-│   │       │   │   ├── verifiability/ #   measurability, operating conditions
-│   │       │   │   ├── traceability/  #   parent/child, allocation (LLM-powered)
-│   │       │   │   └── certification/ #   DO-178, DAL, safety (LLM-powered)
-│   │       │   ├── rules/             # deterministic rule constants (word lists)
+│   │       │   │   ├── orchestrator.py#   LLM review + category scoring + completion
+│   │       │   │   └── consolidated.py#   per-category version metadata
+│   │       │   │                      #   (analysis lives in the prompt)
 │   │       │   ├── schemas/           # API request/response schemas
 │   │       │   ├── services/          # review, delta, history, standards services
 │   │       │   ├── standards/         # standards registry (fallback)
@@ -100,7 +96,7 @@ RadiaAi-2.0/
 │   │   └── main.py                    # FastAPI app factory + middleware
 │   │
 │   ├── tests/
-│   │   └── unit/                      # 19 unit tests
+│   │   └── unit/                      # 55 unit tests
 │   ├── pyproject.toml
 │   └── requirements.txt
 │
@@ -130,25 +126,21 @@ RadiaAi-2.0/
 
 ## Review Pipeline
 
-The review system uses a **hybrid architecture** — deterministic rules run in parallel
-with a single consolidated GPT-5 + RAG call:
+The review system uses **LLM-based architecture** with GPT-5 + RAG:
 
 ```
                         ┌─────────────────────────┐
-    Input Requirement   │    ThreadPoolExecutor    │
+    Input Requirement   │   LLM Review Pipeline    │
     ─────────────────►  │                         │
-                        │  Thread 1: Deterministic │  ← regex rules (~1ms)
-                        │    language/structure/   │
-                        │    verifiability checks  │
-                        │                         │
-                        │  Thread 2: LLM + RAG    │  ← GPT-5 (~60s)
-                        │    1. Embed query        │
-                        │    2. Search (diverse)   │
-                        │    3. GPT-5 consolidated │
-                        │       review prompt      │
+                        │  1. Embed query          │
+                        │  2. Search (diverse)     │  ← Azure AI Search (~5s)
+                        │  3. GPT-5 consolidated   │  ← GPT-5 (~60s)
+                        │     review prompt        │
+                        │     (language/structure/ │
+                        │      verifiability/      │
+                        │      certification)      │
                         └────────────┬────────────┘
                                      │
-                              Merge findings
                               Enrich references
                               (SharePoint URLs)
                                      │
@@ -157,17 +149,32 @@ with a single consolidated GPT-5 + RAG call:
 ```
 
 **Key behaviors:**
-- Deterministic rules provide instant feedback for common issues
 - GPT-5 provides deeper analysis grounded in indexed standards documents
 - All findings include a `suggested_rewrite` (full improved requirement text)
 - References point to actual SharePoint document URLs, not hardcoded names
 - File-hash caching: unchanged documents are not re-embedded on restart
+- Every response carries a **completion record** — a review that could not run
+  reports `overall: "Not Evaluated"` plus the specific reason, so a failure is
+  never presented as a clean requirement
+
+### Review completion
+
+Each response includes `completion: { status, reason, message }`.
+
+| status | meaning |
+|--------|---------|
+| `complete` | the requirement was evaluated; an empty findings list means it passed |
+| `partial` | batch review where only some requirements were evaluated |
+| `failed` | nothing was evaluated; `reason` says why |
+
+Failure reasons: `review_engine_unavailable`, `no_standards_context`,
+`retrieval_failed`, `llm_call_failed`, `invalid_llm_response`.
 
 ---
 
 ## Ingestion Pipeline
 
-Standards documents are automatically ingested from SharePoint at server startup:
+Standards documents are ingested from SharePoint on demand via `POST /api/v1/ingest`:
 
 1. **Download** from SharePoint via Microsoft Graph API
 2. **Extract text** using PyMuPDF (PDF), python-docx (DOCX), or UTF-8 (TXT/MD)
@@ -176,7 +183,7 @@ Standards documents are automatically ingested from SharePoint at server startup
 5. **Index** into Azure AI Search with vector + keyword + semantic search
 6. **Cache** file hashes — skip re-processing unchanged documents
 
-Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
+Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
 
 ---
 
@@ -185,11 +192,15 @@ Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
 ### Requirements review workflow
 
 - [x] Upload or copy/paste requirement content
-- [x] AI-powered review across 5 categories (language, structure, verifiability, traceability, certification)
+- [x] AI-powered review across 4 categories (language, structure, verifiability, certification)
 - [x] Color-coded overall scoring
-- [x] Sub-category scoring displayed directly below overall score
+- [x] Sub-category scoring displayed directly below overall score, with every
+      category scored on a completed review — a clean category reads as a pass,
+      not as "not evaluated"
 - [x] Persistent review state across navigation with explicit **Clear Review**
 - [x] Findings grounded in indexed standards with source document links
+- [x] Explicit reporting when a review could not run, with the reason and a retry
+      action for transient failures
 
 ### AI-assisted modification workflow
 
@@ -200,9 +211,21 @@ Manual ingestion is also available via `POST /api/v1/ingest` or file upload.
   - [x] Supporting evidence/context for each finding
   - [x] Full suggested rewrite (changeset)
 
+### Delta (verification) review workflow
+
+- [x] Baseline vs updated comparison with a new/modified/deleted change summary
+- [x] Requirements without an ID are paired by position, so pasting an original
+      and its revision reads as one **modified** requirement rather than an
+      unrelated add plus delete
+- [x] Only changed requirements are re-scored; each is compared against the
+      baseline text it replaces
+- [x] Scoring only — no rewrites are proposed, because the requirement under
+      review has already been revised
+- [x] Read-only findings explaining what a category still leaves unmet
+
 ### Document ingestion
 
-- [x] Auto-sync from SharePoint at startup
+- [x] On-demand sync from SharePoint via `POST /api/v1/ingest`
 - [x] Manual upload via API endpoint
 - [x] File-hash deduplication (skip unchanged)
 - [x] PDF, TXT extraction
@@ -237,11 +260,14 @@ pip install -r requirements.txt
 uvicorn radia_ai.main:app --reload --port 8000
 ```
 
-On first start, the server will:
-1. Create/update the Azure AI Search index
-2. Download standards from SharePoint
-3. Extract, chunk, embed, and index all documents
-4. Subsequent starts skip unchanged documents (~10s startup)
+On start, the server creates/updates the Azure AI Search index.
+
+Standards are **not** ingested at startup — that keeps cold starts viable on
+serverless hosting. Populate the index once via `POST /api/v1/ingest` (or the UI
+button); file-hash caching means unchanged documents are skipped on later runs.
+
+The review pipeline needs a populated index: with an empty index every review
+returns `no_standards_context` instead of findings.
 
 ### 3. Local frontend development
 
@@ -277,7 +303,7 @@ Quick validation after deploy:
 | GET | `/api/v1/review/version` | Reviewer bundle version + determinism metadata |
 | GET | `/api/v1/standards` | Standards/reference libraries (SharePoint or fallback) |
 | POST | `/api/v1/review/requirement` | AI-powered individual requirement review |
-| POST | `/api/v1/review/delta` | Incremental delta review for changed requirements |
+| POST | `/api/v1/review/delta` | Score changed requirements against their baseline (no rewrites proposed) |
 | GET | `/api/v1/review/history` | List stored review runs and findings |
 | POST | `/api/v1/review/history/{id}/disposition` | Apply finding disposition (Accepted/Rejected/Deferred) |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
@@ -322,7 +348,7 @@ the full reference with descriptions.
 
 ```bash
 cd backend
-pytest                          # all tests (19 unit tests)
+pytest                          # all tests (55 unit tests)
 pytest -m unit                  # unit tests only
 pytest -m integration           # integration tests only (requires Azure)
 pytest --cov=app --cov=radia_ai # with coverage report
@@ -339,5 +365,13 @@ pytest --cov=app --cov=radia_ai # with coverage report
 **AI/ML:** Azure OpenAI (GPT-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
 
 **Infrastructure:** Azure App Service / Container Apps, Azure OpenAI, Azure AI Search, Azure Blob Storage
+
+---
+
+## Known Limitations
+
+- **Review history is not durable.** It lives in an in-memory repository, so on
+  serverless hosting each invocation starts empty and disposition writes will not
+  find their review. Durable storage is needed before history is production-ready.
 
 **Note:** Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.

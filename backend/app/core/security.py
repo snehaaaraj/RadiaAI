@@ -1,12 +1,9 @@
 """
 Security utilities — authentication and authorization stubs for Microsoft Entra ID.
 
-Phase 1: Provides the hook points and placeholder dependency so endpoints compile
-and work locally without auth. Phase 2+ will wire in real JWT validation.
-
-The pattern used here (FastAPI Depends on a callable) means that switching from
-the stub to real Entra validation requires changing only this file — no endpoint
-code needs to change.
+Provides authentication dependency injection for FastAPI endpoints.
+The pattern used here (FastAPI Depends on a callable) means that switching between
+authentication modes requires changing only this file — no endpoint code needs to change.
 """
 
 from fastapi import Depends, HTTPException, Request, status
@@ -68,7 +65,7 @@ async def _entra_auth(
     """
     Validate a Microsoft Entra ID bearer token.
 
-    TODO (Phase 2): Implement full JWT validation using python-jose:
+    TODO: Implement full JWT validation using python-jose:
       - Fetch JWKS from https://login.microsoftonline.com/{tenant_id}/discovery/v2.0/keys
       - Validate signature, expiry, audience, and issuer
       - Extract roles from token claims

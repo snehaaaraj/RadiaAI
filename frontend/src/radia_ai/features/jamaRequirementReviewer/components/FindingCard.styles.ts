@@ -43,6 +43,14 @@ export const findingCardStyles = {
     border: '1px solid',
     borderColor: 'divider',
   } satisfies SxProps<Theme>,
+  sourceExcerptBox: {
+    mt: 0.5,
+    p: 1,
+    borderRadius: 1,
+    borderLeft: '3px solid',
+    borderColor: 'primary.main',
+    bgcolor: 'action.hover',
+  } satisfies SxProps<Theme>,
   accordion: {
     boxShadow: 'none',
     border: '1px solid',

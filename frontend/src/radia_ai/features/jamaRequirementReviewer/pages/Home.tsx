@@ -9,6 +9,7 @@ import Grid from '@mui/material/Grid2';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import RuleIcon from '@mui/icons-material/Rule';
+import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
@@ -26,6 +27,13 @@ const QUICK_ACTIONS = [
     icon: <RuleIcon color="secondary" />,
     path: ROUTES.REVIEW_REQUIREMENT,
     label: 'Open single review',
+  },
+  {
+    title: 'Set Review',
+    description: 'Upload a PDF with multiple requirements and review them one by one.',
+    icon: <PlaylistAddCheckIcon color="primary" />,
+    path: ROUTES.REVIEW_SET,
+    label: 'Open set review',
   },
   {
     title: 'Delta Review',
