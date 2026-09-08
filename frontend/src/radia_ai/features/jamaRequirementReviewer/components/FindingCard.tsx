@@ -168,7 +168,7 @@ export function FindingCard({
                 </Typography>
               </Box>
 
-              {/* Changeset — AI-assisted rephrased requirement */}
+              {/* Changeset - AI-assisted rephrased requirement */}
               {finding.suggested_rewrite && (
                 <>
                   <Divider />

@@ -1,5 +1,5 @@
 /**
- * Application context — global state that needs to be accessible
+ * Application context - global state that needs to be accessible
  * across multiple pages without prop drilling.
  *
  * Manages theme preferences, UI settings.

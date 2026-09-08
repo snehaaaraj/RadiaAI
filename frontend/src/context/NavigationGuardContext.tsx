@@ -6,7 +6,7 @@ export interface NavigationGuardContextValue {
   setDirty: (dirty: boolean) => void;
   /** Sidebar / any nav component calls this instead of navigate() directly */
   guardedNavigate: (path: string) => void;
-  /** Dialog state — consumed by the single dialog rendered in AppLayout */
+  /** Dialog state - consumed by the single dialog rendered in AppLayout */
   dialogOpen: boolean;
   handleConfirm: () => void;
   handleCancel: () => void;

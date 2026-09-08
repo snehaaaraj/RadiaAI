@@ -1,5 +1,5 @@
 """
-Radia AI — FastAPI application factory.
+Radia AI - FastAPI application factory.
 
 This module creates and configures the FastAPI application instance. It wires:
   - CORS middleware
@@ -8,7 +8,7 @@ This module creates and configures the FastAPI application instance. It wires:
   - API versioned router
   - OpenAPI metadata
 
-It deliberately contains NO business logic — that lives in services/.
+It deliberately contains NO business logic - that lives in services/.
 """
 
 import time
@@ -99,7 +99,7 @@ def _resolve_settings() -> AppSettings:
 
 def create_app() -> FastAPI:
     """
-    Application factory — returns a fully configured FastAPI instance.
+    Application factory - returns a fully configured FastAPI instance.
 
     Using a factory function (instead of a module-level app = FastAPI())
     makes it trivial to create isolated test instances with different settings.
@@ -135,7 +135,7 @@ def create_app() -> FastAPI:
 def _register_middleware(app: FastAPI, settings: AppSettings) -> None:
     """Attach all middleware to the application in correct order (outermost first)."""
 
-    # CORS — must be outermost so preflight OPTIONS requests are handled correctly
+    # CORS - must be outermost so preflight OPTIONS requests are handled correctly
     # Support both explicit origins and Vercel preview deployments
     app.add_middleware(
         CORSMiddleware,
@@ -244,7 +244,7 @@ def _register_exception_handlers(app: FastAPI) -> None:
         Catch-all for unexpected exceptions.
 
         Logs the full traceback internally but returns a generic message to the
-        caller — never expose stack traces in production responses.
+        caller - never expose stack traces in production responses.
         """
         logger.exception("unhandled_exception", exc_info=exc)
         return JSONResponse(
@@ -270,7 +270,7 @@ def _register_routers(app: FastAPI, settings: AppSettings) -> None:
 
     @app.get("/", tags=["Root"])
     async def root() -> dict[str, str]:
-        """Root endpoint — confirms the backend is running."""
+        """Root endpoint - confirms the backend is running."""
         return {
             "message": "Radia AI Backend is successfully running",
             "status": "online",
@@ -283,7 +283,7 @@ def _register_routers(app: FastAPI, settings: AppSettings) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Application instance — used by uvicorn
+# Application instance - used by uvicorn
 # ---------------------------------------------------------------------------
 
 app = create_app()

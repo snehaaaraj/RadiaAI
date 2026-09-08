@@ -1,9 +1,9 @@
 """
-Documents endpoint — list and manage indexed documents.
+Documents endpoint - list and manage indexed documents.
 
-GET  /api/v1/documents          — list documents
-GET  /api/v1/documents/{id}     — get document details
-DELETE /api/v1/documents/{id}   — delete document and its chunks
+GET  /api/v1/documents          - list documents
+GET  /api/v1/documents/{id}     - get document details
+DELETE /api/v1/documents/{id}   - delete document and its chunks
 """
 
 from fastapi import APIRouter, Request, status

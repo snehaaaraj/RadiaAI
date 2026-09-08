@@ -1,5 +1,5 @@
 /**
- * MUI theme configuration — Radia AI brand colours and typography.
+ * MUI theme configuration - Radia AI brand colours and typography.
  */
 
 import { createTheme, type PaletteMode } from '@mui/material/styles';

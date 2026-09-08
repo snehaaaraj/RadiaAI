@@ -41,7 +41,7 @@ frontend/coverage/
 .eslintcache
 
 # =============================================================================
-# Environment & Secrets — NEVER commit these
+# Environment & Secrets - NEVER commit these
 # =============================================================================
 .env
 .env.local

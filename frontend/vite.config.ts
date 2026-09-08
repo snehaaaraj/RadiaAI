@@ -35,7 +35,7 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       sourcemap: true,
-      // Raise the warning threshold — MUI bundles are large by nature
+      // Raise the warning threshold - MUI bundles are large by nature
       chunkSizeWarningLimit: 1000,
       rollupOptions: {
         output: {

@@ -68,7 +68,7 @@ export default function Search() {
       {data && (
         <Box>
           <Typography variant="body2" color="text.secondary" mb={2}>
-            {data.total} result{data.total !== 1 ? 's' : ''} — {data.mode} search
+            {data.total} result{data.total !== 1 ? 's' : ''} - {data.mode} search
           </Typography>
 
           {data.results.length === 0 ? (

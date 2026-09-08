@@ -2,7 +2,7 @@
 Unit tests for the category scoring contract.
 
 The guarantee under test: a completed review scores *every* category. A category
-that produced no findings is reported as Acceptable, never omitted — an omitted
+that produced no findings is reported as Acceptable, never omitted - an omitted
 category is indistinguishable from one that was never evaluated. Traceability is
 out of scope and must not appear anywhere in the pipeline.
 """
@@ -131,7 +131,7 @@ def test_finding_from_an_unexpected_category_is_still_scored(test_settings) -> N
 
 @pytest.mark.unit
 def test_failed_review_reports_no_category_scores(test_settings) -> None:
-    """A review that never ran has nothing to score — not even an Acceptable."""
+    """A review that never ran has nothing to score - not even an Acceptable."""
     orchestrator = ReviewOrchestrator(settings=test_settings, reviewers=[], llm_enhancer=None)
 
     response = orchestrator.review_requirement(_payload())

@@ -31,7 +31,7 @@ class ConsolidatedCategoryReviewer(RequirementReviewer):
         self.name = category.value
 
     def review_requirement(self, payload: RequirementReviewInput) -> ReviewerResult:
-        """Return an empty result — findings come from the consolidated LLM call."""
+        """Return an empty result - findings come from the consolidated LLM call."""
         return ReviewerResult(
             reviewer=self.name,
             reviewer_version=self.reviewer_version,

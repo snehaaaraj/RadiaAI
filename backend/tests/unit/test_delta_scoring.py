@@ -3,7 +3,7 @@ Unit tests for the delta (verification) review contract.
 
 Delta review scores a requirement that a previous review already caused to be
 revised. It must therefore: compare against the baseline version, and never hand
-back replacement text — the reviewer is checking the revision, not asking for
+back replacement text - the reviewer is checking the revision, not asking for
 another one.
 """
 
@@ -102,7 +102,7 @@ def test_pasted_revision_without_an_id_is_a_modification_not_an_add_and_delete()
     """
     The core delta workflow: paste the original, paste the revision.
 
-    Keying an unidentified requirement by its text made this impossible — the
+    Keying an unidentified requirement by its text made this impossible - the
     revision's text differs, so it never matched its baseline and was reported as
     one deletion plus one addition, scored with no previous version.
     """

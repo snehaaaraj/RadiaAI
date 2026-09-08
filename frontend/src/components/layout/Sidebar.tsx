@@ -30,8 +30,8 @@ import { useActiveScrollSection } from '@/hooks/useActiveScrollSection';
 const NAV_ITEMS = [
   { label: 'Home', icon: <HomeIcon />, path: ROUTES.HOME },
   { label: 'Single Review', icon: <RuleIcon />, path: ROUTES.REVIEW_REQUIREMENT },
-  { label: 'Set Review', icon: <PlaylistAddCheckIcon />, path: ROUTES.REVIEW_SET },
   { label: 'Delta Review', icon: <CompareArrowsIcon />, path: ROUTES.REVIEW_DELTA },
+  { label: 'Set Review', icon: <PlaylistAddCheckIcon />, path: ROUTES.REVIEW_SET },
   { label: 'Review History', icon: <HistoryIcon />, path: ROUTES.REVIEW_HISTORY },
   { label: 'Standards', icon: <MenuBookIcon />, path: ROUTES.STANDARDS },
 ] as const;
@@ -287,7 +287,7 @@ export function Sidebar() {
         {drawerContent}
       </Drawer>
 
-      {/* Edge collapse/expand arrow — sits on the right border of the sidebar */}
+      {/* Edge collapse/expand arrow - sits on the right border of the sidebar */}
       <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
         <IconButton
           size="small"

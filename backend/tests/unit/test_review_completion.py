@@ -31,7 +31,7 @@ from radia_ai.features.jama_requirement_reviewer.utils.review_utils import (
 )
 
 # ---------------------------------------------------------------------------
-# Fake RAG service — lets each enhancer stage fail independently
+# Fake RAG service - lets each enhancer stage fail independently
 # ---------------------------------------------------------------------------
 
 
@@ -313,7 +313,7 @@ def test_failed_review_is_recorded_in_history_with_its_reason(
 
 @pytest.mark.unit
 def test_delta_review_reports_partial_completion(client: TestClient, review_engine) -> None:
-    """One requirement evaluated, one not — the run must not claim to be complete."""
+    """One requirement evaluated, one not - the run must not claim to be complete."""
 
     def per_requirement(payload: RequirementReviewInput) -> ConsolidatedReviewResult:
         if payload.requirement_id == "REQ-001":

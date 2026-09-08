@@ -1,5 +1,5 @@
 """
-Consolidated LLM review enhancer — single GPT-5 call for all categories.
+Consolidated LLM review enhancer - single GPT-5 call for all categories.
 
 Makes one standards-grounded RAG and LLM call covering language, structure,
 verifiability, and certification.
@@ -66,7 +66,7 @@ class LLMReviewEnhancer:
         Run a single LLM call covering all review categories.
 
         Returns findings spanning language, structure, verifiability, and
-        certification — all from one GPT-5 invocation — together with a
+        certification - all from one GPT-5 invocation - together with a
         completion record. Each pipeline stage is guarded separately so a failure
         is reported with its specific cause instead of collapsing into an empty
         result that would read as "this requirement is clean".
@@ -93,7 +93,7 @@ class LLMReviewEnhancer:
         the earlier problems instead of re-raising them.
         """
         payload = revision.requirement
-        previous = revision.baseline_text or "(none — this requirement is newly added)"
+        previous = revision.baseline_text or "(none - this requirement is newly added)"
         user_message = (
             f"Requirement ID: {payload.requirement_id or 'N/A'}\n"
             f"Requirement Level: {payload.requirement_level or 'not specified'}\n"
@@ -162,7 +162,7 @@ class LLMReviewEnhancer:
         """
         Parse the JSON response from the consolidated LLM call.
 
-        Returns the parsed findings, or None when the response was not usable —
+        Returns the parsed findings, or None when the response was not usable -
         which the caller reports as a failed review rather than a clean one.
         """
         try:
@@ -292,7 +292,7 @@ def _match_best_chunk(
     """
     Find the retrieved chunk whose content best matches a finding, deterministically.
 
-    The LLM is not trusted to self-report which page or chunk it used — its
+    The LLM is not trusted to self-report which page or chunk it used - its
     citations can be plausible-sounding but wrong. Instead this scores every
     chunk retrieved for this review by token overlap with the finding's
     evidence/explanation text (and reference/filename as a tie-breaker), and

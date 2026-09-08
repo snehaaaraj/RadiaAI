@@ -1,5 +1,5 @@
 """
-Test configuration — shared fixtures and test client setup.
+Test configuration - shared fixtures and test client setup.
 
 pytest-asyncio is configured in auto mode (see pyproject.toml), so
 async test functions work without explicit @pytest.mark.asyncio decorators.
@@ -113,7 +113,7 @@ class StubLLMReviewEnhancer:
     """
     Deterministic stand-in for the Azure-backed consolidated review enhancer.
 
-    Accepts a callable so a test can vary the result per requirement — needed to
+    Accepts a callable so a test can vary the result per requirement - needed to
     cover partially-failed delta runs. It mirrors the real enhancer's two modes:
     ``consolidated_review`` authors rewrites, ``score_revision`` only scores.
     """
@@ -175,14 +175,14 @@ class ReviewEngineHarness:
 
 
 def _test_settings() -> AppSettings:
-    """Override settings for unit tests — avoids needing a real .env file."""
+    """Override settings for unit tests - avoids needing a real .env file."""
     # Reset the lru_cache so tests get a fresh settings object
     get_settings.cache_clear()
     return AppSettings(
         environment="local",
         debug=True,
         log_level="DEBUG",
-        # Minimal Azure stubs — real values not needed for unit tests
+        # Minimal Azure stubs - real values not needed for unit tests
         azure_openai={
             "endpoint": "https://test.openai.azure.com",
             "api_key": "test-key",

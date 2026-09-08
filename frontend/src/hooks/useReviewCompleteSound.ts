@@ -4,7 +4,7 @@ import { useAppContext } from '@/context/useAppContext';
 /**
  * Plays a short two-tone chime using the Web Audio API when a review completes.
  * Respects the `soundOnReviewComplete` preference from AppContext.
- * No external audio files needed — synthesized directly in the browser.
+ * No external audio files needed - synthesized directly in the browser.
  */
 export function useReviewCompleteSound() {
   const { soundOnReviewComplete } = useAppContext();
@@ -38,7 +38,7 @@ export function useReviewCompleteSound() {
       // Close context after sound finishes
       setTimeout(() => ctx.close(), 800);
     } catch {
-      // Web Audio not supported — silently ignore
+      // Web Audio not supported - silently ignore
     }
   }, [soundOnReviewComplete]);
 

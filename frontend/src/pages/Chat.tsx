@@ -119,7 +119,7 @@ export default function Chat() {
                   {turn.citations.map((c, ci) => (
                     <Chip
                       key={ci}
-                      label={`${c.filename}${c.section ? ' — ' + c.section : ''}`}
+                      label={`${c.filename}${c.section ? ' - ' + c.section : ''}`}
                       size="small"
                       variant="outlined"
                     />

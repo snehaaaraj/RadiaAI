@@ -96,7 +96,7 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
       }}
     >
       <Toolbar sx={{ gap: 1.5, color: headerForegroundColor, minHeight: `${HEADER_HEIGHT}px !important` }}>
-        {/* Brand group — single hover zone: scales as unit, one plane animation */}
+        {/* Brand group - single hover zone: scales as unit, one plane animation */}
         <Box
           sx={{
             display: 'inline-flex',
@@ -134,7 +134,7 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
             },
           }}
         >
-          {/* Single plane — positioned over the logo, flies on parent hover */}
+          {/* Single plane - positioned over the logo, flies on parent hover */}
           <Box className="radia-hover-flight" aria-hidden>
             <FlightTakeoffIcon className="radia-hover-plane" />
           </Box>

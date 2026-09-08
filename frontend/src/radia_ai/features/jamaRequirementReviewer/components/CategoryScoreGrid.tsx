@@ -91,7 +91,7 @@ export function CategoryScoreGrid({ categories }: CategoryScoreGridProps) {
                   {category.label}
                 </Typography>
                 <Typography variant="h6" fontWeight={800}>
-                  {score == null ? '—' : score.toFixed(1)}
+                  {score == null ? '-' : score.toFixed(1)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
                   {category.status ?? 'Not scored'}

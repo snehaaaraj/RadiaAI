@@ -169,7 +169,7 @@ function cleanFieldValue(value: string): string {
 
 /**
  * Normalize a Jama PDF export into a structured string containing
- * Title, Description, and Rationale — the fields the AI uses for review.
+ * Title, Description, and Rationale - the fields the AI uses for review.
  *
  * Falls back to the full cleaned text when no structure is detected.
  */

@@ -14,7 +14,7 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 ┌────────────────────────────────────────────────────────────┐
 │                         Frontend                           │
 │      React + TypeScript + Vite + MUI + Framer Motion      │
-│                    port 3000 (nginx)                       │
+│                    port 5173 (Vite dev server)             │
 │                                                            │
 │  src/pages/                         ← shared app pages     │
 │  src/radia_ai/features/resources/   ← resource hub         │
@@ -30,7 +30,7 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 │                       port 8000                            │
 │                                                            │
 │  LLM-based review pipeline:                                   │
-│    1. RAG retrieval (Azure AI Search) — ~5s                   │
+│    1. RAG retrieval (Azure AI Search) - ~5s                   │
 │    2. GPT-5 consolidated review                               │
 │    3. Enrich with SharePoint URLs                             │
 │    4. Report completion status (or why it failed)             │
@@ -149,11 +149,11 @@ The review system uses **LLM-based architecture** with GPT-5 + RAG:
 ```
 
 **Key behaviors:**
-- GPT-5 provides deeper analysis grounded in indexed standards documents
+- LLM analysis grounded in indexed standards documents
 - All findings include a `suggested_rewrite` (full improved requirement text)
 - References point to actual SharePoint document URLs, not hardcoded names
 - File-hash caching: unchanged documents are not re-embedded on restart
-- Every response carries a **completion record** — a review that could not run
+- Every response carries a **completion record** - a review that could not run
   reports `overall: "Not Evaluated"` plus the specific reason, so a failure is
   never presented as a clean requirement
 
@@ -181,7 +181,7 @@ Standards documents are ingested from SharePoint on demand via `POST /api/v1/ing
 3. **Chunk** into ~512-word overlapping segments
 4. **Embed** via Azure OpenAI text-embedding-3-large (3072 dimensions)
 5. **Index** into Azure AI Search with vector + keyword + semantic search
-6. **Cache** file hashes — skip re-processing unchanged documents
+6. **Cache** file hashes - skip re-processing unchanged documents
 
 Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
 
@@ -195,7 +195,7 @@ Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
 - [x] AI-powered review across 4 categories (language, structure, verifiability, certification)
 - [x] Color-coded overall scoring
 - [x] Sub-category scoring displayed directly below overall score, with every
-      category scored on a completed review — a clean category reads as a pass,
+      category scored on a completed review - a clean category reads as a pass,
       not as "not evaluated"
 - [x] Persistent review state across navigation with explicit **Clear Review**
 - [x] Findings grounded in indexed standards with source document links
@@ -219,7 +219,7 @@ Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
       unrelated add plus delete
 - [x] Only changed requirements are re-scored; each is compared against the
       baseline text it replaces
-- [x] Scoring only — no rewrites are proposed, because the requirement under
+- [x] Scoring only - no rewrites are proposed, because the requirement under
       review has already been revised
 - [x] Read-only findings explaining what a category still leaves unmet
 
@@ -256,13 +256,13 @@ cp .env.example .env
 cd backend
 python -m venv .venv
 source .venv/bin/activate       # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .                # Install in editable mode
 uvicorn radia_ai.main:app --reload --port 8000
 ```
 
 On start, the server creates/updates the Azure AI Search index.
 
-Standards are **not** ingested at startup — that keeps cold starts viable on
+Standards are **not** ingested at startup - that keeps cold starts viable on
 serverless hosting. Populate the index once via `POST /api/v1/ingest` (or the UI
 button); file-hash caching means unchanged documents are skipped on later runs.
 
@@ -362,17 +362,16 @@ pytest --cov=app --cov=radia_ai # with coverage report
 
 **Frontend:** React 18, TypeScript, Vite, MUI v6, React Query v5, Axios, Framer Motion
 
-**AI/ML:** Azure OpenAI (GPT-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
+**AI/ML:** Azure OpenAI (gpt-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
 
 **Infrastructure:** Azure App Service / Container Apps, Azure OpenAI, Azure AI Search, Azure Blob Storage
 
 ---
+## Notes
 
-## Known Limitations
-
-- **Review history retention is limited.** Review entries and finding dispositions
+- **Review history retention.** Review entries and finding dispositions
   are stored durably in Azure Blob Storage and persist across serverless
   invocations, but entries are automatically deleted after 10 days. This requires
   a valid `AZURE_BLOB_CONNECTION_STRING` configuration.
 
-**Note:** Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.
+- Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.

@@ -1,11 +1,5 @@
-import type { FindingSeverity, ReviewFinding, ReviewStatus } from '@/types/api';
+import type { CategoryResult, ReviewStatus } from '@/types/api';
 
-const SEVERITY_PENALTY: Record<FindingSeverity, number> = {
-  Low: 0.5,
-  Medium: 1.25,
-  High: 2,
-  Critical: 3,
-};
 const STATUS_BASE_SCORE: Record<ReviewStatus, number> = {
   Acceptable: 9.5,
   'Revision Recommended': 6.5,
@@ -20,31 +14,38 @@ function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
 }
 
-export function getReviewQualityScore(
-  overall: ReviewStatus,
-  findings: ReviewFinding[]
-): number {
-  // A review that never ran has no score — never fall through to a passing value.
-  if (overall === 'Not Evaluated') {
-    return 0;
-  }
+/**
+ * Overall score: the mean of the scored category scores.
+ *
+ * The overall number answers "how good is this requirement overall", so it is
+ * the average of the parts shown in the category grid and nothing else. It is
+ * deliberately NOT clamped by the worst category — that would make the headline
+ * number disagree with the tiles directly beneath it.
+ *
+ * Severity is not applied again here. The backend already maps a finding's
+ * severity to its status (Low/Medium -> Revision Recommended, High/Critical ->
+ * Unacceptable) and a category takes the worst status among its findings, so
+ * severity is fully reflected in the category scores being averaged. Penalising
+ * it a second time would double-count it.
+ *
+ * The gating verdict still travels separately as the overall `status` chip, so
+ * a requirement that averages well but is Unacceptable in one category is not
+ * presented as passing.
+ */
+export function getReviewQualityScore(categories: CategoryResult[]): number {
+  const scored = categories.filter((category) => category.status !== 'Not Evaluated');
 
-  if (findings.length === 0) {
-    return overall === 'Acceptable' ? 10 : overall === 'Revision Recommended' ? 7 : 4;
-  }
+  // Nothing was scored — never fall through to a passing value.
+  if (scored.length === 0) return 0;
 
-  const penalty = findings.reduce((total, finding) => total + SEVERITY_PENALTY[finding.severity], 0);
-  let score = 10 - penalty;
+  const total = scored.reduce(
+    (sum, category) => sum + getCategoryStatusScore(category.status),
+    0
+  );
 
-  if (overall === 'Acceptable') {
-    score = Math.max(score, 8.5);
-  } else if (overall === 'Revision Recommended') {
-    score = clamp(score, 4, 8.5);
-  } else {
-    score = clamp(score, 0, 4);
-  }
-
-  return Number(clamp(score, 0, 10).toFixed(1));
+  // Category scores land on quarter/eighth values, so keep three decimals to
+  // hold the exact mean (e.g. 7.875). Display rounds to one decimal.
+  return Number((clamp(total / scored.length, 0, 10)).toFixed(3));
 }
 
 export function getReviewQualityColor(score: number): string {

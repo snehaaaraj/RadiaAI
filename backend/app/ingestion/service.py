@@ -1,5 +1,5 @@
 """
-Ingestion service — end-to-end document processing pipeline.
+Ingestion service - end-to-end document processing pipeline.
 
 Orchestrates: download → extract text → chunk → embed → index into Azure AI Search.
 Supports both SharePoint auto-sync and manual blob upload ingestion.

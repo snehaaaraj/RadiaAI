@@ -1,5 +1,6 @@
 """Requirements review endpoints."""
 
+from anyio import to_thread
 from fastapi import APIRouter, Request, status
 
 from app.core.logging import get_logger
@@ -26,6 +27,13 @@ from radia_ai.features.jama_requirement_reviewer.schemas.review_history import (
 
 router = APIRouter()
 logger = get_logger(__name__)
+
+# The review pipeline (Azure OpenAI chat completions, AI Search, Blob Storage)
+# uses synchronous SDK clients. Calling them directly from an ``async def``
+# endpoint blocks the event loop, which serialises every concurrent request —
+# a set review of 10 requirements would queue behind one another and time out.
+# Offloading to the worker threadpool lets the requests genuinely run in
+# parallel, so each result returns as soon as that requirement is done.
 
 
 @router.get(
@@ -64,9 +72,11 @@ async def review_requirement(
     history_service: ReviewHistoryServiceDep,
 ) -> APIResponse[RequirementReviewResponse]:
     logger.info("requirement_review_requested", requirement_id=body.requirement_id or "")
-    response = service.review_requirement(body)
-    review_id = history_service.record_requirement_review(
-        subject_id=body.requirement_id, response=response
+    response = await to_thread.run_sync(service.review_requirement, body)
+    review_id = await to_thread.run_sync(
+        lambda: history_service.record_requirement_review(
+            subject_id=body.requirement_id, response=response
+        )
     )
     response = response.model_copy(update={"review_id": review_id})
     return APIResponse(data=response, request_id=request.state.request_id)
@@ -94,9 +104,11 @@ async def review_delta(
         baseline_count=len(body.baseline_requirements),
         updated_count=len(body.updated_requirements),
     )
-    response = service.review_delta(body)
-    review_id = history_service.record_delta_review(
-        subject_id=body.specification_id, response=response
+    response = await to_thread.run_sync(service.review_delta, body)
+    review_id = await to_thread.run_sync(
+        lambda: history_service.record_delta_review(
+            subject_id=body.specification_id, response=response
+        )
     )
     response = response.model_copy(update={"review_id": review_id})
     return APIResponse(data=response, request_id=request.state.request_id)
@@ -114,7 +126,7 @@ async def get_review_history(
     workflow: ReviewWorkflow | None = None,
     limit: int = 100,
 ) -> APIResponse[ReviewHistoryListResponse]:
-    history = service.list_history(workflow=workflow, limit=limit)
+    history = await to_thread.run_sync(lambda: service.list_history(workflow=workflow, limit=limit))
     return APIResponse(data=history, request_id=request.state.request_id)
 
 
@@ -130,5 +142,7 @@ async def apply_finding_disposition(
     request: Request,
     service: ReviewHistoryServiceDep,
 ) -> APIResponse[ReviewHistoryEntry]:
-    updated_entry = service.apply_disposition(review_id=review_id, payload=body)
+    updated_entry = await to_thread.run_sync(
+        lambda: service.apply_disposition(review_id=review_id, payload=body)
+    )
     return APIResponse(data=updated_entry, request_id=request.state.request_id)

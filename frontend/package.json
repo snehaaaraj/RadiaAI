@@ -25,6 +25,8 @@
     "@tanstack/react-query-devtools": "^5.62.16",
     "axios": "^1.7.9",
     "framer-motion": "^13.0.0",
+    "jspdf": "^4.2.1",
+    "jspdf-autotable": "^5.0.8",
     "mammoth": "^1.12.1",
     "pdfjs-dist": "^6.2.108",
     "react": "^18.3.1",

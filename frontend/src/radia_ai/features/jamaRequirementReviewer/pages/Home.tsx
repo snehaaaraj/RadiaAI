@@ -29,18 +29,18 @@ const QUICK_ACTIONS = [
     label: 'Open single review',
   },
   {
-    title: 'Set Review',
-    description: 'Upload a PDF with multiple requirements and review them one by one.',
-    icon: <PlaylistAddCheckIcon color="primary" />,
-    path: ROUTES.REVIEW_SET,
-    label: 'Open set review',
-  },
-  {
     title: 'Delta Review',
     description: 'Review only the items that changed between revisions.',
     icon: <CompareArrowsIcon sx={{ color: 'warning.main' }} />,
     path: ROUTES.REVIEW_DELTA,
     label: 'Open delta review',
+  },
+  {
+    title: 'Set Review',
+    description: 'Upload a PDF with multiple requirements and review them one by one.',
+    icon: <PlaylistAddCheckIcon color="primary" />,
+    path: ROUTES.REVIEW_SET,
+    label: 'Open set review',
   },
 ] as const;
 
@@ -86,7 +86,7 @@ export default function Home() {
           ) : (
             <Chip
               icon={<CheckCircleIcon />}
-              label={`API ${health?.status ?? 'unknown'} — v${health?.version ?? '—'}`}
+              label={`API ${health?.status ?? 'unknown'} - v${health?.version ?? '-'}`}
               color={health?.status === 'ok' ? 'success' : 'warning'}
               size="small"
               variant="outlined"

@@ -1,9 +1,9 @@
 """
-Security utilities — authentication and authorization stubs for Microsoft Entra ID.
+Security utilities - authentication and authorization stubs for Microsoft Entra ID.
 
 Provides authentication dependency injection for FastAPI endpoints.
 The pattern used here (FastAPI Depends on a callable) means that switching between
-authentication modes requires changing only this file — no endpoint code needs to change.
+authentication modes requires changing only this file - no endpoint code needs to change.
 """
 
 from fastapi import Depends, HTTPException, Request, status
@@ -48,7 +48,7 @@ async def _stub_auth(
     remains reachable without a real token. This stub is replaced by
     _entra_auth once Entra is configured.
     """
-    logger.debug("Auth stub active — returning synthetic local user")
+    logger.debug("Auth stub active - returning synthetic local user")
     return AuthenticatedUser(
         user_id="local-dev-user",
         email="dev@radia.local",
@@ -76,5 +76,5 @@ async def _entra_auth(
             detail="Authorization header missing",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    # Placeholder — will be replaced with real validation
+    # Placeholder - will be replaced with real validation
     raise NotImplementedError("Entra ID token validation not yet implemented")

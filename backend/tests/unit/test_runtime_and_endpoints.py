@@ -77,6 +77,7 @@ def test_app_settings_rejects_debug_in_production() -> None:
         )
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_stub_auth_returns_synthetic_user() -> None:
     user = await _stub_auth(_make_request(), credentials=None)
@@ -86,6 +87,7 @@ async def test_stub_auth_returns_synthetic_user() -> None:
     assert user.has_role("admin") is True
 
 
+@pytest.mark.unit
 @pytest.mark.asyncio
 async def test_entra_auth_requires_credentials() -> None:
     with pytest.raises(HTTPException) as exc_info:

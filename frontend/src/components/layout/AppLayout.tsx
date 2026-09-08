@@ -62,7 +62,7 @@ function AppLayoutInner() {
 }
 
 /**
- * Root layout wrapper — renders TopBar + Sidebar + page content (via Outlet).
+ * Root layout wrapper - renders TopBar + Sidebar + page content (via Outlet).
  * All authenticated pages are rendered inside this layout.
  */
 export function AppLayout() {

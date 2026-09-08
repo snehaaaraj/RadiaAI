@@ -3,7 +3,7 @@ import type { ReviewCompletion, ReviewFailureReason } from '@/types/api';
 /**
  * Helpers for reading the review completion record.
  *
- * A review result can reach the UI without a completion record — it was persisted
+ * A review result can reach the UI without a completion record - it was persisted
  * in localStorage by an earlier build, or came from an older backend. Those are
  * treated as complete, which matches how they were rendered at the time. Every
  * read goes through `resolveCompletion` so a missing record can never throw.
@@ -65,7 +65,7 @@ export function getCompletionMessage(completion?: ReviewCompletion | null): stri
 /**
  * Whether re-running the review is a sensible next step.
  *
- * Transient failures are worth retrying. A missing standards library is not —
+ * Transient failures are worth retrying. A missing standards library is not -
  * the user has to ingest documents first.
  */
 export function isRetryableFailure(completion?: ReviewCompletion | null): boolean {

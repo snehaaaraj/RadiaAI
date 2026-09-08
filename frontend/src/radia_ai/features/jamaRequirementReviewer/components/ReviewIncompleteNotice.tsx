@@ -13,7 +13,7 @@ import {
 
 interface ReviewIncompleteNoticeProps {
   completion?: ReviewCompletion | null;
-  /** Optional retry handler — only offered for transient failures. */
+  /** Optional retry handler - only offered for transient failures. */
   onRetry?: () => void;
   isRetrying?: boolean;
 }

@@ -10,7 +10,7 @@ import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { useState } from 'react';
-import type { ErrorResponse } from '@/types/api';
+import { extractErrorInfo } from '@/utils/errorInfo';
 
 interface ErrorDisplayProps {
   error: unknown;
@@ -20,50 +20,14 @@ interface ErrorDisplayProps {
 }
 
 /**
- * Extract structured error information from various error types.
- */
-function extractErrorInfo(error: unknown): {
-  code: string;
-  message: string;
-  detail: Record<string, unknown>;
-  requestId: string;
-} {
-  // Structured ErrorResponse from backend
-  if (error && typeof error === 'object' && 'error' in error) {
-    const errorResponse = error as ErrorResponse;
-    return {
-      code: errorResponse.error.code,
-      message: errorResponse.error.message,
-      detail: errorResponse.error.detail,
-      requestId: errorResponse.request_id,
-    };
-  }
-
-  // Generic error object with message
-  if (error && typeof error === 'object' && 'message' in error) {
-    return {
-      code: 'UNKNOWN_ERROR',
-      message: String((error as { message: unknown }).message),
-      detail: {},
-      requestId: '',
-    };
-  }
-
-  // Fallback
-  return {
-    code: 'UNKNOWN_ERROR',
-    message: 'An unexpected error occurred',
-    detail: {},
-    requestId: '',
-  };
-}
-
-/**
  * Get user-friendly title based on error code.
  */
 function getErrorTitle(code: string): string {
   const titles: Record<string, string> = {
     NETWORK_ERROR: 'Network Connection Error',
+    TIMEOUT_ERROR: 'Request Timed Out',
+    RATE_LIMITED: 'Rate Limit Exceeded',
+    HTTP_ERROR: 'Unexpected Server Response',
     VALIDATION_ERROR: 'Validation Error',
     DOCUMENT_NOT_FOUND: 'Document Not Found',
     INDEX_NOT_FOUND: 'Search Index Not Found',
@@ -88,6 +52,14 @@ function getSuggestion(code: string, detail: Record<string, unknown>): string | 
   // Network errors
   if (code === 'NETWORK_ERROR') {
     return 'Please check your internet connection and try again.';
+  }
+
+  if (code === 'TIMEOUT_ERROR') {
+    return 'The server took too long to respond. This requirement may be unusually long - retry it on its own.';
+  }
+
+  if (code === 'RATE_LIMITED') {
+    return 'Too many reviews were sent at once. Wait a few seconds, then retry the failed items.';
   }
 
   // Azure service errors with specific suggestions

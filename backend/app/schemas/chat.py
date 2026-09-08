@@ -1,4 +1,4 @@
-"""Chat endpoint schemas — request/response models for the RAG chat interface."""
+"""Chat endpoint schemas - request/response models for the RAG chat interface."""
 
 from pydantic import BaseModel, Field
 

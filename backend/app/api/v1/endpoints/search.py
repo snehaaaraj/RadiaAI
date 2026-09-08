@@ -1,5 +1,5 @@
 """
-Search endpoint — document search powered by Azure AI Search.
+Search endpoint - document search powered by Azure AI Search.
 
 POST /api/v1/search
 
