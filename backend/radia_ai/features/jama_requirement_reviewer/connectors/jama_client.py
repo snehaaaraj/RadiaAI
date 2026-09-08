@@ -97,9 +97,7 @@ class JamaClient:
             resp = client.post(
                 self._settings.token_url,
                 data={"grant_type": "client_credentials"},
-                auth=httpx.BasicAuth(
-                    self._settings.client_id, self._settings.client_secret
-                ),
+                auth=httpx.BasicAuth(self._settings.client_id, self._settings.client_secret),
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
                 timeout=self._settings.timeout_seconds,
             )

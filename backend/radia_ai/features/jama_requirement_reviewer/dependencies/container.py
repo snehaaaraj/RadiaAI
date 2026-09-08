@@ -23,10 +23,10 @@ from app.core.logging import get_logger
 from app.ingestion.service import IngestionService
 from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
+from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import JamaClient
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointStandardsClient,
 )
-from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import JamaClient
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
     ReviewHistoryRepository,
 )
@@ -34,6 +34,7 @@ from radia_ai.features.jama_requirement_reviewer.reviewers.consolidated import (
     build_category_reviewers,
 )
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
+from radia_ai.features.jama_requirement_reviewer.services.jama_service import JamaService
 from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import (
     RequirementDeltaReviewService,
 )
@@ -47,7 +48,6 @@ from radia_ai.features.jama_requirement_reviewer.services.review_version_service
     ReviewVersionService,
 )
 from radia_ai.features.jama_requirement_reviewer.services.standards_service import StandardsService
-from radia_ai.features.jama_requirement_reviewer.services.jama_service import JamaService
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
 
 logger = get_logger(__name__)
