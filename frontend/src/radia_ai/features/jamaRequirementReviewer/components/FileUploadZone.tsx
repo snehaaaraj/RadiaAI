@@ -18,7 +18,7 @@ interface FileUploadZoneProps {
   label: string;
   /** Called with the extracted file text content and the filename */
   onFileContent: (content: string, filename: string) => void;
-  /** Filename currently loaded — pass to show the "loaded" state */
+  /** Filename currently loaded - pass to show the "loaded" state */
   filename?: string;
   onClear?: () => void;
 }

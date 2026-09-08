@@ -46,7 +46,7 @@ def aggregate_completions(completions: list[ReviewCompletion]) -> ReviewCompleti
     first_reason = failed[0].reason or ReviewFailureReason.REVIEW_ENGINE_UNAVAILABLE
 
     if len(failed) == len(completions):
-        # Every item failed for (typically) the same reason — surface it directly.
+        # Every item failed for (typically) the same reason - surface it directly.
         return ReviewCompletion(
             status=ReviewCompletionStatus.FAILED,
             reason=first_reason,

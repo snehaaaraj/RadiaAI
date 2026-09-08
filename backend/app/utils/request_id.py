@@ -4,7 +4,7 @@ Request ID management using Python contextvars.
 A unique request ID is generated per HTTP request (or accepted from the
 X-Request-ID header if the caller provides one). It is stored in a contextvar
 so that structlog can automatically include it in every log line produced
-during that request's lifecycle — without passing it as a function argument.
+during that request's lifecycle - without passing it as a function argument.
 """
 
 import uuid

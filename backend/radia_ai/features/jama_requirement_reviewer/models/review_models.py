@@ -108,7 +108,7 @@ class ReviewCompletion(BaseModel):
     Outcome of the review *process*, kept separate from the review *verdict*.
 
     A requirement with no findings and ``status=COMPLETE`` genuinely passed. A
-    requirement with no findings and ``status=FAILED`` was never evaluated — the
+    requirement with no findings and ``status=FAILED`` was never evaluated - the
     two must never be presented to a reviewer as the same result.
     """
 

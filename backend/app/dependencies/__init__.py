@@ -1,1 +1,1 @@
-"""Dependencies package — FastAPI dependency injection wiring."""
+"""Dependencies package - FastAPI dependency injection wiring."""

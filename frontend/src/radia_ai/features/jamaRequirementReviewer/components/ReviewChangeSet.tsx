@@ -13,7 +13,7 @@ interface ReviewChangeSetProps {
   reviewId?: string | null;
   onApplyDisposition?: (reviewId: string, payload: ApplyFindingDispositionRequest) => void;
   isApplyingDisposition?: boolean;
-  /** Renders findings as evidence only — no disposition actions. */
+  /** Renders findings as evidence only - no disposition actions. */
   readOnly?: boolean;
 }
 

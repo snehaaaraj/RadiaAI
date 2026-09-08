@@ -52,10 +52,10 @@ def _extract_pdf_pages(data: bytes) -> list[tuple[int, str]]:
         return pages
     except ImportError:
         logger.warning("pymupdf_not_installed_using_fallback")
-        # Very basic PDF text extraction fallback — page boundaries are unknown,
+        # Very basic PDF text extraction fallback - page boundaries are unknown,
         # so the whole document is reported as a single unnumbered page.
         text = data.decode("latin-1", errors="replace")
-        # Strip binary noise — not reliable but better than nothing
+        # Strip binary noise - not reliable but better than nothing
         import re
 
         clean = re.sub(r"[^\x20-\x7E\n\r\t]", " ", text)

@@ -139,7 +139,7 @@ export default function ReviewHistory() {
                 {!isReviewFailed(entry.completion) && (
                   <>
                     <ReviewQualityBand
-                      score={getReviewQualityScore(entry.overall, entry.findings)}
+                      score={getReviewQualityScore(entry.category_results)}
                     />
                     <Box sx={reviewHistoryStyles.categoryRow}>
                       {entry.category_results.map((category, index) => (

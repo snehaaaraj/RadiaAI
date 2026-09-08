@@ -1,5 +1,5 @@
 """
-Chat endpoint — RAG question answering.
+Chat endpoint - RAG question answering.
 
 POST /api/v1/chat
 TODO: Implement the full RAG pipeline for chatbot.

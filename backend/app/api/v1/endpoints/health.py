@@ -1,7 +1,7 @@
 """
 Health check endpoint.
 
-GET /api/v1/health — Returns the application status and the health of
+GET /api/v1/health - Returns the application status and the health of
 each external dependency (Azure OpenAI, Azure AI Search, Blob Storage).
 """
 

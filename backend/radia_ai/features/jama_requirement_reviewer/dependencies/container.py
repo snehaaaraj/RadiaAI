@@ -13,6 +13,8 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import Annotated, cast
 
+import anyio
+from anyio import to_thread
 from fastapi import Depends, FastAPI, Request
 
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService
@@ -48,6 +50,13 @@ from radia_ai.features.jama_requirement_reviewer.standards.registry import Stand
 
 logger = get_logger(__name__)
 
+# Review requests are served by offloading blocking Azure SDK calls to the AnyIO
+# worker threadpool. The default limit (40) is shared by every threadpool user in
+# the process, so a large set review could starve unrelated endpoints. Raising it
+# keeps headroom for concurrent set reviews plus regular traffic; threads here are
+# I/O-bound (waiting on Azure), not CPU-bound, so they stay cheap.
+_WORKER_THREAD_LIMIT = 64
+
 
 def _resolve_settings(app: FastAPI) -> AppSettings:
     """Use explicit app-scoped settings when present, else load the default settings."""
@@ -75,6 +84,16 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         version=settings.app_version,
         environment=settings.environment,
     )
+
+    # Endpoints offload blocking Azure SDK calls to this threadpool; size it so
+    # a concurrent set review cannot exhaust the shared default capacity.
+    try:
+        limiter = to_thread.current_default_thread_limiter()
+        if limiter.total_tokens < _WORKER_THREAD_LIMIT:
+            limiter.total_tokens = _WORKER_THREAD_LIMIT
+        logger.info("worker_threadpool_configured", total_tokens=limiter.total_tokens)
+    except (RuntimeError, anyio.WouldBlock):
+        logger.warning("worker_threadpool_config_skipped")
 
     # Azure clients
     openai_client = OpenAIClient(settings.azure_openai)
@@ -178,7 +197,7 @@ def get_llm_enhancer(request: Request) -> LLMReviewEnhancer | None:
     Resolve the LLM review enhancer, rebuilding the Azure chain if needed.
 
     Normally the enhancer is created during lifespan startup. When app state is
-    missing it (a request served by a process that never ran lifespan — e.g. a
+    missing it (a request served by a process that never ran lifespan - e.g. a
     cold serverless invocation), rebuild it from settings rather than handing the
     orchestrator a None enhancer, which would make every review silently return
     zero findings.

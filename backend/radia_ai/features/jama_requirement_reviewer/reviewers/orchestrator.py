@@ -1,4 +1,4 @@
-"""Reviewer orchestration — LLM-based review pipeline."""
+"""Reviewer orchestration - LLM-based review pipeline."""
 
 from __future__ import annotations
 
@@ -235,7 +235,7 @@ class ReviewOrchestrator:
                 else:
                     enriched.append(finding)
             elif not finding.reference_url:
-                # LLM already set the reference name — just look up the URL
+                # LLM already set the reference name - just look up the URL
                 resolved = self._standards_service.resolve_reference(
                     finding.reference,
                     category=finding.category,

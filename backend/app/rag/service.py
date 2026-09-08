@@ -42,7 +42,7 @@ class RetrievedContext:
             content = chunk.get("content", "")
             header = f"[Source {i}: {source}"
             if section:
-                header += f" — {section}"
+                header += f" - {section}"
             header += "]"
             parts.append(f"{header}\n{content}")
 
@@ -179,7 +179,7 @@ def _diversify_by_source(results: list[dict[str, Any]], target_count: int) -> li
     """
     Select *target_count* chunks from *results* ensuring maximum document diversity.
 
-    Strategy — round-robin across source filenames:
+    Strategy - round-robin across source filenames:
       1. Group results by filename, preserving score order within each group.
       2. Round-robin pick the top-scored chunk from each document in turn.
       3. Continue until *target_count* slots are filled or all results are used.

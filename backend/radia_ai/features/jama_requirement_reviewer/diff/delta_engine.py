@@ -86,7 +86,7 @@ def _key_requirements(
     previous version of the Nth unidentified updated requirement.
 
     Position is the only usable signal here. Keying unidentified requirements by
-    their text would mean a revision — which by definition changes the text —
+    their text would mean a revision - which by definition changes the text -
     could never match its baseline, so every edit would be reported as a deletion
     plus an addition and would be scored with no previous version to compare
     against. That is precisely the pasted-original-vs-revision workflow.

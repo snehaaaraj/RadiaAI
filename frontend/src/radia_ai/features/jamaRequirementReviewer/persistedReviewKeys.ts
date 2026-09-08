@@ -3,7 +3,7 @@
  *
  * The version suffix is bumped whenever the review response shape changes. A
  * result cached by an older build is then ignored rather than rendered against
- * the current UI — a payload saved before every category was scored would
+ * the current UI - a payload saved before every category was scored would
  * otherwise draw a scorecard with categories silently missing.
  */
 const RESULT_SCHEMA_VERSION = 'v2';

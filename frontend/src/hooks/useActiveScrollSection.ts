@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { HEADER_HEIGHT } from '@/utils/constants';
 
-const THRESHOLD = HEADER_HEIGHT + 32;   // px from viewport top — "past this = active"
+const THRESHOLD = HEADER_HEIGHT + 32;   // px from viewport top - "past this = active"
 const SCROLL_LOCK_MS = 800;             // ignore scroll events after a programmatic click
 const HASH_SETTLE_MS = 120;             // debounce before writing the URL hash
 
@@ -50,7 +50,7 @@ export function useActiveScrollSection(
   const lockTimerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollLockedRef = useRef(false);
 
-  // Called by the sidebar on a manual click — locks scroll tracking briefly.
+  // Called by the sidebar on a manual click - locks scroll tracking briefly.
   const setTarget = (id: string) => {
     if (lockTimerRef.current) clearTimeout(lockTimerRef.current);
     scrollLockedRef.current = true;

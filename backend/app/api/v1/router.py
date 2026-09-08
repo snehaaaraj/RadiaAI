@@ -1,5 +1,5 @@
 """
-API v1 router — aggregates all versioned endpoint routers.
+API v1 router - aggregates all versioned endpoint routers.
 
 Adding a new feature means creating a new module under endpoints/
 and registering it here. No changes needed elsewhere in the app.

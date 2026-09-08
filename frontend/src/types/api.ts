@@ -179,7 +179,7 @@ export type ReviewFailureReason =
  * Outcome of the review *process*, separate from the review *verdict*.
  *
  * Zero findings with status 'complete' means the requirement passed. Zero findings
- * with status 'failed' means it was never evaluated — the UI must never present
+ * with status 'failed' means it was never evaluated - the UI must never present
  * those two the same way.
  */
 export interface ReviewCompletion {

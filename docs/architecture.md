@@ -52,17 +52,17 @@ The frontend is a single-page application built with React and TypeScript.
 
 ### Primary routes
 
-- `/` — Launchpad
-- `/radia-ai` — Radia AI Resources
-- `/workspace` — Main application workspace
-- `/review/requirement` — Single requirement review
-- `/review/delta` — Delta review
-- `/review/history` — Review history
-- `/standards` — Standards catalog
-- `/chat` — Document Q&A
-- `/search` — Search
-- `/documents` — Documents
-- `/settings` — Personalization controls
+- `/` - Launchpad
+- `/radia-ai` - Radia AI Resources
+- `/workspace` - Main application workspace
+- `/review/requirement` - Single requirement review
+- `/review/delta` - Delta review
+- `/review/history` - Review history
+- `/standards` - Standards catalog
+- `/chat` - Document Q&A
+- `/search` - Search
+- `/documents` - Documents
+- `/settings` - Personalization controls
 
 ### Frontend behavior
 
@@ -155,7 +155,7 @@ asking for another one.
 | Input | Pairing key |
 |-------|-------------|
 | Requirement carries an ID | that ID |
-| Requirement has no ID | its **position** — the Nth unidentified baseline requirement pairs with the Nth unidentified updated requirement, labelled `Requirement N` |
+| Requirement has no ID | its **position** - the Nth unidentified baseline requirement pairs with the Nth unidentified updated requirement, labelled `Requirement N` |
 
 Position is the only usable signal for unidentified requirements. Keying them by
 their text cannot work, because a revision changes the text by definition: the
@@ -171,7 +171,7 @@ normal outcome for a good revision.
 ## 6. Review completion contract
 
 The review *verdict* and the review *process outcome* are separate fields, because
-an empty findings list is ambiguous on its own — it means either "this requirement
+an empty findings list is ambiguous on its own - it means either "this requirement
 is clean" or "the engine never ran".
 
 Every review response carries a `completion` record:
@@ -184,11 +184,11 @@ Every review response carries a `completion` record:
 
 Failure reasons are raised by the specific stage that broke:
 
-- `review_engine_unavailable` — no LLM enhancer could be constructed
-- `no_standards_context` — retrieval returned nothing to review against
-- `retrieval_failed` — Azure AI Search errored
-- `llm_call_failed` — the GPT-5 call errored
-- `invalid_llm_response` — the response was not parsable JSON of the expected shape
+- `review_engine_unavailable` - no LLM enhancer could be constructed
+- `no_standards_context` - retrieval returned nothing to review against
+- `retrieval_failed` - Azure AI Search errored
+- `llm_call_failed` - the GPT-5 call errored
+- `invalid_llm_response` - the response was not parsable JSON of the expected shape
 
 When a review does not complete, `overall` is `Not Evaluated` and findings and
 category results are empty. The frontend renders the failure notice in place of
@@ -200,8 +200,8 @@ Requirement analysis happens in one consolidated GPT-5 call per requirement
 (`app/prompts/review_prompts.py`). Two prompts share the same four scored
 categories:
 
-- `CONSOLIDATED_REVIEW_SYSTEM` — authoring review (single and set review); proposes rewrites
-- `DELTA_REVIEW_SYSTEM` — verification review (delta review); proposes nothing
+- `CONSOLIDATED_REVIEW_SYSTEM` - authoring review (single and set review); proposes rewrites
+- `DELTA_REVIEW_SYSTEM` - verification review (delta review); proposes nothing
 
 The scored categories are:
 
@@ -232,6 +232,35 @@ categories, showing "Not scored" for any the payload omits rather than dropping
 the tile or inventing a passing value. Persisted review results are keyed by a
 schema version so a result cached by an older build cannot be rendered against
 the current scorecard.
+
+### From status to number
+
+Statuses are turned into scores on the client (`utils/reviewQuality.ts`):
+
+| Status | Score |
+|--------|-------|
+| Acceptable | 9.5 |
+| Revision Recommended | 6.5 |
+| Unacceptable | 3.0 |
+| Not Evaluated | no score |
+
+**The overall score is the arithmetic mean of the scored category scores.** For
+example `9.5, 9.5, 9.5, 3.0` averages to `7.875`. Categories that carry no score
+are excluded from the mean rather than counted as zero; when nothing was scored
+the overall score is `0` and the page renders the incomplete notice instead (§6).
+
+Severity is deliberately **not** applied again at this stage. The backend already
+maps severity to status (Low/Medium → Revision Recommended, High/Critical →
+Unacceptable) and a category takes the worst status among its findings, so
+severity is fully reflected in the numbers being averaged. Applying a second
+severity penalty on top would double-count it.
+
+The overall score is also **not** clamped by the worst category. Clamping made
+the headline number contradict the tiles directly beneath it — three categories
+reading 9.5 under an overall of 3.0. The gating verdict travels separately as the
+overall **status**, which remains worst-wins: a requirement can average well and
+still be reported Unacceptable, so a strong average never hides a failing
+category.
 
 The reviewer modules registered with the orchestrator
 (`reviewers/consolidated.py`, one per category) carry no rule logic.
@@ -295,7 +324,7 @@ Ingestion extracts text, chunks it, embeds it with `text-embedding-3-large`, and
 indexes it into Azure AI Search. File hashes are recorded so unchanged documents
 are not re-embedded.
 
-Ingestion runs on demand via `POST /api/v1/ingest` — it is deliberately not run at
+Ingestion runs on demand via `POST /api/v1/ingest` - it is deliberately not run at
 startup, which keeps cold starts viable on serverless hosting. The review pipeline
 depends on this index being populated: with an empty index, reviews return
 `no_standards_context` rather than findings.

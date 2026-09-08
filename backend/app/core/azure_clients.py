@@ -215,7 +215,7 @@ class SearchService:
         try:
             self._index_client.create_or_update_index(index)
         except Exception:
-            # Incompatible existing index — delete and recreate
+            # Incompatible existing index - delete and recreate
             logger.warning(
                 "index_schema_incompatible_recreating", index_name=self._settings.index_name
             )

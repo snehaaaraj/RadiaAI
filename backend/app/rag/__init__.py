@@ -1,1 +1,1 @@
-"""RAG (Retrieval-Augmented Generation) pipeline — search retrieval and LLM integration."""
+"""RAG (Retrieval-Augmented Generation) pipeline - search retrieval and LLM integration."""

@@ -87,7 +87,7 @@ function parseRequirementsFromText(fullText: string): ParsedRequirement[] {
       if (/\.{4,}/.test(nearId)) continue;
       // Skip if this ID was already claimed by an earlier Title
       if (usedIds.has(h.id)) continue;
-      // Take the first match — it's the heading ID
+      // Take the first match - it's the heading ID
       bestHit = h;
       break;
     }
@@ -106,7 +106,7 @@ function parseRequirementsFromText(fullText: string): ParsedRequirement[] {
 
   if (anchors.length === 0) return [];
 
-  // Step 3: build blocks — each requirement runs from its ID to the next requirement's ID
+  // Step 3: build blocks - each requirement runs from its ID to the next requirement's ID
   const requirements: ParsedRequirement[] = [];
 
   for (let i = 0; i < anchors.length; i++) {
@@ -135,7 +135,7 @@ function parseRequirementsFromText(fullText: string): ParsedRequirement[] {
     });
   }
 
-  // Step 4: second pass — find heading-level WR-xxx IDs that have no Title/Release
+  // Step 4: second pass - find heading-level WR-xxx IDs that have no Title/Release
   // metadata table (e.g., WR-TXT-6529, WR-TXT-6523). These are identified by being
   // preceded by a section number (like "1.1.4.1") in the flat text.
   const claimedIds = new Set(anchors.map((a) => a.id));

@@ -47,7 +47,7 @@ def chunk_text(
 
     Each chunk overlaps with the next by *chunk_overlap* words to preserve
     context across chunk boundaries. Chunks produced this way have no page
-    number — use ``chunk_pages`` when the document's page boundaries are
+    number - use ``chunk_pages`` when the document's page boundaries are
     known so findings can be traced back to a specific page.
     """
     return chunk_pages(
@@ -79,7 +79,7 @@ def chunk_pages(
     document) means every chunk can carry an accurate ``page_number``, which
     is required to trace an AI review finding back to the exact page of the
     source-of-truth document that produced it. The tradeoff is that overlap
-    context is not carried across a page boundary — acceptable since a page
+    context is not carried across a page boundary - acceptable since a page
     break is itself a natural place to split.
     """
     chunks: list[Chunk] = []

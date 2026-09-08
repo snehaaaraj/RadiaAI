@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "radia-ai-backend"
 version = "0.1.0"
-description = "Radia AI — Enterprise RAG Platform Backend"
+description = "Radia AI - Enterprise RAG Platform Backend"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi==0.115.6",
@@ -30,7 +30,7 @@ where = ["."]
 include = ["app*", "radia_ai*"]
 
 # ---------------------------------------------------------------------------
-# Ruff — linter + formatter (replaces flake8 + isort + pyupgrade)
+# Ruff - linter + formatter (replaces flake8 + isort + pyupgrade)
 # ---------------------------------------------------------------------------
 [tool.ruff]
 target-version = "py312"
@@ -54,8 +54,8 @@ select = [
 ]
 ignore = [
     "S101",   # use of assert (allowed in tests)
-    "B008",   # FastAPI Depends/File in argument defaults — idiomatic pattern
-    "E501",   # line too long — handled by formatter
+    "B008",   # FastAPI Depends/File in argument defaults - idiomatic pattern
+    "E501",   # line too long - handled by formatter
     "TC001",  # TODO: move app imports into TYPE_CHECKING blocks
     "RUF012", # TODO: annotate mutable class attributes with ClassVar
 ]
@@ -67,14 +67,14 @@ ignore = [
 known-first-party = ["app", "radia_ai"]
 
 # ---------------------------------------------------------------------------
-# Black — code formatter
+# Black - code formatter
 # ---------------------------------------------------------------------------
 [tool.black]
 line-length = 100
 target-version = ["py312"]
 
 # ---------------------------------------------------------------------------
-# mypy — static type checker
+# mypy - static type checker
 # ---------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.12"

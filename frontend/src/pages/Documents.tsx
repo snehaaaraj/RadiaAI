@@ -75,7 +75,7 @@ export default function Documents() {
                       <TableCell>
                         {doc.ingested_at
                           ? new Date(doc.ingested_at).toLocaleDateString()
-                          : '—'}
+                          : '-'}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -2,7 +2,7 @@
  * Generates exportable PDF reports for requirement reviews.
  *
  * Used by both Single Review (one requirement, one result) and Set Review
- * (many requirements, one result each — exportable individually or as a
+ * (many requirements, one result each - exportable individually or as a
  * single consolidated PDF covering every reviewed requirement in the set).
  */
 import jsPDF from 'jspdf';
@@ -158,11 +158,11 @@ function renderSection(doc: jsPDF, section: ReviewPdfSection, cursorY: number, i
   }
 
   const heading = section.requirementTitle
-    ? `${section.requirementId} — ${section.requirementTitle}`
+    ? `${section.requirementId} - ${section.requirementTitle}`
     : section.requirementId;
   cursorY = addHeading(doc, heading, 'Requirement Review Report', cursorY);
 
-  const score = getReviewQualityScore(section.result.overall, section.result.findings);
+  const score = getReviewQualityScore(section.result.category_results);
   const rows: [string, string][] = [
     ['Overall status', section.result.overall],
     ['Overall score', score.toFixed(1)],
@@ -197,7 +197,7 @@ export function exportReviewSetToPdf(sections: ReviewPdfSection[], setName = 'se
 
   const cursorY = addHeading(
     doc,
-    'Set Review — Consolidated Report',
+    'Set Review - Consolidated Report',
     `${sections.length} requirement${sections.length === 1 ? '' : 's'} reviewed`,
     PAGE_MARGIN
   );
@@ -210,7 +210,7 @@ export function exportReviewSetToPdf(sections: ReviewPdfSection[], setName = 'se
       s.requirementId,
       s.requirementTitle ?? '',
       s.result.overall,
-      getReviewQualityScore(s.result.overall, s.result.findings).toFixed(1),
+      getReviewQualityScore(s.result.category_results).toFixed(1),
       String(s.result.findings.length),
     ]),
     styles: { fontSize: 9, cellPadding: 4 },

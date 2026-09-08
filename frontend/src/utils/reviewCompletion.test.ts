@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import type { ReviewCompletion, ReviewFailureReason } from '@/types/api';
+import type {
+  CategoryResult,
+  ReviewCompletion,
+  ReviewFailureReason,
+  ReviewStatus,
+} from '@/types/api';
 import {
   getCompletionMessage,
   getCompletionTitle,
@@ -101,12 +106,62 @@ describe('isRetryableFailure', () => {
 });
 
 describe('getReviewQualityScore', () => {
+  const category = (status: ReviewStatus): CategoryResult => ({ category: 'language', status });
+
   it('never scores an unevaluated review as a pass', () => {
     // The regression this contract exists to prevent: a failed review reading 10/10.
-    expect(getReviewQualityScore('Not Evaluated', [])).toBe(0);
+    // A failed review carries no category results at all.
+    expect(getReviewQualityScore([])).toBe(0);
+    expect(getReviewQualityScore([category('Not Evaluated')])).toBe(0);
   });
 
   it('still scores a genuinely clean review as a pass', () => {
-    expect(getReviewQualityScore('Acceptable', [])).toBe(10);
+    expect(getReviewQualityScore([category('Acceptable')])).toBe(9.5);
+  });
+
+  it('averages the category scores', () => {
+    // 9.5 + 9.5 + 9.5 + 3.0 = 31.5, / 4 = 7.875
+    expect(
+      getReviewQualityScore([
+        { category: 'language', status: 'Acceptable' },
+        { category: 'structure', status: 'Acceptable' },
+        { category: 'verifiability', status: 'Acceptable' },
+        { category: 'certification', status: 'Unacceptable' },
+      ])
+    ).toBe(7.875);
+  });
+
+  it('is not dragged down to the worst category', () => {
+    // The bug this replaced: one Unacceptable category clamped the overall
+    // score into [0, 4], so the headline number contradicted the tiles below it.
+    const score = getReviewQualityScore([
+      { category: 'language', status: 'Acceptable' },
+      { category: 'structure', status: 'Acceptable' },
+      { category: 'verifiability', status: 'Acceptable' },
+      { category: 'certification', status: 'Unacceptable' },
+    ]);
+    expect(score).toBeGreaterThan(4);
+  });
+
+  it('scores an all-clean review as the clean category score', () => {
+    expect(
+      getReviewQualityScore([
+        { category: 'language', status: 'Acceptable' },
+        { category: 'structure', status: 'Acceptable' },
+        { category: 'verifiability', status: 'Acceptable' },
+        { category: 'certification', status: 'Acceptable' },
+      ])
+    ).toBe(9.5);
+  });
+
+  it('ignores unevaluated categories rather than counting them as zero', () => {
+    // 9.5 + 6.5 = 16, / 2 = 8
+    expect(
+      getReviewQualityScore([
+        { category: 'language', status: 'Acceptable' },
+        { category: 'structure', status: 'Revision Recommended' },
+        { category: 'verifiability', status: 'Not Evaluated' },
+      ])
+    ).toBe(8);
   });
 });

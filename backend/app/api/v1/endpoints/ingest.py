@@ -1,8 +1,8 @@
 """
-Ingestion endpoint — trigger document ingestion into Azure AI Search.
+Ingestion endpoint - trigger document ingestion into Azure AI Search.
 
-POST /api/v1/ingest         — trigger blob or sharepoint ingestion
-POST /api/v1/ingest/upload  — upload a single document for ingestion
+POST /api/v1/ingest         - trigger blob or sharepoint ingestion
+POST /api/v1/ingest/upload  - upload a single document for ingestion
 """
 
 import uuid
@@ -76,6 +76,6 @@ async def upload_and_ingest(
     response = IngestResponse(
         job_id=job_id,
         queued_count=1 if result.get("status") == "indexed" else 0,
-        message=f"Status: {result.get('status', 'unknown')} — {result.get('reason', result.get('error', 'OK'))}",
+        message=f"Status: {result.get('status', 'unknown')} - {result.get('reason', result.get('error', 'OK'))}",
     )
     return APIResponse(data=response, request_id=request.state.request_id)

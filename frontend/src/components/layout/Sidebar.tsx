@@ -287,7 +287,7 @@ export function Sidebar() {
         {drawerContent}
       </Drawer>
 
-      {/* Edge collapse/expand arrow — sits on the right border of the sidebar */}
+      {/* Edge collapse/expand arrow - sits on the right border of the sidebar */}
       <Tooltip title={sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'} placement="right">
         <IconButton
           size="small"

@@ -152,7 +152,7 @@ def test_review_history_cleanup_deletes_old_entries(test_app) -> None:
 
     blob_client.list_blobs = patched_list_blobs
 
-    # List entries — this should trigger cleanup
+    # List entries - this should trigger cleanup
     entries = repo.list_entries()
 
     # Only the recent entry should remain

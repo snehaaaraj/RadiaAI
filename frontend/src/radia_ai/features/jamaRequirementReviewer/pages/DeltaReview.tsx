@@ -389,7 +389,7 @@ export default function DeltaReview() {
 
       {isError && <Alert severity="error">Delta review failed: {getApiErrorMessage(error)}</Alert>}
 
-      {/* Nothing was evaluated — explain why instead of showing an empty result. */}
+      {/* Nothing was evaluated - explain why instead of showing an empty result. */}
       {activeResult && isReviewFailed(activeResult.completion) && (
         <Stack spacing={2} ref={resultRef}>
           <ReviewIncompleteNotice completion={activeResult.completion} />
@@ -398,13 +398,13 @@ export default function DeltaReview() {
 
       {activeResult && !isReviewFailed(activeResult.completion) && (
         <Stack spacing={2} ref={resultRef}>
-          {/* Some requirements were evaluated and some were not — say so up front. */}
+          {/* Some requirements were evaluated and some were not - say so up front. */}
           {isReviewIncomplete(activeResult.completion) && (
             <ReviewIncompleteNotice completion={activeResult.completion} />
           )}
           <ReviewResultHero
             title="Delta review score"
-            score={getReviewQualityScore(activeResult.overall, activeResult.reviewed_requirements.flatMap(r => r.findings))}
+            score={getReviewQualityScore(activeResult.reviewed_requirements.flatMap(r => r.category_results))}
             status={activeResult.overall}
             findings={activeResult.reviewed_requirements.flatMap(r => r.findings)}
             reviewId={activeResult.review_id}
@@ -447,8 +447,7 @@ export default function DeltaReview() {
                               label="Requirement score"
                               showValue={false}
                               score={getReviewQualityScore(
-                                reviewedRequirement.overall,
-                                reviewedRequirement.findings
+                                reviewedRequirement.category_results
                               )}
                             />
                             <CategoryScoreGrid categories={reviewedRequirement.category_results} />
@@ -457,7 +456,7 @@ export default function DeltaReview() {
                               readOnly
                               title="Why this scored the way it did"
                               description="Delta review verifies an already-revised requirement, so it reports what is still unmet without proposing new text."
-                              emptyMessage="This revision satisfies every category — no issues remain."
+                              emptyMessage="This revision satisfies every category - no issues remain."
                             />
                           </>
                         )}

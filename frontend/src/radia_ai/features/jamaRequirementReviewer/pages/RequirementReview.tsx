@@ -321,7 +321,7 @@ export default function RequirementReview() {
       )}
 
       {/*
-        A failed review has no score, no categories and no findings — show why it
+        A failed review has no score, no categories and no findings - show why it
         did not run instead of a result that would read as a clean pass.
       */}
       {activeResult && reviewFailed && (
@@ -343,7 +343,7 @@ export default function RequirementReview() {
           </Box>
           <ReviewResultHero
             title="Requirement score"
-            score={getReviewQualityScore(activeResult.overall, activeResult.findings)}
+            score={getReviewQualityScore(activeResult.category_results)}
             status={activeResult.overall}
             findings={activeResult.findings}
             reviewId={activeResult.review_id}
