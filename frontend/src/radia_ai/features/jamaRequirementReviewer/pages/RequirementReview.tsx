@@ -30,6 +30,8 @@ import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requireme
 import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 import { isReviewFailed } from '@/utils/reviewCompletion';
+import { exportReviewToPdf } from '@/radia_ai/features/jamaRequirementReviewer/utils/reviewPdfExport';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
 type InputMode = 'paste' | 'upload';
@@ -178,6 +180,18 @@ export default function RequirementReview() {
 
   const reviewFailed = activeResult ? isReviewFailed(activeResult.completion) : false;
 
+  const handleExportPdf = () => {
+    if (!activeResult) return;
+    exportReviewToPdf({
+      requirementId: requirementId || 'requirement',
+      result: activeResult,
+      metadata: [
+        { label: 'Requirement ID', value: requirementId || 'Not provided' },
+        { label: 'Level', value: requirementLevel },
+      ],
+    });
+  };
+
   return (
     <Stack spacing={3}>
       <Box>
@@ -322,6 +336,11 @@ export default function RequirementReview() {
 
       {activeResult && !reviewFailed && (
         <Stack spacing={2} ref={resultRef}>
+          <Box display="flex" justifyContent="flex-end">
+            <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={handleExportPdf}>
+              Export PDF
+            </Button>
+          </Box>
           <ReviewResultHero
             title="Requirement score"
             score={getReviewQualityScore(activeResult.overall, activeResult.findings)}

@@ -259,7 +259,7 @@ This allows findings to link back to a source document or guidance entry and kee
 
 ## 9. Review history
 
-Completed reviews are stored in an in-memory history repository for now.
+Completed reviews are stored in Azure Blob Storage for durability.
 
 Stored data includes:
 
@@ -280,10 +280,7 @@ Users can apply dispositions to findings:
 - Rejected
 - Deferred
 
-**Known limitation:** the repository is process-local. On a serverless deployment
-each invocation starts a fresh process, so history will read as empty and
-disposition writes will not find their review. Durable storage is required before
-history can be relied on in production.
+Review history persists across deployments and serverless invocations via Azure Blob Storage.
 
 ## 10. Document and RAG surfaces
 
@@ -341,10 +338,7 @@ Implemented and central to the product:
 - standards catalog browsing
 - document ingestion, search, and chat over the index
 - workspace and launchpad UX
-
-Known gaps:
-
-- **review history is not durable** — in-memory only (§9)
+- durable review history backed by Azure Blob Storage
 
 ## 14. Summary
 

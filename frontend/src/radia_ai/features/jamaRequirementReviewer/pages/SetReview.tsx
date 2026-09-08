@@ -18,6 +18,7 @@ import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import UploadFileIcon from '@mui/icons-material/UploadFile';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
@@ -32,6 +33,11 @@ import {
   parseRequirementsFromPdf,
   type ParsedRequirement,
 } from '@/radia_ai/features/jamaRequirementReviewer/utils/pdfRequirementParser';
+import {
+  exportReviewSetToPdf,
+  exportReviewToPdf,
+  type ReviewPdfSection,
+} from '@/radia_ai/features/jamaRequirementReviewer/utils/reviewPdfExport';
 import type { RequirementReviewResponse } from '@/types/api';
 import { normalizeRequirementText, prepareFlatTextForNormalization } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { useNavigationGuard } from '@/hooks/useNavigationGuard';
@@ -153,6 +159,36 @@ export default function SetReview() {
   const reviewedCount = requirements.filter((r) => r.reviewState === 'done').length;
   const progress = requirements.length > 0 ? (reviewedCount / requirements.length) * 100 : 0;
 
+  const handleExportActivePdf = () => {
+    if (!activeReq || !activeResult) return;
+    exportReviewToPdf({
+      requirementId: activeReq.id,
+      requirementTitle: activeReq.title,
+      result: activeResult,
+      metadata: [
+        { label: 'Requirement ID', value: activeReq.id },
+        { label: 'Title', value: activeReq.title },
+        ...(activeReq.section ? [{ label: 'Section', value: activeReq.section }] : []),
+      ],
+    });
+  };
+
+  const handleExportConsolidatedPdf = () => {
+    const sections: ReviewPdfSection[] = requirements
+      .filter((r): r is RequirementWithReview & { result: RequirementReviewResponse } => !!r.result)
+      .map((r) => ({
+        requirementId: r.id,
+        requirementTitle: r.title,
+        result: r.result,
+        metadata: [
+          { label: 'Requirement ID', value: r.id },
+          { label: 'Title', value: r.title },
+          ...(r.section ? [{ label: 'Section', value: r.section }] : []),
+        ],
+      }));
+    exportReviewSetToPdf(sections, uploadedFilename ? `set-review-${uploadedFilename.replace(/\.pdf$/i, '')}` : 'set-review');
+  };
+
   // Guard navigation: dirty while a set is loaded/parsing/reviewing.
   const isDirty = requirements.length > 0 || isParsing || isReviewing;
   useNavigationGuard(isDirty);
@@ -207,6 +243,16 @@ export default function SetReview() {
                 <Button variant="outlined" color="inherit" size="small" onClick={handleClearAll}>
                   Clear Review
                 </Button>
+                {reviewedCount > 0 && (
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    startIcon={<FileDownloadIcon />}
+                    onClick={handleExportConsolidatedPdf}
+                  >
+                    Export consolidated PDF ({reviewedCount})
+                  </Button>
+                )}
               </>
             )}
           </Box>
@@ -355,6 +401,11 @@ export default function SetReview() {
 
       {activeResult && !reviewFailed && (
         <Stack spacing={2} ref={resultRef}>
+          <Box display="flex" justifyContent="flex-end">
+            <Button variant="outlined" startIcon={<FileDownloadIcon />} onClick={handleExportActivePdf}>
+              Export PDF
+            </Button>
+          </Box>
           <ReviewResultHero
             title="Requirement score"
             score={getReviewQualityScore(activeResult.overall, activeResult.findings)}

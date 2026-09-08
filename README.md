@@ -14,7 +14,7 @@ For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.m
 ┌────────────────────────────────────────────────────────────┐
 │                         Frontend                           │
 │      React + TypeScript + Vite + MUI + Framer Motion      │
-│                    port 3000 (nginx)                       │
+│                    port 5173 (Vite dev server)             │
 │                                                            │
 │  src/pages/                         ← shared app pages     │
 │  src/radia_ai/features/resources/   ← resource hub         │
@@ -149,7 +149,7 @@ The review system uses **LLM-based architecture** with GPT-5 + RAG:
 ```
 
 **Key behaviors:**
-- GPT-5 provides deeper analysis grounded in indexed standards documents
+- LLM analysis grounded in indexed standards documents
 - All findings include a `suggested_rewrite` (full improved requirement text)
 - References point to actual SharePoint document URLs, not hardcoded names
 - File-hash caching: unchanged documents are not re-embedded on restart
@@ -256,7 +256,7 @@ cp .env.example .env
 cd backend
 python -m venv .venv
 source .venv/bin/activate       # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+pip install -e .                # Install in editable mode
 uvicorn radia_ai.main:app --reload --port 8000
 ```
 
@@ -362,17 +362,16 @@ pytest --cov=app --cov=radia_ai # with coverage report
 
 **Frontend:** React 18, TypeScript, Vite, MUI v6, React Query v5, Axios, Framer Motion
 
-**AI/ML:** Azure OpenAI (GPT-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
+**AI/ML:** Azure OpenAI (gpt-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
 
 **Infrastructure:** Azure App Service / Container Apps, Azure OpenAI, Azure AI Search, Azure Blob Storage
 
 ---
+## Notes
 
-## Known Limitations
-
-- **Review history retention is limited.** Review entries and finding dispositions
+- **Review history retention.** Review entries and finding dispositions
   are stored durably in Azure Blob Storage and persist across serverless
   invocations, but entries are automatically deleted after 10 days. This requires
   a valid `AZURE_BLOB_CONNECTION_STRING` configuration.
 
-**Note:** Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.
+- Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.
