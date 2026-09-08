@@ -26,6 +26,7 @@ from app.rag.service import RAGService
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointStandardsClient,
 )
+from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import JamaClient
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
     ReviewHistoryRepository,
 )
@@ -46,6 +47,7 @@ from radia_ai.features.jama_requirement_reviewer.services.review_version_service
     ReviewVersionService,
 )
 from radia_ai.features.jama_requirement_reviewer.services.standards_service import StandardsService
+from radia_ai.features.jama_requirement_reviewer.services.jama_service import JamaService
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
 
 logger = get_logger(__name__)
@@ -122,6 +124,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     sharepoint_client = SharePointStandardsClient(settings.sharepoint)
     app.state.standards_service = StandardsService(StandardsRegistry(), sharepoint_client)
     app.state.sharepoint_client = sharepoint_client
+
+    # Jama Connect integration (read-only requirement access)
+    jama_client = JamaClient(settings.jama)
+    app.state.jama_client = jama_client
+    app.state.jama_service = JamaService(jama_client)
+    logger.info("jama_service_ready", configured=jama_client.is_configured)
 
     # Ingestion service
     ingestion_service = IngestionService(
@@ -315,6 +323,21 @@ def get_standards_service(request: Request) -> StandardsService:
 
 
 StandardsServiceDep = Annotated[StandardsService, Depends(get_standards_service)]
+
+
+def get_jama_service(request: Request) -> JamaService:
+    """Resolve the Jama service from application state, building it lazily if needed."""
+    service = getattr(request.app.state, "jama_service", None)
+    if service is None:
+        settings = _resolve_settings(request.app)
+        client = JamaClient(settings.jama)
+        service = JamaService(client)
+        request.app.state.jama_client = client
+        request.app.state.jama_service = service
+    return service
+
+
+JamaServiceDep = Annotated[JamaService, Depends(get_jama_service)]
 
 
 # ---------------------------------------------------------------------------

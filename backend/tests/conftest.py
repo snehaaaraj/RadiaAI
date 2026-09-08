@@ -205,6 +205,14 @@ def _test_settings() -> AppSettings:
             "standards_folder": "0. Reference Material/AI Reference Material",
             "cache_ttl_seconds": 300,
         },
+        jama={
+            "base_url": "",
+            "auth_type": "basic",
+            "username": "",
+            "password": "",
+            "client_id": "",
+            "client_secret": "",
+        },
     )
 
 

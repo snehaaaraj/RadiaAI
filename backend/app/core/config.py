@@ -40,6 +40,10 @@ def _sharepoint_settings_factory() -> "SharePointSettings":
     return cast(SharePointSettings, cast(Any, SharePointSettings)())
 
 
+def _jama_settings_factory() -> "JamaSettings":
+    return cast(JamaSettings, cast(Any, JamaSettings)())
+
+
 class AzureOpenAISettings(BaseSettings):
     """Azure OpenAI service configuration."""
 
@@ -118,6 +122,62 @@ class SharePointSettings(BaseSettings):
         return bool(self.tenant_id and self.client_id and self.client_secret and self.site_url)
 
 
+class JamaSettings(BaseSettings):
+    """
+    Jama Connect REST API settings.
+
+    Credentials live only on the backend and are never exposed to the browser.
+    Two authentication modes are supported:
+
+      - ``basic``: username + password (or a Jama API ID / API key pair for
+        Jama Cloud personal access).
+      - ``oauth``: client_id + client_secret exchanged for a bearer token via
+        the OAuth 2.0 client-credentials flow (POST /rest/oauth/token).
+    """
+
+    model_config = SettingsConfigDict(env_prefix="JAMA_", env_file=_ENV_FILE, extra="ignore")
+
+    base_url: str = Field(
+        default="",
+        description="Jama instance root URL, e.g. https://yourorg.jamacloud.com (no /rest suffix)",
+    )
+    auth_type: Literal["basic", "oauth"] = Field(
+        default="basic", description="Authentication mode: basic or oauth"
+    )
+    username: str = Field(default="", description="Username / API ID for basic auth")
+    password: str = Field(default="", description="Password / API key for basic auth")
+    client_id: str = Field(default="", description="OAuth client ID for client-credentials flow")
+    client_secret: str = Field(
+        default="", description="OAuth client secret for client-credentials flow"
+    )
+    api_version: str = Field(default="v1", description="Jama REST API version path segment")
+    timeout_seconds: float = Field(
+        default=20.0, description="Per-request timeout for Jama API calls (seconds)"
+    )
+    verify_ssl: bool = Field(
+        default=True, description="Verify TLS certificates (disable only for self-hosted test)"
+    )
+
+    @property
+    def rest_base(self) -> str:
+        """Return the fully-qualified REST base URL, e.g. https://org.jamacloud.com/rest/v1."""
+        return f"{self.base_url.rstrip('/')}/rest/{self.api_version.strip('/')}"
+
+    @property
+    def token_url(self) -> str:
+        """Return the OAuth token endpoint URL."""
+        return f"{self.base_url.rstrip('/')}/rest/oauth/token"
+
+    @property
+    def is_configured(self) -> bool:
+        """True only when a base URL and a complete credential set are present."""
+        if not self.base_url:
+            return False
+        if self.auth_type == "oauth":
+            return bool(self.client_id and self.client_secret)
+        return bool(self.username and self.password)
+
+
 class EntraIDSettings(BaseSettings):
     """Microsoft Entra ID (Azure AD) configuration for authentication."""
 
@@ -189,6 +249,7 @@ class AppSettings(BaseSettings):
     azure_blob: AzureBlobSettings = Field(default_factory=_azure_blob_settings_factory)
     entra: EntraIDSettings = Field(default_factory=_entra_id_settings_factory)
     sharepoint: SharePointSettings = Field(default_factory=_sharepoint_settings_factory)
+    jama: JamaSettings = Field(default_factory=_jama_settings_factory)
 
     @field_validator("debug")
     @classmethod
