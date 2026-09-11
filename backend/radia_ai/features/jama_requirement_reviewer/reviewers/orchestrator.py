@@ -25,7 +25,11 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
 from radia_ai.features.jama_requirement_reviewer.utils.requirement_normalization import (
     normalize_requirement_review_input,
 )
-from radia_ai.features.jama_requirement_reviewer.utils.review_utils import overall_from_statuses
+from radia_ai.features.jama_requirement_reviewer.utils.review_scoring import (
+    average_score,
+    score_from_findings,
+    status_from_score,
+)
 
 if TYPE_CHECKING:
     from app.core.config import AppSettings
@@ -108,8 +112,9 @@ class ReviewOrchestrator:
 
         enriched = self._enrich_findings(llm_result.findings)
         category_results = self._build_category_results(enriched)
+        overall_score = average_score([result.score for result in category_results])
         return RequirementReviewResponse(
-            overall=overall_from_statuses([cr.status for cr in category_results]),
+            overall=status_from_score(overall_score),
             completion=llm_result.completion,
             category_results=category_results,
             findings=enriched,
@@ -121,20 +126,29 @@ class ReviewOrchestrator:
         """
         Score every review category, not just the ones that produced findings.
 
-        A category the review checked and found nothing wrong with is
-        ``ACCEPTABLE``. Omitting it would make a clean category indistinguishable
-        from one that was never evaluated.
+        A category the review checked and found nothing wrong with scores a full
+        10 and is ``ACCEPTABLE``. Omitting it would make a clean category
+        indistinguishable from one that was never evaluated.
+
+        The score comes from the findings themselves (severity and how many),
+        not from a fixed value per status, so category scores vary with how bad
+        the problems actually are.
         """
-        statuses: dict[str, list[ReviewStatus]] = {category: [] for category in REVIEW_CATEGORIES}
+        by_category: dict[str, list[ReviewFinding]] = {
+            category: [] for category in REVIEW_CATEGORIES
+        }
         for finding in findings:
             # Findings from an unrecognized category are still scored, so an
             # unexpected reviewer value can never silently drop a problem.
-            statuses.setdefault(finding.reviewer, []).append(finding.status)
+            by_category.setdefault(finding.reviewer, []).append(finding)
 
-        return [
-            CategoryResult(category=category, status=overall_from_statuses(category_statuses))
-            for category, category_statuses in statuses.items()
-        ]
+        results = []
+        for category, category_findings in by_category.items():
+            score = score_from_findings(category_findings)
+            results.append(
+                CategoryResult(category=category, status=status_from_score(score), score=score)
+            )
+        return results
 
     def build_version_response(self) -> ReviewVersionResponse:
         """Return reviewer/prompt/standards version metadata."""

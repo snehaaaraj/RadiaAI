@@ -297,15 +297,26 @@ class ReviewVersionResponse(BaseModel):
 
 class CategoryResult(BaseModel):
     """
-    Category-level status for a requirement review.
+    Category-level score and status for a requirement review.
 
     A completed review emits one of these for every category in
     ``REVIEW_CATEGORIES``, so a category that produced no findings is reported
     as ``ACCEPTABLE`` rather than being omitted and read as "never checked".
+
+    ``score`` is earned from the findings in the category rather than looked up
+    from its status, so a clean category scores a full 10 and two failing
+    categories can be told apart by how badly they fail. ``status`` is the band
+    that score falls in.
     """
 
     category: str
     status: ReviewStatus
+    score: float = Field(
+        default=0.0,
+        ge=0.0,
+        le=10.0,
+        description="Finding-derived quality score for this category, 0-10.",
+    )
 
 
 class RequirementReviewResponse(BaseModel):

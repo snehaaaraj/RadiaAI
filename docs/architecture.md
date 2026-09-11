@@ -115,8 +115,8 @@ Single review is an **authoring** pass: it flags violations and proposes replace
    source-diversified retrieval so several documents can be cited.
 4. One consolidated GPT-5 call produces findings across all four scored categories.
 5. Findings are enriched with standards references and SharePoint URLs.
-6. Category statuses are derived from the findings and aggregated into an overall
-   status.
+6. Category scores are derived from the findings and averaged into an overall
+   score and status.
 7. The response includes:
    - overall status
    - completion record (see §6)
@@ -218,10 +218,11 @@ and silently dropped by another. Traceability is deliberately out of scope.
 ### Category scoring
 
 A completed review emits a `CategoryResult` for **every** category, not only the
-ones that produced findings:
+ones that produced findings. Each result carries a numeric `score` (0-10) and the
+verdict band that score falls in:
 
-- findings in a category → that category takes the worst status among them
-- no findings in a category → `Acceptable`
+- findings in a category → the score is earned down from 10 by the findings
+- no findings in a category → a full `10.0`, `Acceptable`
 
 Omitting clean categories would make "checked and clean" indistinguishable from
 "never checked". A review that did not complete emits no category results at all,
@@ -233,34 +234,52 @@ the tile or inventing a passing value. Persisted review results are keyed by a
 schema version so a result cached by an older build cannot be rendered against
 the current scorecard.
 
-### From status to number
+### From findings to number
 
-Statuses are turned into scores on the client (`utils/reviewQuality.ts`):
+Scores are computed on the backend (`utils/review_scoring.py`) from the findings
+themselves, not looked up from a category or a status. Every category starts at
+`10.0` and loses points:
 
-| Status | Score |
-|--------|-------|
-| Acceptable | 9.5 |
-| Revision Recommended | 6.5 |
-| Unacceptable | 3.0 |
-| Not Evaluated | no score |
+| Severity of the worst finding | Penalty |
+|-------------------------------|---------|
+| Low | 2.5 |
+| Medium | 4.0 |
+| High | 6.0 |
+| Critical | 8.0 |
 
-**The overall score is the arithmetic mean of the scored category scores.** For
-example `9.5, 9.5, 9.5, 3.0` averages to `7.875`. Categories that carry no score
-are excluded from the mean rather than counted as zero; when nothing was scored
-the overall score is `0` and the page renders the incomplete notice instead (§6).
+Every additional finding in the same category costs **half** its own penalty:
+repeat problems compound, but with diminishing weight, since the first defect is
+what characterises the category. Scores are floored at `0`.
 
-Severity is deliberately **not** applied again at this stage. The backend already
-maps severity to status (Low/Medium → Revision Recommended, High/Critical →
-Unacceptable) and a category takes the worst status among its findings, so
-severity is fully reflected in the numbers being averaged. Applying a second
-severity penalty on top would double-count it.
+The Low penalty is deliberately large enough that *any* open finding drops a
+category below the Acceptable threshold — a category with an open finding must
+never present itself as clean — and the High penalty drops it below the revision
+threshold, keeping the derived band consistent with the severity taxonomy.
 
-The overall score is also **not** clamped by the worst category. Clamping made
-the headline number contradict the tiles directly beneath it — three categories
-reading 9.5 under an overall of 3.0. The gating verdict travels separately as the
-overall **status**, which remains worst-wins: a requirement can average well and
-still be reported Unacceptable, so a strong average never hides a failing
-category.
+### From number to verdict
+
+| Average score | Verdict |
+|---------------|---------|
+| ≥ 8.0 | Acceptable |
+| ≥ 5.0 | Revision Recommended |
+| < 5.0 | Unacceptable |
+| nothing scored | Not Evaluated |
+
+**The overall score is the arithmetic mean of the scored category scores, and the
+overall verdict is the band that mean falls in.** For example `10, 10, 10, 3.5`
+averages to `8.375` → `Acceptable`: one weak sub-category lowers the score
+without on its own condemning an otherwise strong requirement. A requirement that
+is broadly weak still fails, because the mean itself falls into the lower bands.
+
+Categories that carry no score are excluded from the mean rather than counted as
+zero; when nothing was scored at all the verdict is `Not Evaluated` and the page
+renders the incomplete notice instead of a score (§6).
+
+Severity is deliberately **not** applied again at aggregation time. It is already
+baked into the category scores being averaged, so penalising it a second time
+would double-count it. The client (`utils/reviewQuality.ts`) averages the same
+category scores for display, falling back to a status-based approximation only
+for older stored payloads that predate the numeric field.
 
 The reviewer modules registered with the orchestrator
 (`reviewers/consolidated.py`, one per category) carry no rule logic.

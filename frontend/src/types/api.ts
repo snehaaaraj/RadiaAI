@@ -205,6 +205,12 @@ export interface DeterminismContext {
 export interface CategoryResult {
   category: string;
   status: ReviewStatus;
+  /**
+   * Finding-derived quality score for the category, 0-10. A category with no
+   * findings scores a full 10. Older payloads may omit it, in which case the
+   * status is used as a fallback.
+   */
+  score?: number;
 }
 
 export interface ReviewFinding {

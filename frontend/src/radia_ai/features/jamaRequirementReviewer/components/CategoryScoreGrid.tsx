@@ -3,7 +3,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import type { CategoryResult, ReviewStatus } from '@/types/api';
-import { getCategoryStatusScore, getReviewQualityColor } from '@/utils/reviewQuality';
+import { getCategoryScore, getReviewQualityColor } from '@/utils/reviewQuality';
 
 interface CategoryScoreGridProps {
   categories: CategoryResult[];
@@ -43,25 +43,33 @@ type DisplayCategory = {
   label: string;
   /** Undefined when the payload carried no score for this category. */
   status?: ReviewStatus;
+  /** The category's numeric score, when the payload reported one. */
+  score?: number;
 };
 
 export function CategoryScoreGrid({ categories }: CategoryScoreGridProps) {
-  const reported = new Map<string, ReviewStatus>();
+  const reported = new Map<string, CategoryResult>();
   for (const item of categories) {
-    reported.set(toCategoryKey(item.category), item.status);
+    reported.set(toCategoryKey(item.category), item);
   }
 
   const displayCategories: DisplayCategory[] = SCORED_CATEGORIES.map((key) => ({
     key,
     label: CATEGORY_LABEL_MAP[key],
-    status: reported.get(key),
+    status: reported.get(key)?.status,
+    score: reported.get(key)?.score,
   }));
 
   // Surface anything the backend scored outside the standard set rather than hiding it.
   for (const item of categories) {
     const key = toCategoryKey(item.category);
     if (!SCORED_CATEGORIES.includes(key)) {
-      displayCategories.push({ key, label: toDisplayLabel(item.category), status: item.status });
+      displayCategories.push({
+        key,
+        label: toDisplayLabel(item.category),
+        status: item.status,
+        score: item.score,
+      });
     }
   }
 
@@ -72,7 +80,11 @@ export function CategoryScoreGrid({ categories }: CategoryScoreGridProps) {
         // placeholder rather than inventing a passing value.
         const score =
           category.status && category.status !== 'Not Evaluated'
-            ? getCategoryStatusScore(category.status)
+            ? getCategoryScore({
+                category: category.key,
+                status: category.status,
+                score: category.score,
+              })
             : null;
         return (
           <Grid key={category.key} size={{ xs: displayCategories.length, sm: 1 }}>
