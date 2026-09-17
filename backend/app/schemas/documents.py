@@ -50,3 +50,18 @@ class IngestResponse(BaseModel):
     job_id: str = Field(description="Background job ID to poll for status")
     queued_count: int
     message: str
+
+
+class IngestionStatusResponse(BaseModel):
+    """Response body describing the most recent ingestion run, if any."""
+
+    timestamp: datetime | None = Field(
+        default=None, description="When the most recent ingestion run completed"
+    )
+    source: str | None = Field(default=None, description="'sharepoint' or 'blob'")
+    trigger: str | None = Field(default=None, description="'manual' or 'webhook'")
+    outcome: str | None = Field(default=None, description="'success' or 'error'")
+    processed: int = 0
+    skipped: int = 0
+    failed: int = 0
+    message: str = ""

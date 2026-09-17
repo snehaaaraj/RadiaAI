@@ -152,6 +152,17 @@ export interface IngestResponse {
   message: string;
 }
 
+export interface IngestionStatusResponse {
+  timestamp: string | null;
+  source: string | null;
+  trigger: 'manual' | 'webhook' | null;
+  outcome: 'success' | 'error' | null;
+  processed: number;
+  skipped: number;
+  failed: number;
+  message: string;
+}
+
 // ---------------------------------------------------------------------------
 // Requirements review
 // ---------------------------------------------------------------------------

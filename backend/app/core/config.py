@@ -111,11 +111,30 @@ class SharePointSettings(BaseSettings):
         default=300,
         description="How long to cache the file listing before re-fetching (seconds)",
     )
+    webhook_enabled: bool = Field(
+        default=False,
+        description=(
+            "Enable a Microsoft Graph change-notification subscription so documents are "
+            "automatically re-ingested whenever the SharePoint standards folder changes."
+        ),
+    )
+    webhook_public_base_url: str = Field(
+        default="",
+        description=(
+            "Public HTTPS base URL of this backend (e.g. https://myapp.vercel.app), used to "
+            "build the Graph notificationUrl. Required when webhook_enabled is True."
+        ),
+    )
 
     @property
     def is_configured(self) -> bool:
         """True only when all credentials and site URL are set."""
         return bool(self.tenant_id and self.client_id and self.client_secret and self.site_url)
+
+    @property
+    def is_webhook_configured(self) -> bool:
+        """True only when SharePoint is configured and the webhook has been enabled with a base URL."""
+        return self.is_configured and self.webhook_enabled and bool(self.webhook_public_base_url)
 
 
 class EntraIDSettings(BaseSettings):

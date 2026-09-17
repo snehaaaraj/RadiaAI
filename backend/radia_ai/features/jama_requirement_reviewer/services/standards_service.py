@@ -1,5 +1,7 @@
 """Service layer for standards catalog endpoints."""
 
+from typing import TYPE_CHECKING
+
 from app.core.logging import get_logger
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointStandardsClient,
@@ -9,6 +11,9 @@ from radia_ai.features.jama_requirement_reviewer.models.standards_models import 
     StandardsResponse,
 )
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
+
+if TYPE_CHECKING:
+    from app.ingestion.sharepoint_webhook import SharePointWebhookService
 
 logger = get_logger(__name__)
 
@@ -27,11 +32,22 @@ class StandardsService:
         self,
         registry: StandardsRegistry,
         sharepoint_client: SharePointStandardsClient | None = None,
+        webhook_service: "SharePointWebhookService | None" = None,
     ) -> None:
         self._registry = registry
         self._sharepoint = sharepoint_client
+        self._webhook_service = webhook_service
 
     def list_standards(self) -> StandardsResponse:
+        # Fallback safety net: the frontend calls this endpoint on every Home page
+        # load, so piggyback a throttled check here to renew the SharePoint webhook
+        # subscription before it silently expires during a quiet period.
+        if self._webhook_service is not None:
+            try:
+                self._webhook_service.ensure_subscription_throttled()
+            except Exception:
+                logger.exception("sharepoint_webhook_fallback_check_failed")
+
         # Try SharePoint first
         if self._sharepoint is not None and self._sharepoint._settings.is_configured:
             standards = self._sharepoint.fetch_standards()
