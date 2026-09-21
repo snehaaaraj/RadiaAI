@@ -12,6 +12,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
 import { FileUploadZone } from '@/radia_ai/features/jamaRequirementReviewer/components/FileUploadZone';
+import { JamaRequirementPicker } from '@/radia_ai/features/jamaRequirementReviewer/components/JamaRequirementPicker';
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
 import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
@@ -25,6 +26,7 @@ import { useNavigationGuard } from '@/hooks/useNavigationGuard';
 import { useReviewCompleteSound } from '@/hooks/useReviewCompleteSound';
 import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
+import type { JamaRequirement } from '@/types/api';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
@@ -34,7 +36,7 @@ import { exportReviewToPdf } from '@/radia_ai/features/jamaRequirementReviewer/u
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
-type InputMode = 'paste' | 'upload';
+type InputMode = 'paste' | 'upload' | 'jama';
 type RequirementReviewFormState = {
   requirementId: string;
   requirementLevel: string;
@@ -144,6 +146,18 @@ export default function RequirementReview() {
     setText('');
     setUploadedFilename('');
     updateFormState({ text: '', uploadedFilename: '' });
+  };
+
+  const handleJamaRequirementSelected = (requirement: JamaRequirement) => {
+    const nextId = requirement.document_key ?? String(requirement.id);
+    const parts = [requirement.name, requirement.description].filter(
+      (part) => part && part.trim().length > 0
+    );
+    const nextText = normalizeRequirementText(parts.join('\n\n'));
+    setRequirementId(nextId);
+    setText(nextText);
+    setUploadedFilename('');
+    updateFormState({ requirementId: nextId, text: nextText, uploadedFilename: '' });
   };
 
   const handleClearAll = () => {
@@ -264,6 +278,7 @@ export default function RequirementReview() {
               >
                 <ToggleButton value="paste">Type / Paste</ToggleButton>
                 <ToggleButton value="upload">Upload file</ToggleButton>
+                <ToggleButton value="jama">From Jama</ToggleButton>
               </ToggleButtonGroup>
               <Button variant="outlined" color="inherit" onClick={handleClearAll}>
                 Clear Review
@@ -283,13 +298,18 @@ export default function RequirementReview() {
                 }}
                 placeholder="The subsystem shall ..."
               />
-            ) : (
+            ) : inputMode === 'upload' ? (
               <FileUploadZone
                 accept=".txt,.pdf"
                 label="Upload a .pdf or .txt document containing the requirement"
                 onFileContent={handleFileContent}
                 filename={uploadedFilename}
                 onClear={handleClearFile}
+              />
+            ) : (
+              <JamaRequirementPicker
+                onRequirementSelected={handleJamaRequirementSelected}
+                disabled={isPending}
               />
             )}
           </Box>
@@ -305,6 +325,24 @@ export default function RequirementReview() {
               label="Extracted text (sent to AI)"
               size="small"
               helperText="This is the cleaned text extracted from your file."
+            />
+          )}
+
+          {inputMode === 'jama' && text.trim() && (
+            <TextField
+              fullWidth
+              multiline
+              minRows={4}
+              maxRows={12}
+              value={text}
+              onChange={(event) => {
+                const nextValue = event.target.value;
+                setText(nextValue);
+                updateFormState({ text: nextValue });
+              }}
+              label="Requirement text from Jama (sent to AI)"
+              size="small"
+              helperText="Pulled from Jama. You can edit before running the review."
             />
           )}
 
