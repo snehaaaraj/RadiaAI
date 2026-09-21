@@ -252,7 +252,9 @@ async def _stream_answer_events(
     the non-streaming endpoint (bounded timeout, same worker-thread offload).
     """
     system_prompt = get_chat_system_prompt(citation_style)
-    send_stream, receive_stream = anyio.create_memory_object_stream[dict[str, Any]](max_buffer_size=64)
+    send_stream, receive_stream = anyio.create_memory_object_stream[dict[str, Any]](
+        max_buffer_size=64
+    )
 
     def _produce() -> None:
         try:

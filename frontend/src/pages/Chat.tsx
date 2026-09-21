@@ -57,15 +57,15 @@ export default function Chat() {
   };
 
   return (
-    <Box display="flex" flexDirection="column" height="calc(100vh - 120px)">
-      <Typography variant="h5" fontWeight={700} mb={2}>
+    <Box display="flex" flexDirection="column" flexGrow={1} minHeight={0}>
+      <Typography variant="h5" fontWeight={700} mb={2} flexShrink={0}>
         Chat
       </Typography>
 
-      {/* Conversation area */}
+      {/* Conversation area - the only part of this page that scrolls. */}
       <Paper
         variant="outlined"
-        sx={{ flexGrow: 1, overflow: 'auto', p: 2, mb: 2, bgcolor: 'background.default' }}
+        sx={{ flexGrow: 1, minHeight: 0, overflow: 'auto', p: 2, mb: 2, bgcolor: 'background.default' }}
       >
         {history.length === 0 && (
           <Box
@@ -131,10 +131,10 @@ export default function Chat() {
         <div ref={endRef} />
       </Paper>
 
-      <Divider />
+      <Divider sx={{ flexShrink: 0 }} />
 
       {/* Input area */}
-      <Box display="flex" gap={1} pt={2}>
+      <Box display="flex" gap={1} pt={2} flexShrink={0}>
         <TextField
           fullWidth
           multiline

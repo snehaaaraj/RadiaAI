@@ -204,11 +204,7 @@ class RAGService:
         a faster, latency-tuned deployment for document Q&A.
         """
         context_text = context.format_for_prompt()
-        full_system = (
-            f"{system_prompt}\n\n"
-            f"## Retrieved Standards Context\n\n"
-            f"{context_text}"
-        )
+        full_system = f"{system_prompt}\n\n" f"## Retrieved Standards Context\n\n" f"{context_text}"
 
         messages = [{"role": "system", "content": full_system}]
         messages.extend(conversation_history or [])
@@ -243,11 +239,7 @@ class RAGService:
         endpoint). This is a blocking generator; run it on a worker thread.
         """
         context_text = context.format_for_prompt()
-        full_system = (
-            f"{system_prompt}\n\n"
-            f"## Retrieved Standards Context\n\n"
-            f"{context_text}"
-        )
+        full_system = f"{system_prompt}\n\n" f"## Retrieved Standards Context\n\n" f"{context_text}"
 
         messages = [{"role": "system", "content": full_system}]
         messages.extend(conversation_history or [])

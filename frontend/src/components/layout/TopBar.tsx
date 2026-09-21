@@ -318,6 +318,27 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
         )}
         <Box sx={{ flexGrow: 1 }} />
 
+        {location.pathname !== ROUTES.LANDING && location.pathname !== ROUTES.CHAT && (
+          <Button
+            color="inherit"
+            onClick={() => guardedNavigate(ROUTES.CHAT)}
+            sx={{
+              textTransform: 'none',
+              minWidth: 'auto',
+              fontWeight: 600,
+              color: headerForegroundColor,
+              px: 1,
+              borderRadius: 1,
+              transition: 'transform 160ms ease, background-color 160ms ease',
+              '&:hover': {
+                backgroundColor: hoverHighlight,
+                transform: 'scale(1.04)',
+              },
+            }}
+          >
+            Chat
+          </Button>
+        )}
         {showGlobalSettings && (
           <Button
             color="inherit"

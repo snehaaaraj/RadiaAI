@@ -14,13 +14,15 @@ import { HEADER_HEIGHT, ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@
 function AppLayoutInner() {
   const { sidebarOpen, motionPreference, uiDensity } = useAppContext();
   const location = useLocation();
-  const sidebarWidth = sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+  const isChatPage = location.pathname === ROUTES.CHAT;
+  const sidebarWidth = isChatPage ? 0 : sidebarOpen ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
   const { dialogOpen, handleConfirm, handleCancel } = useNavigationGuardContext();
 
   return (
     <Box display="flex">
       <TopBar />
-      <Sidebar />
+      {/* Chat is a standalone workspace, unrelated to the Jama review nav items - no sidebar. */}
+      {!isChatPage && <Sidebar />}
 
       <Box
         component="main"
@@ -33,13 +35,20 @@ function AppLayoutInner() {
             }),
           marginLeft: `${sidebarWidth}px`,
           width: `calc(100% - ${sidebarWidth}px)`,
-          minHeight: '100vh',
+          // The chat page manages its own internal scroll region (see Chat.tsx)
+          // instead of growing the whole page - fix its height to the viewport
+          // and disable the page-level scrollbar.
+          height: isChatPage ? '100vh' : undefined,
+          minHeight: isChatPage ? undefined : '100vh',
+          overflow: isChatPage ? 'hidden' : undefined,
           bgcolor: 'background.default',
           p: uiDensity === 'compact' ? 2 : 3,
+          display: isChatPage ? 'flex' : undefined,
+          flexDirection: isChatPage ? 'column' : undefined,
         }}
       >
         {/* Push content below the AppBar */}
-        <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important` }} />
+        <Toolbar sx={{ minHeight: `${HEADER_HEIGHT}px !important`, flexShrink: 0 }} />
         <AnimatePresence mode="wait">
           <motion.div
             key={location.pathname}
@@ -47,6 +56,7 @@ function AppLayoutInner() {
             animate={motionPreference === 'reduced' ? {} : { opacity: 1, y: 0 }}
             exit={motionPreference === 'reduced' ? {} : { opacity: 0, y: -8 }}
             transition={{ duration: 0.2, ease: 'easeOut' }}
+            style={isChatPage ? { flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column' } : undefined}
           >
             <Outlet />
           </motion.div>

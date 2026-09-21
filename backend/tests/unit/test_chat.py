@@ -63,7 +63,13 @@ class DummyRAGService:
         diversify: bool = False,
     ) -> RetrievedContext:
         self.retrieve_calls.append(
-            {"query": query, "mode": mode, "top_k": top_k, "filters": filters, "diversify": diversify}
+            {
+                "query": query,
+                "mode": mode,
+                "top_k": top_k,
+                "filters": filters,
+                "diversify": diversify,
+            }
         )
         if self.raise_on_retrieve:
             raise self.raise_on_retrieve
@@ -176,7 +182,10 @@ def test_chat_widget_citation_style_none_uses_prompt_without_inline_citations(
     try:
         response = client.post(
             "/api/v1/chat",
-            json={"question": "What modal verb should mandatory requirements use?", "citation_style": "none"},
+            json={
+                "question": "What modal verb should mandatory requirements use?",
+                "citation_style": "none",
+            },
         )
     finally:
         app.dependency_overrides.pop(get_rag_service, None)
