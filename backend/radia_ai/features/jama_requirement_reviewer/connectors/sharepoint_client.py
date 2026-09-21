@@ -159,6 +159,33 @@ class SharePointStandardsClient:
             return cast(str, drives[0]["id"])
         raise ValueError(f"No drives found on site {site_id}")
 
+    def auth_headers(self) -> dict[str, str]:
+        """Public accessor for Graph API auth headers (used by the webhook subscription service)."""
+        return self._headers()
+
+    def resolve_folder_context(self) -> tuple[str, str]:
+        """
+        Resolve the (drive_id, folder_item_id) pair for the configured standards folder.
+
+        Unlike the path-based addressing used for listing children, Graph change
+        notification subscriptions must reference a resource by driveItem ID, so this
+        looks up the folder's own item ID via the Graph API.
+        """
+        with httpx.Client() as client:
+            if self._site_id is None:
+                self._site_id = self._resolve_site_id(client)
+            if self._drive_id is None:
+                self._drive_id = self._resolve_drive_id(client, self._site_id)
+
+            folder = self._settings.standards_folder
+            encoded_folder = "/".join(quote(segment) for segment in folder.split("/"))
+            url = f"{_GRAPH_BASE}/drives/{self._drive_id}/root:/{encoded_folder}"
+            resp = client.get(url, headers=self._headers(), timeout=15)
+            resp.raise_for_status()
+            folder_item_id = cast(str, resp.json()["id"])
+
+        return self._drive_id, folder_item_id
+
     def _list_folder_children(self, client: httpx.Client, drive_id: str) -> list[GraphDriveItem]:
         """Return the Graph API items from the configured standards folder."""
         folder = self._settings.standards_folder
