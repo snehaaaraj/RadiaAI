@@ -119,7 +119,9 @@ async def get_ingestion_status(
 ) -> APIResponse[IngestionStatusResponse]:
     """Return the most recently recorded ingestion status, if any."""
     latest = status_store.get_latest()
-    response = IngestionStatusResponse(**latest) if latest else IngestionStatusResponse()
+    response = (
+        IngestionStatusResponse.model_validate(latest) if latest else IngestionStatusResponse()
+    )
     return APIResponse(data=response, request_id=request.state.request_id)
 
 
