@@ -16,7 +16,10 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     ReviewFinding,
     ReviewStatus,
 )
-from radia_ai.features.jama_requirement_reviewer.utils.review_utils import overall_from_statuses
+from radia_ai.features.jama_requirement_reviewer.utils.review_scoring import (
+    average_score,
+    status_from_score,
+)
 
 
 class ReviewWorkflow(StrEnum):
@@ -133,15 +136,19 @@ def _merge_category_results(response: DeltaReviewResponse) -> list[CategoryResul
     Roll per-requirement category results up into one row per category.
 
     Each reviewed requirement reports every category, so concatenating them
-    would repeat each category once per requirement. The worst status across the
-    change set wins, matching how the overall verdict is aggregated.
+    would repeat each category once per requirement. The scores are averaged
+    across the change set and the status is the band that average falls in,
+    matching how the overall verdict is aggregated.
     """
-    statuses: dict[str, list[ReviewStatus]] = {}
+    scores: dict[str, list[float]] = {}
     for requirement_result in response.reviewed_requirements:
         for category_result in requirement_result.category_results:
-            statuses.setdefault(category_result.category, []).append(category_result.status)
+            scores.setdefault(category_result.category, []).append(category_result.score)
 
-    return [
-        CategoryResult(category=category, status=overall_from_statuses(category_statuses))
-        for category, category_statuses in statuses.items()
-    ]
+    merged = []
+    for category, category_scores in scores.items():
+        score = average_score(category_scores)
+        merged.append(
+            CategoryResult(category=category, status=status_from_score(score), score=score)
+        )
+    return merged

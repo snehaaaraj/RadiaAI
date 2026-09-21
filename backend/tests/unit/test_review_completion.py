@@ -27,7 +27,6 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
 from radia_ai.features.jama_requirement_reviewer.utils.review_utils import (
     aggregate_completions,
-    overall_from_statuses,
 )
 
 # ---------------------------------------------------------------------------
@@ -378,23 +377,6 @@ def test_delta_review_reports_full_failure(client: TestClient, review_engine) ->
 # ---------------------------------------------------------------------------
 # Aggregation helpers
 # ---------------------------------------------------------------------------
-
-
-@pytest.mark.unit
-def test_all_not_evaluated_does_not_aggregate_to_acceptable() -> None:
-    statuses = [ReviewStatus.NOT_EVALUATED, ReviewStatus.NOT_EVALUATED]
-    assert overall_from_statuses(statuses) is ReviewStatus.NOT_EVALUATED
-
-
-@pytest.mark.unit
-def test_real_verdicts_win_over_not_evaluated() -> None:
-    statuses = [ReviewStatus.NOT_EVALUATED, ReviewStatus.UNACCEPTABLE]
-    assert overall_from_statuses(statuses) is ReviewStatus.UNACCEPTABLE
-
-
-@pytest.mark.unit
-def test_empty_status_list_is_acceptable() -> None:
-    assert overall_from_statuses([]) is ReviewStatus.ACCEPTABLE
 
 
 @pytest.mark.unit

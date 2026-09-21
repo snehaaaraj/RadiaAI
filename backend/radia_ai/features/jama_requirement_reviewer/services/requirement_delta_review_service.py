@@ -5,14 +5,18 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     DeltaRequirementReviewResult,
     DeltaReviewInput,
     DeltaReviewResponse,
+    ReviewStatus,
 )
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
 from radia_ai.features.jama_requirement_reviewer.services.review_version_service import (
     ReviewVersionService,
 )
+from radia_ai.features.jama_requirement_reviewer.utils.review_scoring import (
+    average_score,
+    status_from_score,
+)
 from radia_ai.features.jama_requirement_reviewer.utils.review_utils import (
     aggregate_completions,
-    overall_from_statuses,
 )
 
 
@@ -52,7 +56,7 @@ class RequirementDeltaReviewService:
                 )
             )
 
-        overall = overall_from_statuses([result.overall for result in reviewed_requirements])
+        overall = self._overall_from_results(reviewed_requirements)
         completion = aggregate_completions([result.completion for result in reviewed_requirements])
         determinism = self._review_version_service.get_review_version().determinism
         return DeltaReviewResponse(
@@ -62,3 +66,17 @@ class RequirementDeltaReviewService:
             reviewed_requirements=reviewed_requirements,
             determinism=determinism,
         )
+
+    @staticmethod
+    def _overall_from_results(results: list[DeltaRequirementReviewResult]) -> ReviewStatus:
+        """
+        Roll the changed requirements up into one verdict via their average score.
+
+        A requirement that could not be evaluated contributes no score, so it
+        cannot be read as passing; when nothing at all could be evaluated the
+        change set is reported as ``NOT_EVALUATED`` rather than acceptable.
+        """
+        scores = [category.score for result in results for category in result.category_results]
+        if results and not scores:
+            return ReviewStatus.NOT_EVALUATED
+        return status_from_score(average_score(scores))
