@@ -57,6 +57,24 @@ class AzureOpenAISettings(BaseSettings):
     embedding_dimensions: int = Field(default=3072, description="Embedding vector dimensions")
     max_tokens: int = Field(default=4096, description="Max tokens for chat completions")
     temperature: float = Field(default=0.0, description="Sampling temperature (0 = deterministic)")
+    rag_chat_deployment: str | None = Field(
+        default=None,
+        description=(
+            "Deployment used for the document Q&A chat endpoint/widget. This is "
+            "latency-sensitive, so it defaults to a fast non-reasoning model rather "
+            "than 'chat_deployment' (which may be a slower reasoning model such as "
+            "gpt-5 used for the Jama Requirement Reviewer's deeper analysis). Falls "
+            "back to 'chat_deployment' if unset."
+        ),
+    )
+    rag_chat_max_tokens: int = Field(
+        default=1200,
+        description=(
+            "Max tokens for the RAG chat endpoint's answers. Kept much lower than "
+            "'max_tokens' (used by the reviewer) since chat answers are short and a "
+            "large budget only adds latency without improving answer quality."
+        ),
+    )
 
 
 class AzureSearchSettings(BaseSettings):

@@ -9,11 +9,14 @@ in the actual indexed standards documents.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from app.core.azure_clients import OpenAIClient, SearchService
 from app.core.config import AppSettings
 from app.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = get_logger(__name__)
 
@@ -183,6 +186,7 @@ class RAGService:
         conversation_history: list[dict[str, str]] | None = None,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        model: str | None = None,
     ) -> str:
         """
         Run a multi-turn chat completion grounded in retrieved context.
@@ -194,6 +198,10 @@ class RAGService:
         caller - they are passed straight through to the LLM as message turns,
         never merged into the system prompt, so they cannot be mistaken for
         grounding instructions.
+
+        *model* overrides the default chat deployment for this call only (see
+        ``OpenAIClient.chat_completion``); the chat endpoint uses this to target
+        a faster, latency-tuned deployment for document Q&A.
         """
         context_text = context.format_for_prompt()
         full_system = (
@@ -212,6 +220,46 @@ class RAGService:
             if temperature is not None
             else self._settings.azure_openai.temperature,
             max_tokens=max_tokens,
+            model=model,
+        )
+
+    def stream_chat_answer(
+        self,
+        system_prompt: str,
+        question: str,
+        context: RetrievedContext,
+        *,
+        conversation_history: list[dict[str, str]] | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        model: str | None = None,
+    ) -> Iterator[str]:
+        """
+        Streaming counterpart to ``generate_chat_answer``.
+
+        Builds the same grounded message list, but yields the answer as text
+        deltas rather than returning the complete string, so the caller can
+        forward tokens to the client as they arrive (see the ``/chat/stream``
+        endpoint). This is a blocking generator; run it on a worker thread.
+        """
+        context_text = context.format_for_prompt()
+        full_system = (
+            f"{system_prompt}\n\n"
+            f"## Retrieved Standards Context\n\n"
+            f"{context_text}"
+        )
+
+        messages = [{"role": "system", "content": full_system}]
+        messages.extend(conversation_history or [])
+        messages.append({"role": "user", "content": question})
+
+        yield from self._openai.stream_chat_completion(
+            messages,
+            temperature=temperature
+            if temperature is not None
+            else self._settings.azure_openai.temperature,
+            max_tokens=max_tokens,
+            model=model,
         )
 
 

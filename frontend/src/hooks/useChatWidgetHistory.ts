@@ -6,14 +6,12 @@
  */
 
 import { useEffect, useState } from 'react';
-import type { CitedChunk } from '@/types/api';
 
 const STORAGE_KEY = 'radia-chat-widget-history';
 
 export interface ChatWidgetTurn {
   role: 'user' | 'assistant';
   content: string;
-  citations?: Pick<CitedChunk, 'filename' | 'section' | 'score'>[];
 }
 
 function loadHistory(): ChatWidgetTurn[] {

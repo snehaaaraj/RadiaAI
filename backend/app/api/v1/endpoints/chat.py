@@ -2,6 +2,7 @@
 Chat endpoint - RAG question answering.
 
 POST /api/v1/chat
+POST /api/v1/chat/stream
 
 Retrieves relevant chunks from the indexed SharePoint standards documents via
 Azure AI Search and generates a grounded answer with Azure OpenAI. The prompt
@@ -9,17 +10,28 @@ requires the model to base its answer only on retrieved content, and when
 retrieval finds nothing relevant we skip the LLM call entirely and return a
 fixed refusal - so every answer is either grounded in a real citation or an
 explicit "not found" message, never a hallucinated guess.
+
+The ``/stream`` variant runs the identical retrieval + grounding pipeline but
+streams the generated answer to the client as Server-Sent Events, token by
+token, instead of waiting for the full completion - so the UI can render text
+incrementally (see ``_stream_answer_events`` for the event protocol).
 """
 
 from __future__ import annotations
 
+import contextlib
+import json
+from typing import TYPE_CHECKING, Any
+
 import anyio
 from anyio import to_thread
 from fastapi import APIRouter, Request, status
+from fastapi.responses import StreamingResponse
 
+from app.core.config import AppSettings
 from app.core.exceptions import ChatTimeoutError
 from app.core.logging import get_logger
-from app.prompts.chat_prompts import CHAT_SYSTEM_PROMPT, NO_ANSWER_MESSAGE
+from app.prompts.chat_prompts import NO_ANSWER_MESSAGE, CitationStyle, get_chat_system_prompt
 from app.rag.service import RAGService, RetrievedContext
 from app.schemas.chat import ChatRequest, ChatResponse, CitedChunk
 from app.schemas.common import APIResponse
@@ -27,6 +39,9 @@ from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
     RAGServiceDep,
     SettingsDep,
 )
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
 
 router = APIRouter()
 logger = get_logger(__name__)
@@ -66,36 +81,101 @@ async def chat(
         top_k=body.top_k,
     )
 
+    chat_model = settings.azure_openai.rag_chat_deployment or settings.azure_openai.chat_deployment
+
     context = await _retrieve(rag_service, body.question, body.top_k)
 
     if not context.has_context:
         logger.info("chat_no_relevant_chunks", question_length=len(body.question))
         return APIResponse(
-            data=_no_answer_response(settings.azure_openai.chat_deployment),
+            data=_no_answer_response(chat_model),
             request_id=request.state.request_id,
         )
 
     history = [
         {"role": message.role, "content": message.content} for message in body.conversation_history
     ]
-    answer = await _generate(rag_service, body.question, context, history)
+    answer = await _generate(
+        rag_service, body.question, context, history, body.citation_style, chat_model, settings
+    )
 
     # The model can still refuse per the system prompt (e.g. retrieved chunks
     # matched the query but don't actually answer it). Treat that refusal the
     # same as an empty retrieval: no citations attached to an unfounded answer.
     if answer.strip().lower() == NO_ANSWER_MESSAGE.lower():
         return APIResponse(
-            data=_no_answer_response(settings.azure_openai.chat_deployment),
+            data=_no_answer_response(chat_model),
             request_id=request.state.request_id,
         )
 
     response = ChatResponse(
         answer=answer,
         citations=[_to_cited_chunk(chunk) for chunk in context.chunks],
-        model=settings.azure_openai.chat_deployment,
+        model=chat_model,
         retrieval_count=len(context.chunks),
     )
     return APIResponse(data=response, request_id=request.state.request_id)
+
+
+@router.post(
+    "/stream",
+    summary="Ask a question against indexed documents (streamed answer)",
+    description=(
+        "Server-Sent Events variant of POST /chat. Retrieval runs first with the "
+        "same bounded timeout and grounding rules, then the generated answer is "
+        "streamed to the client token-by-token as Azure OpenAI produces it, so "
+        "the UI can render it incrementally instead of waiting for the full "
+        "response. Emits one or more 'delta' events with partial answer text, "
+        "followed by exactly one terminal event: 'done' (full answer + "
+        "citations + model + retrieval_count), 'no_answer' (nothing grounded "
+        "the question), or 'error' (generation failed or timed out)."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def chat_stream(
+    body: ChatRequest,
+    request: Request,
+    rag_service: RAGServiceDep,
+    settings: SettingsDep,
+) -> StreamingResponse:
+    """Streaming counterpart to ``chat()`` - see the route description for the SSE event protocol."""
+    logger.info(
+        "chat_stream_request",
+        question_length=len(body.question),
+        history_turns=len(body.conversation_history),
+        top_k=body.top_k,
+    )
+
+    chat_model = settings.azure_openai.rag_chat_deployment or settings.azure_openai.chat_deployment
+
+    # Retrieval hasn't started streaming yet, so a timeout here is allowed to
+    # propagate normally and be handled by the app's standard JSON error
+    # response - only generation (after we've committed to the SSE response)
+    # needs its own in-band 'error' event.
+    context = await _retrieve(rag_service, body.question, body.top_k)
+
+    if not context.has_context:
+        logger.info("chat_stream_no_relevant_chunks", question_length=len(body.question))
+        return StreamingResponse(
+            _single_sse_event("no_answer", _no_answer_payload(chat_model)),
+            media_type="text/event-stream",
+        )
+
+    history = [
+        {"role": message.role, "content": message.content} for message in body.conversation_history
+    ]
+    return StreamingResponse(
+        _stream_answer_events(
+            rag_service, body.question, context, history, body.citation_style, chat_model, settings
+        ),
+        media_type="text/event-stream",
+        headers={
+            # Disable response buffering on common reverse proxies (e.g. nginx)
+            # so SSE frames flush to the client as soon as they're written.
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 async def _retrieve(rag_service: RAGService, question: str, top_k: int) -> RetrievedContext:
@@ -119,16 +199,22 @@ async def _generate(
     question: str,
     context: RetrievedContext,
     history: list[dict[str, str]],
+    citation_style: CitationStyle,
+    model: str,
+    settings: AppSettings,
 ) -> str:
     """Run answer generation on the worker threadpool with a bounded timeout."""
+    system_prompt = get_chat_system_prompt(citation_style)
     try:
         with anyio.fail_after(_GENERATION_TIMEOUT_SECONDS):
             return await to_thread.run_sync(
                 lambda: rag_service.generate_chat_answer(
-                    CHAT_SYSTEM_PROMPT,
+                    system_prompt,
                     question,
                     context,
                     conversation_history=history,
+                    model=model,
+                    max_tokens=settings.azure_openai.rag_chat_max_tokens,
                 ),
                 abandon_on_cancel=True,
             )
@@ -138,6 +224,116 @@ async def _generate(
             "Answer generation timed out. Please try again.",
             detail={"stage": "generation", "timeout_seconds": _GENERATION_TIMEOUT_SECONDS},
         ) from e
+
+
+async def _stream_answer_events(
+    rag_service: RAGService,
+    question: str,
+    context: RetrievedContext,
+    history: list[dict[str, str]],
+    citation_style: CitationStyle,
+    model: str,
+    settings: AppSettings,
+) -> AsyncIterator[str]:
+    """
+    Yield Server-Sent Event frames for a streamed answer.
+
+    Emits a 'delta' event per answer-text chunk as it's generated, then
+    exactly one terminal event: 'no_answer' if the model refused per the
+    grounding rules (equivalent to an empty retrieval), 'error' if generation
+    failed or exceeded the timeout, or 'done' with the full answer, citations,
+    model, and retrieval_count otherwise.
+
+    The Azure OpenAI SDK's streaming iterator is a blocking (sync) generator,
+    so it's run on a worker thread and bridged onto this async generator via
+    an anyio memory object stream - this keeps cancellation (e.g. the client
+    disconnecting) and backpressure working correctly between the thread and
+    the event loop, matching the pattern ``_retrieve``/``_generate`` use for
+    the non-streaming endpoint (bounded timeout, same worker-thread offload).
+    """
+    system_prompt = get_chat_system_prompt(citation_style)
+    send_stream, receive_stream = anyio.create_memory_object_stream[dict[str, Any]](max_buffer_size=64)
+
+    def _produce() -> None:
+        try:
+            for delta in rag_service.stream_chat_answer(
+                system_prompt,
+                question,
+                context,
+                conversation_history=history,
+                model=model,
+                max_tokens=settings.azure_openai.rag_chat_max_tokens,
+            ):
+                anyio.from_thread.run(send_stream.send, {"type": "delta", "text": delta})
+        except Exception as e:
+            logger.error("chat_stream_generation_failed", error=str(e))
+            with contextlib.suppress(anyio.BrokenResourceError):
+                anyio.from_thread.run(send_stream.send, {"type": "error"})
+        finally:
+            # The receiver may have already closed its end (e.g. the overall
+            # generation timeout fired) - closing an already-broken send
+            # stream is a no-op we don't need to surface.
+            with contextlib.suppress(anyio.BrokenResourceError):
+                anyio.from_thread.run(send_stream.aclose)
+
+    async def _run_producer() -> None:
+        await to_thread.run_sync(_produce, abandon_on_cancel=True)
+
+    accumulated: list[str] = []
+    failed = False
+    try:
+        with anyio.fail_after(_GENERATION_TIMEOUT_SECONDS):
+            async with anyio.create_task_group() as tg:
+                tg.start_soon(_run_producer)
+                async with receive_stream:
+                    async for item in receive_stream:
+                        if item["type"] == "error":
+                            failed = True
+                            break
+                        accumulated.append(item["text"])
+                        yield _sse("delta", {"text": item["text"]})
+    except TimeoutError:
+        logger.error("chat_stream_generation_timeout", timeout_seconds=_GENERATION_TIMEOUT_SECONDS)
+        yield _sse("error", {"message": "Answer generation timed out. Please try again."})
+        return
+
+    if failed:
+        yield _sse("error", {"message": "Answer generation failed. Please try again."})
+        return
+
+    answer = "".join(accumulated)
+
+    # The model can still refuse per the system prompt (e.g. retrieved chunks
+    # matched the query but don't actually answer it). Treat that refusal the
+    # same as an empty retrieval: no citations attached to an unfounded answer.
+    if answer.strip().lower() == NO_ANSWER_MESSAGE.lower():
+        yield _sse("no_answer", _no_answer_payload(model))
+        return
+
+    yield _sse(
+        "done",
+        {
+            "answer": answer,
+            "citations": [_to_cited_chunk(chunk).model_dump() for chunk in context.chunks],
+            "model": model,
+            "retrieval_count": len(context.chunks),
+        },
+    )
+
+
+async def _single_sse_event(event: str, data: dict[str, Any]) -> AsyncIterator[str]:
+    """Wrap a single event as a one-shot async generator for ``StreamingResponse``."""
+    yield _sse(event, data)
+
+
+def _sse(event: str, data: dict[str, Any]) -> str:
+    """Format a single Server-Sent Event frame."""
+    return f"event: {event}\ndata: {json.dumps(data)}\n\n"
+
+
+def _no_answer_payload(model: str) -> dict[str, Any]:
+    """Build the SSE payload for the fixed refusal, matching ``_no_answer_response``'s shape."""
+    return _no_answer_response(model).model_dump()
 
 
 def _no_answer_response(model: str) -> ChatResponse:

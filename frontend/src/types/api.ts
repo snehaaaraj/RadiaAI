@@ -67,6 +67,12 @@ export interface ChatRequest {
   question: string;
   conversation_history?: ChatMessage[];
   top_k?: number;
+  /**
+   * 'inline' (default) cites source filenames in parentheses within the answer
+   * text; 'none' omits filenames from the answer text entirely. The
+   * structured `citations` array on the response is always returned either way.
+   */
+  citation_style?: 'inline' | 'none';
 }
 
 export interface CitedChunk {

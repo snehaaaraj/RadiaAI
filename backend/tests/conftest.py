@@ -188,6 +188,11 @@ def _test_settings() -> AppSettings:
             "api_key": "test-key",
             "chat_deployment": "gpt-4o-test",
             "embedding_deployment": "embedding-test",
+            # Explicit so tests never fall through to a real .env value for
+            # these optional fields (BaseSettings still consults env_file for
+            # any key omitted here).
+            "rag_chat_deployment": None,
+            "rag_chat_max_tokens": 1200,
         },
         azure_search={
             "endpoint": "https://test.search.windows.net",

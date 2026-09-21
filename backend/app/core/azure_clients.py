@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
 
 from azure.core.credentials import AzureKeyCredential
 from azure.search.documents import SearchClient
@@ -40,6 +40,9 @@ from openai import AzureOpenAI
 from app.core.config import AppSettings, AzureBlobSettings, AzureOpenAISettings, AzureSearchSettings
 from app.core.exceptions import EmbeddingError, LLMError
 from app.core.logging import get_logger
+
+if TYPE_CHECKING:
+    from collections.abc import Iterator
 
 logger = get_logger(__name__)
 
@@ -94,11 +97,20 @@ class OpenAIClient:
         *,
         temperature: float | None = None,
         max_tokens: int | None = None,
+        model: str | None = None,
     ) -> str:
-        """Run a chat completion and return the assistant message content."""
+        """
+        Run a chat completion and return the assistant message content.
+
+        *model* overrides the default ``chat_deployment`` for this call only,
+        so latency-sensitive callers (e.g. the RAG chat endpoint) can target a
+        faster deployment without affecting other callers (e.g. the Jama
+        Requirement Reviewer, which stays on the configured reasoning model).
+        """
+        target_model = model or self._settings.chat_deployment
         try:
             kwargs: dict[str, Any] = {
-                "model": self._settings.chat_deployment,
+                "model": target_model,
                 "messages": messages,
                 "max_completion_tokens": max_tokens or self._settings.max_tokens,
             }
@@ -113,13 +125,62 @@ class OpenAIClient:
         except Exception as e:
             logger.error(
                 "chat_completion_failed",
-                model=self._settings.chat_deployment,
+                model=target_model,
                 message_count=len(messages),
                 error=str(e),
             )
             raise LLMError(
-                message=f"Chat completion failed with model {self._settings.chat_deployment}",
-                model=self._settings.chat_deployment,
+                message=f"Chat completion failed with model {target_model}",
+                model=target_model,
+                original_error=str(e),
+                detail={"message_count": len(messages)},
+            ) from e
+
+    def stream_chat_completion(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        model: str | None = None,
+    ) -> Iterator[str]:
+        """
+        Run a chat completion in streaming mode, yielding answer text deltas as
+        they arrive from Azure OpenAI instead of blocking until the full
+        response is generated.
+
+        This is a blocking generator - the caller (``RAGService``) is expected
+        to run it on a worker thread, matching ``chat_completion``'s sync API.
+        """
+        target_model = model or self._settings.chat_deployment
+        try:
+            kwargs: dict[str, Any] = {
+                "model": target_model,
+                "messages": messages,
+                "max_completion_tokens": max_tokens or self._settings.max_tokens,
+                "stream": True,
+            }
+            temp = temperature if temperature is not None else self._settings.temperature
+            if temp > 0.0:
+                kwargs["temperature"] = temp
+
+            stream = self._client.chat.completions.create(**kwargs)
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                delta = chunk.choices[0].delta.content
+                if delta:
+                    yield delta
+        except Exception as e:
+            logger.error(
+                "chat_stream_completion_failed",
+                model=target_model,
+                message_count=len(messages),
+                error=str(e),
+            )
+            raise LLMError(
+                message=f"Streaming chat completion failed with model {target_model}",
+                model=target_model,
                 original_error=str(e),
                 detail={"message_count": len(messages)},
             ) from e

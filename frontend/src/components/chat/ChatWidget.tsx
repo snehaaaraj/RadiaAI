@@ -5,10 +5,9 @@
  * navigation and reloads.
  */
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
-import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Fab from '@mui/material/Fab';
@@ -22,7 +21,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ForumIcon from '@mui/icons-material/Forum';
 import SendIcon from '@mui/icons-material/Send';
 import { AnimatePresence, motion } from 'framer-motion';
-import { useChat } from '@/hooks/useChat';
+import { useChatStream } from '@/hooks/useChatStream';
 import { useChatWidgetHistory } from '@/hooks/useChatWidgetHistory';
 import { useAppContext } from '@/context/useAppContext';
 import type { ChatMessage } from '@/types/api';
@@ -36,7 +35,7 @@ export function ChatWidget() {
   const [input, setInput] = useState('');
   const { history, setHistory, clearHistory } = useChatWidgetHistory();
   const { motionPreference } = useAppContext();
-  const { mutate: sendMessage, isPending } = useChat();
+  const { isStreaming, streamingText, sendMessage } = useChatStream();
   const endRef = useRef<HTMLDivElement>(null);
 
   const reduceMotion = motionPreference === 'reduced';
@@ -50,9 +49,15 @@ export function ChatWidget() {
     scrollToEnd();
   };
 
+  // Keep the conversation pinned to the bottom as the streamed answer grows.
+  useEffect(() => {
+    if (streamingText) scrollToEnd();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streamingText]);
+
   const handleSend = () => {
     const question = input.trim();
-    if (!question || isPending) return;
+    if (!question || isStreaming) return;
 
     const updatedHistory = [...history, { role: 'user' as const, content: question }];
     setHistory(updatedHistory);
@@ -64,28 +69,14 @@ export function ChatWidget() {
       .map((t) => ({ role: t.role, content: t.content }));
 
     sendMessage(
-      { question, conversation_history: apiHistory },
+      { question, conversation_history: apiHistory, citation_style: 'none' },
       {
-        onSuccess: (data) => {
-          setHistory((prev) => [
-            ...prev,
-            {
-              role: 'assistant',
-              content: data.answer,
-              citations: data.citations.map((c) => ({
-                filename: c.filename,
-                section: c.section,
-                score: c.score,
-              })),
-            },
-          ]);
+        onDone: (data) => {
+          setHistory((prev) => [...prev, { role: 'assistant', content: data.answer }]);
           scrollToEnd();
         },
-        onError: (err) => {
-          setHistory((prev) => [
-            ...prev,
-            { role: 'assistant', content: `Error: ${(err as Error).message}` },
-          ]);
+        onError: (message) => {
+          setHistory((prev) => [...prev, { role: 'assistant', content: `Error: ${message}` }]);
           scrollToEnd();
         },
       }
@@ -161,7 +152,12 @@ export function ChatWidget() {
               </Box>
 
               {/* Conversation area */}
-              <Box flexGrow={1} overflow="auto" p={1.5} sx={{ bgcolor: 'background.default' }}>
+              <Box
+                flexGrow={1}
+                overflow="auto"
+                sx={{ overflowX: 'hidden', bgcolor: 'background.default' }}
+                p={1.5}
+              >
                 {history.length === 0 && (
                   <Box
                     display="flex"
@@ -194,33 +190,51 @@ export function ChatWidget() {
                       sx={{
                         p: 1.5,
                         maxWidth: '85%',
+                        minWidth: 0,
                         bgcolor: turn.role === 'user' ? 'primary.main' : 'background.paper',
                         color: turn.role === 'user' ? 'primary.contrastText' : 'text.primary',
                         border: turn.role === 'assistant' ? '1px solid' : 'none',
                         borderColor: 'divider',
                       }}
                     >
-                      <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }}>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          whiteSpace: 'pre-wrap',
+                          overflowWrap: 'anywhere',
+                          wordBreak: 'break-word',
+                        }}
+                      >
                         {turn.content}
                       </Typography>
-
-                      {turn.citations && turn.citations.length > 0 && (
-                        <Box mt={1} display="flex" gap={0.5} flexWrap="wrap">
-                          {turn.citations.map((c, ci) => (
-                            <Chip
-                              key={ci}
-                              label={`${c.filename}${c.section ? ' - ' + c.section : ''}`}
-                              size="small"
-                              variant="outlined"
-                            />
-                          ))}
-                        </Box>
-                      )}
                     </Paper>
                   </Box>
                 ))}
 
-                {isPending && (
+                {isStreaming && streamingText && (
+                  <Box mb={1.5} display="flex" flexDirection="column" alignItems="flex-start">
+                    <Paper
+                      elevation={0}
+                      sx={{
+                        p: 1.5,
+                        maxWidth: '85%',
+                        minWidth: 0,
+                        bgcolor: 'background.paper',
+                        border: '1px solid',
+                        borderColor: 'divider',
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }}
+                      >
+                        {streamingText}
+                      </Typography>
+                    </Paper>
+                  </Box>
+                )}
+
+                {isStreaming && !streamingText && (
                   <Box display="flex" alignItems="center" gap={1} color="text.secondary">
                     <CircularProgress size={14} />
                     <Typography variant="caption">Thinking…</Typography>
@@ -247,13 +261,13 @@ export function ChatWidget() {
                       handleSend();
                     }
                   }}
-                  disabled={isPending}
+                  disabled={isStreaming}
                   size="small"
                 />
                 <IconButton
                   color="primary"
                   onClick={handleSend}
-                  disabled={isPending || !input.trim()}
+                  disabled={isStreaming || !input.trim()}
                   sx={{ alignSelf: 'flex-end' }}
                 >
                   <SendIcon fontSize="small" />

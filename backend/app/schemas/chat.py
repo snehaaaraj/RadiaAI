@@ -35,6 +35,15 @@ class ChatRequest(BaseModel):
         le=20,
         description="Number of document chunks to retrieve",
     )
+    citation_style: Literal["inline", "none"] = Field(
+        default="inline",
+        description=(
+            "'inline' cites source filenames in parentheses within the answer text "
+            "(used by the full chat page). 'none' omits filenames from the answer "
+            "text entirely (used by the compact chat widget). The structured "
+            "'citations' array is always returned regardless of this setting."
+        ),
+    )
 
 
 class CitedChunk(BaseModel):
