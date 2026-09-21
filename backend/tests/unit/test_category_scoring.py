@@ -86,7 +86,7 @@ def test_category_without_findings_is_acceptable_not_unevaluated(test_settings) 
 
 
 @pytest.mark.unit
-def test_category_status_reflects_worst_finding_in_that_category(test_settings) -> None:
+def test_category_score_reflects_worst_finding_in_that_category(test_settings) -> None:
     response = _review(
         test_settings,
         [
@@ -102,9 +102,65 @@ def test_category_status_reflects_worst_finding_in_that_category(test_settings) 
         ],
     )
 
-    scored = {result.category: result.status for result in response.category_results}
-    assert scored[ReviewCategory.STRUCTURE.value] is ReviewStatus.UNACCEPTABLE
-    assert response.overall is ReviewStatus.UNACCEPTABLE
+    scored = {result.category: result for result in response.category_results}
+    structure = scored[ReviewCategory.STRUCTURE.value]
+    # Critical costs 8.0, the extra Medium costs half of 4.0 -> 10 - 10 = 0.
+    assert structure.score == 0.0
+    assert structure.status is ReviewStatus.UNACCEPTABLE
+    # The other three categories are clean, so the average still allows revision
+    # rather than condemning the whole requirement over one category.
+    assert response.overall is ReviewStatus.REVISION_RECOMMENDED
+
+
+@pytest.mark.unit
+def test_a_clean_category_scores_a_full_ten(test_settings) -> None:
+    """A well-written requirement is not capped below a perfect score."""
+    response = _review(test_settings, [])
+
+    assert [result.score for result in response.category_results] == [10.0] * len(SCORED_CATEGORIES)
+    assert response.overall is ReviewStatus.ACCEPTABLE
+
+
+@pytest.mark.unit
+def test_category_score_varies_with_severity_not_just_status(test_settings) -> None:
+    """Scores are earned from findings, never looked up from the category or status."""
+    low = _review(
+        test_settings,
+        [build_stub_finding(reviewer=ReviewCategory.LANGUAGE.value, severity=FindingSeverity.LOW)],
+    )
+    high = _review(
+        test_settings,
+        [build_stub_finding(reviewer=ReviewCategory.LANGUAGE.value, severity=FindingSeverity.HIGH)],
+    )
+
+    low_score = next(
+        r.score for r in low.category_results if r.category == ReviewCategory.LANGUAGE.value
+    )
+    high_score = next(
+        r.score for r in high.category_results if r.category == ReviewCategory.LANGUAGE.value
+    )
+    assert low_score > high_score
+    assert low_score < 10.0
+
+
+@pytest.mark.unit
+def test_one_weak_category_does_not_force_an_unacceptable_overall(test_settings) -> None:
+    """The regression this pins: a single bad sub-category condemned the whole review."""
+    response = _review(
+        test_settings,
+        [
+            build_stub_finding(
+                reviewer=ReviewCategory.CERTIFICATION.value,
+                severity=FindingSeverity.CRITICAL,
+                status=ReviewStatus.UNACCEPTABLE,
+            )
+        ],
+    )
+
+    scored = {result.category: result for result in response.category_results}
+    assert scored[ReviewCategory.CERTIFICATION.value].status is ReviewStatus.UNACCEPTABLE
+    # (10 + 10 + 10 + 2) / 4 = 8.0 -> Acceptable on average.
+    assert response.overall is ReviewStatus.ACCEPTABLE
 
 
 @pytest.mark.unit
@@ -121,12 +177,18 @@ def test_finding_from_an_unexpected_category_is_still_scored(test_settings) -> N
     """An off-contract reviewer value must not silently drop the finding."""
     response = _review(
         test_settings,
-        [build_stub_finding(reviewer="something-unexpected", status=ReviewStatus.UNACCEPTABLE)],
+        [
+            build_stub_finding(
+                reviewer="something-unexpected",
+                severity=FindingSeverity.CRITICAL,
+                status=ReviewStatus.UNACCEPTABLE,
+            )
+        ],
     )
 
-    scored = {result.category: result.status for result in response.category_results}
-    assert scored["something-unexpected"] is ReviewStatus.UNACCEPTABLE
-    assert response.overall is ReviewStatus.UNACCEPTABLE
+    scored = {result.category: result for result in response.category_results}
+    assert scored["something-unexpected"].status is ReviewStatus.UNACCEPTABLE
+    assert scored["something-unexpected"].score < 5.0
 
 
 @pytest.mark.unit

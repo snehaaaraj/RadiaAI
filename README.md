@@ -185,6 +185,38 @@ Standards documents are ingested from SharePoint on demand via `POST /api/v1/ing
 
 Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
 
+### Automatic ingestion via SharePoint webhook (optional)
+
+Instead of (or in addition to) clicking **Ingest Documents** on the Home page,
+ingestion can be triggered automatically whenever a file in the SharePoint
+standards folder is added, modified, or deleted. This uses a [Microsoft Graph
+change-notification subscription](https://learn.microsoft.com/en-us/graph/api/resources/webhooks)
+on the folder:
+
+1. Graph POSTs a change notification to `POST /api/v1/ingest/webhook`
+2. The `clientState` secret on the notification is verified against the
+   subscription record stored in Blob Storage
+3. `ingest_from_sharepoint()` runs in the background (file-hash caching still
+   applies, so only changed documents are re-indexed)
+
+Because Graph subscriptions expire after a few days, the subscription is
+renewed opportunistically on every notification, plus a throttled fallback
+check on every `GET /api/v1/standards` call (which the frontend already makes
+on page load) in case SharePoint is quiet for an extended period.
+
+Enable it with `SHAREPOINT_WEBHOOK_ENABLED=true` and
+`SHAREPOINT_WEBHOOK_PUBLIC_BASE_URL=https://<your-app-domain>` (see
+`.env.example`). `POST /api/v1/ingest/webhook/subscribe` can be called to
+manually (re)create the subscription, e.g. after first enabling the feature.
+
+**Seeing when ingestion completes:** since webhook-triggered ingestion runs
+server-side with no direct connection back to the browser, the Home page
+polls `GET /api/v1/ingest/status` every 30 seconds and shows a "Last ingested"
+chip next to the system status indicator, noting how long ago it ran, whether
+it was triggered automatically (`auto (SharePoint change)`) or manually, and
+the processed/failed counts. This works for both the webhook and the manual
+button, so there's always a single place to check ingestion health.
+
 ---
 
 ## Functional Coverage
@@ -226,6 +258,7 @@ Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
 ### Document ingestion
 
 - [x] On-demand sync from SharePoint via `POST /api/v1/ingest`
+- [x] Automatic sync via optional Microsoft Graph webhook when SharePoint documents change
 - [x] Manual upload via API endpoint
 - [x] File-hash deduplication (skip unchanged)
 - [x] PDF, TXT extraction
@@ -309,6 +342,9 @@ Quick validation after deploy:
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
 | POST | `/api/v1/ingest` | Trigger document ingestion (blob or SharePoint) |
 | POST | `/api/v1/ingest/upload` | Upload and ingest a single document file |
+| GET | `/api/v1/ingest/status` | Outcome of the most recent ingestion run (manual or webhook) |
+| POST | `/api/v1/ingest/webhook` | Microsoft Graph change-notification receiver (auto-ingestion) |
+| POST | `/api/v1/ingest/webhook/subscribe` | Manually (re)create the SharePoint webhook subscription |
 | GET | `/api/v1/documents` | List indexed documents |
 | POST | `/api/v1/chat` | RAG question answering |
 
@@ -331,6 +367,7 @@ the full reference with descriptions.
 | `AZURE_SEARCH_INDEX_NAME` | Search index name (default: `radia-documents`) |
 | `AZURE_BLOB_CONNECTION_STRING` | Blob Storage connection string |
 | `SHAREPOINT_*` | SharePoint Graph API credentials for standards library |
+| `SHAREPOINT_WEBHOOK_ENABLED` / `SHAREPOINT_WEBHOOK_PUBLIC_BASE_URL` | Optional auto-ingestion webhook (see Ingestion Pipeline) |
 | `ENTRA_*` | Microsoft Entra ID settings (leave empty for local dev) |
 
 ---

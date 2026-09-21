@@ -13,11 +13,15 @@ import PlaylistAddCheckIcon from '@mui/icons-material/PlaylistAddCheck';
 import CompareArrowsIcon from '@mui/icons-material/CompareArrows';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import SyncIcon from '@mui/icons-material/Sync';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAppContext } from '@/context/useAppContext';
 import { useHealth } from '@/hooks/useHealth';
 import { useIngestDocuments } from '@/hooks/useIngestDocuments';
+import { useIngestionStatus } from '@/hooks/useIngestionStatus';
+import { formatRelativeTime } from '@/utils/formatRelativeTime';
 import { ROUTES } from '@/utils/constants';
 
 const QUICK_ACTIONS = [
@@ -48,6 +52,7 @@ export default function Home() {
   const navigate = useNavigate();
   const { data: health, isLoading } = useHealth();
   const { mutate: ingestDocuments, isPending: isIngesting, isSuccess, isError, data: ingestResult } = useIngestDocuments();
+  const { data: ingestionStatus } = useIngestionStatus();
   const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
 
@@ -77,7 +82,7 @@ export default function Home() {
         animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
         transition={{ duration: 0.24, ease: 'easeOut', delay: 0.06 }}
       >
-        <Box display="flex" justifyContent="flex-end" alignItems="center" gap={2}>
+        <Box display="flex" justifyContent="flex-end" alignItems="center" flexWrap="wrap" gap={2}>
           <Typography variant="subtitle2" color="text.secondary">
             System status
           </Typography>
@@ -88,6 +93,17 @@ export default function Home() {
               icon={<CheckCircleIcon />}
               label={`API ${health?.status ?? 'unknown'} - v${health?.version ?? '-'}`}
               color={health?.status === 'ok' ? 'success' : 'warning'}
+              size="small"
+              variant="outlined"
+            />
+          )}
+          {ingestionStatus?.timestamp && (
+            <Chip
+              icon={ingestionStatus.outcome === 'error' ? <ErrorOutlineIcon /> : <SyncIcon />}
+              label={`Last ingested ${formatRelativeTime(ingestionStatus.timestamp)} - ${
+                ingestionStatus.trigger === 'webhook' ? 'auto (SharePoint change)' : 'manual'
+              } - ${ingestionStatus.outcome === 'error' ? 'failed' : `${ingestionStatus.processed} updated`}`}
+              color={ingestionStatus.outcome === 'error' ? 'error' : 'success'}
               size="small"
               variant="outlined"
             />

@@ -14,7 +14,7 @@ import {
   isRetryableFailure,
   resolveCompletion,
 } from './reviewCompletion';
-import { getReviewQualityScore } from './reviewQuality';
+import { getReviewQualityScore, getReviewQualityStatus } from './reviewQuality';
 
 function failed(reason: ReviewFailureReason, message = 'Something went wrong.'): ReviewCompletion {
   return { status: 'failed', reason, message };
@@ -107,6 +107,11 @@ describe('isRetryableFailure', () => {
 
 describe('getReviewQualityScore', () => {
   const category = (status: ReviewStatus): CategoryResult => ({ category: 'language', status });
+  const scored = (name: string, status: ReviewStatus, score: number): CategoryResult => ({
+    category: name,
+    status,
+    score,
+  });
 
   it('never scores an unevaluated review as a pass', () => {
     // The regression this contract exists to prevent: a failed review reading 10/10.
@@ -115,53 +120,71 @@ describe('getReviewQualityScore', () => {
     expect(getReviewQualityScore([category('Not Evaluated')])).toBe(0);
   });
 
-  it('still scores a genuinely clean review as a pass', () => {
-    expect(getReviewQualityScore([category('Acceptable')])).toBe(9.5);
+  it('uses the backend score for a category instead of a per-status constant', () => {
+    // Two categories share a status but differ in how bad they are; the score
+    // must reflect the findings, not the label.
+    expect(getReviewQualityScore([scored('language', 'Unacceptable', 4)])).toBe(4);
+    expect(getReviewQualityScore([scored('language', 'Unacceptable', 2)])).toBe(2);
+  });
+
+  it('scores a flawless requirement as a full 10', () => {
+    expect(
+      getReviewQualityScore([
+        scored('language', 'Acceptable', 10),
+        scored('structure', 'Acceptable', 10),
+        scored('verifiability', 'Acceptable', 10),
+        scored('certification', 'Acceptable', 10),
+      ])
+    ).toBe(10);
   });
 
   it('averages the category scores', () => {
-    // 9.5 + 9.5 + 9.5 + 3.0 = 31.5, / 4 = 7.875
+    // 10 + 10 + 10 + 4 = 34, / 4 = 8.5
     expect(
       getReviewQualityScore([
-        { category: 'language', status: 'Acceptable' },
-        { category: 'structure', status: 'Acceptable' },
-        { category: 'verifiability', status: 'Acceptable' },
-        { category: 'certification', status: 'Unacceptable' },
+        scored('language', 'Acceptable', 10),
+        scored('structure', 'Acceptable', 10),
+        scored('verifiability', 'Acceptable', 10),
+        scored('certification', 'Unacceptable', 4),
       ])
-    ).toBe(7.875);
+    ).toBe(8.5);
   });
 
   it('is not dragged down to the worst category', () => {
     // The bug this replaced: one Unacceptable category clamped the overall
     // score into [0, 4], so the headline number contradicted the tiles below it.
     const score = getReviewQualityScore([
-      { category: 'language', status: 'Acceptable' },
-      { category: 'structure', status: 'Acceptable' },
-      { category: 'verifiability', status: 'Acceptable' },
-      { category: 'certification', status: 'Unacceptable' },
+      scored('language', 'Acceptable', 10),
+      scored('structure', 'Acceptable', 10),
+      scored('verifiability', 'Acceptable', 10),
+      scored('certification', 'Unacceptable', 3.5),
     ]);
     expect(score).toBeGreaterThan(4);
+    expect(getReviewQualityStatus(score)).toBe('Acceptable');
   });
 
-  it('scores an all-clean review as the clean category score', () => {
-    expect(
-      getReviewQualityScore([
-        { category: 'language', status: 'Acceptable' },
-        { category: 'structure', status: 'Acceptable' },
-        { category: 'verifiability', status: 'Acceptable' },
-        { category: 'certification', status: 'Acceptable' },
-      ])
-    ).toBe(9.5);
+  it('falls back to the status when a legacy payload carries no score', () => {
+    expect(getReviewQualityScore([category('Acceptable')])).toBe(10);
   });
 
   it('ignores unevaluated categories rather than counting them as zero', () => {
-    // 9.5 + 6.5 = 16, / 2 = 8
+    // 10 + 6 = 16, / 2 = 8
     expect(
       getReviewQualityScore([
-        { category: 'language', status: 'Acceptable' },
-        { category: 'structure', status: 'Revision Recommended' },
+        scored('language', 'Acceptable', 10),
+        scored('structure', 'Revision Recommended', 6),
         { category: 'verifiability', status: 'Not Evaluated' },
       ])
     ).toBe(8);
+  });
+});
+
+describe('getReviewQualityStatus', () => {
+  it('bands the average score rather than the worst category', () => {
+    expect(getReviewQualityStatus(10)).toBe('Acceptable');
+    expect(getReviewQualityStatus(8)).toBe('Acceptable');
+    expect(getReviewQualityStatus(7.999)).toBe('Revision Recommended');
+    expect(getReviewQualityStatus(5)).toBe('Revision Recommended');
+    expect(getReviewQualityStatus(4.999)).toBe('Unacceptable');
   });
 });

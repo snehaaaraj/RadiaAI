@@ -21,6 +21,8 @@ from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchServic
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
 from app.ingestion.service import IngestionService
+from app.ingestion.sharepoint_webhook import SharePointWebhookService
+from app.ingestion.status_store import IngestionStatusStore
 from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import JamaClient
@@ -122,8 +124,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # SharePoint + Standards
     sharepoint_client = SharePointStandardsClient(settings.sharepoint)
-    app.state.standards_service = StandardsService(StandardsRegistry(), sharepoint_client)
-    app.state.sharepoint_client = sharepoint_client
 
     # Jama Connect integration (read-only requirement access)
     jama_client = JamaClient(settings.jama)
@@ -140,6 +140,32 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         sharepoint_client=sharepoint_client,
     )
     app.state.ingestion_service = ingestion_service
+
+    # Ingestion status store - lets the frontend poll for the outcome of the most
+    # recent ingestion run, whether triggered manually or via the SharePoint webhook.
+    ingestion_status_store = IngestionStatusStore(blob_client)
+    app.state.ingestion_status_store = ingestion_status_store
+
+    # SharePoint webhook - auto-triggers ingestion when documents change in SharePoint,
+    # instead of relying solely on the manual "Ingest Documents" button.
+    sharepoint_webhook_service = SharePointWebhookService(
+        settings=settings.sharepoint,
+        sharepoint_client=sharepoint_client,
+        blob_client=blob_client,
+        ingestion_service=ingestion_service,
+        status_store=ingestion_status_store,
+    )
+    app.state.sharepoint_webhook_service = sharepoint_webhook_service
+    if settings.sharepoint.is_webhook_configured:
+        try:
+            sharepoint_webhook_service.ensure_subscription()
+        except Exception:
+            logger.exception("sharepoint_webhook_subscription_bootstrap_failed")
+
+    app.state.standards_service = StandardsService(
+        StandardsRegistry(), sharepoint_client, sharepoint_webhook_service
+    )
+    app.state.sharepoint_client = sharepoint_client
 
     # Note: Auto-sync removed for Vercel serverless compatibility.
     # Use manual ingestion via POST /api/v1/ingest endpoint or UI button instead.
@@ -317,7 +343,16 @@ def get_standards_service(request: Request) -> StandardsService:
     if service is None:
         settings = _resolve_settings(request.app)
         sharepoint_client = SharePointStandardsClient(settings.sharepoint)
-        service = StandardsService(StandardsRegistry(), sharepoint_client)
+        try:
+            webhook_service: SharePointWebhookService | None = get_sharepoint_webhook_service(
+                request
+            )
+        except Exception:
+            # Cold-start / test contexts may lack the ingestion service needed to build
+            # the webhook service; the fallback renewal check is best-effort, not required.
+            logger.warning("sharepoint_webhook_service_unavailable_for_standards")
+            webhook_service = None
+        service = StandardsService(StandardsRegistry(), sharepoint_client, webhook_service)
         request.app.state.standards_service = service
     return service
 
@@ -367,3 +402,46 @@ def get_ingestion_service(request: Request) -> IngestionService:
 
 
 IngestionServiceDep = Annotated[IngestionService, Depends(get_ingestion_service)]
+
+
+def get_sharepoint_webhook_service(request: Request) -> SharePointWebhookService:
+    """Resolve the SharePoint webhook subscription service from application state."""
+    service = getattr(request.app.state, "sharepoint_webhook_service", None)
+    if service is None:
+        settings = _resolve_settings(request.app)
+        sharepoint_client = getattr(request.app.state, "sharepoint_client", None) or (
+            SharePointStandardsClient(settings.sharepoint)
+        )
+        blob_client = getattr(request.app.state, "blob_client", None) or BlobStorageClient(
+            settings.azure_blob
+        )
+        service = SharePointWebhookService(
+            settings=settings.sharepoint,
+            sharepoint_client=sharepoint_client,
+            blob_client=blob_client,
+            ingestion_service=get_ingestion_service(request),
+            status_store=get_ingestion_status_store(request),
+        )
+        request.app.state.sharepoint_webhook_service = service
+    return service
+
+
+SharePointWebhookServiceDep = Annotated[
+    SharePointWebhookService, Depends(get_sharepoint_webhook_service)
+]
+
+
+def get_ingestion_status_store(request: Request) -> IngestionStatusStore:
+    """Resolve the ingestion status store from application state."""
+    store = getattr(request.app.state, "ingestion_status_store", None)
+    if store is None:
+        settings = _resolve_settings(request.app)
+        blob_client = getattr(request.app.state, "blob_client", None) or BlobStorageClient(
+            settings.azure_blob
+        )
+        store = IngestionStatusStore(blob_client)
+        request.app.state.ingestion_status_store = store
+    return store
+
+
+IngestionStatusStoreDep = Annotated[IngestionStatusStore, Depends(get_ingestion_status_store)]

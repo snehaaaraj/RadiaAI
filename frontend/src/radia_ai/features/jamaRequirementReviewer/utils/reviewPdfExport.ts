@@ -7,8 +7,8 @@
  */
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { CategoryResult, ReviewFinding, ReviewStatus, RequirementReviewResponse } from '@/types/api';
-import { getReviewQualityScore, getCategoryStatusScore } from '@/utils/reviewQuality';
+import type { CategoryResult, ReviewFinding, RequirementReviewResponse } from '@/types/api';
+import { getReviewQualityScore, getCategoryScore } from '@/utils/reviewQuality';
 
 export interface ReviewPdfMetadataItem {
   label: string;
@@ -42,9 +42,9 @@ function categoryLabel(category: string): string {
   );
 }
 
-function statusScoreLabel(status: ReviewStatus): string {
-  if (status === 'Not Evaluated') return 'Not scored';
-  return `${getCategoryStatusScore(status).toFixed(1)} (${status})`;
+function statusScoreLabel(category: CategoryResult): string {
+  if (category.status === 'Not Evaluated') return 'Not scored';
+  return `${getCategoryScore(category).toFixed(1)} (${category.status})`;
 }
 
 const PAGE_MARGIN = 40;
@@ -87,7 +87,7 @@ function addCategoryTable(doc: jsPDF, cursorY: number, categories: CategoryResul
   autoTable(doc, {
     startY: cursorY,
     head: [['Category', 'Score']],
-    body: categories.map((c) => [categoryLabel(c.category), statusScoreLabel(c.status)]),
+    body: categories.map((c) => [categoryLabel(c.category), statusScoreLabel(c)]),
     styles: { fontSize: 9, cellPadding: 4 },
     headStyles: { fillColor: [27, 79, 216] },
     margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },

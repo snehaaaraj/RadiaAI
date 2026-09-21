@@ -1,7 +1,13 @@
 import type { CategoryResult, ReviewStatus } from '@/types/api';
 
-const STATUS_BASE_SCORE: Record<ReviewStatus, number> = {
-  Acceptable: 9.5,
+/**
+ * Fallback score per status, used only for payloads that carry no numeric
+ * `score` (older stored reviews). Live reviews score each category from its
+ * findings on the backend, so these values are a compatibility shim and not the
+ * scoring model.
+ */
+const STATUS_FALLBACK_SCORE: Record<ReviewStatus, number> = {
+  Acceptable: 10,
   'Revision Recommended': 6.5,
   Unacceptable: 3,
   // An unevaluated subject has no quality score. Callers should check the review
@@ -9,6 +15,11 @@ const STATUS_BASE_SCORE: Record<ReviewStatus, number> = {
   // entry only keeps the lookup total.
   'Not Evaluated': 0,
 };
+
+/** At or above this average score the subject is Acceptable. */
+export const ACCEPTABLE_THRESHOLD = 8;
+/** At or above this average score the subject needs revision; below it, Unacceptable. */
+export const REVISION_THRESHOLD = 5;
 
 function clamp(value: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, value));
@@ -20,17 +31,12 @@ function clamp(value: number, min: number, max: number): number {
  * The overall number answers "how good is this requirement overall", so it is
  * the average of the parts shown in the category grid and nothing else. It is
  * deliberately NOT clamped by the worst category — that would make the headline
- * number disagree with the tiles directly beneath it.
+ * number disagree with the tiles directly beneath it, and would condemn an
+ * otherwise strong requirement over a single weak sub-category.
  *
- * Severity is not applied again here. The backend already maps a finding's
- * severity to its status (Low/Medium -> Revision Recommended, High/Critical ->
- * Unacceptable) and a category takes the worst status among its findings, so
- * severity is fully reflected in the category scores being averaged. Penalising
- * it a second time would double-count it.
- *
- * The gating verdict still travels separately as the overall `status` chip, so
- * a requirement that averages well but is Unacceptable in one category is not
- * presented as passing.
+ * Severity is not applied again here. The backend already turns each finding's
+ * severity into the category score being averaged, so penalising it a second
+ * time would double-count it.
  */
 export function getReviewQualityScore(categories: CategoryResult[]): number {
   const scored = categories.filter((category) => category.status !== 'Not Evaluated');
@@ -38,14 +44,23 @@ export function getReviewQualityScore(categories: CategoryResult[]): number {
   // Nothing was scored — never fall through to a passing value.
   if (scored.length === 0) return 0;
 
-  const total = scored.reduce(
-    (sum, category) => sum + getCategoryStatusScore(category.status),
-    0
-  );
+  const total = scored.reduce((sum, category) => sum + getCategoryScore(category), 0);
 
-  // Category scores land on quarter/eighth values, so keep three decimals to
+  // Category scores can land on fractional values, so keep three decimals to
   // hold the exact mean (e.g. 7.875). Display rounds to one decimal.
-  return Number((clamp(total / scored.length, 0, 10)).toFixed(3));
+  return Number(clamp(total / scored.length, 0, 10).toFixed(3));
+}
+
+/**
+ * Verdict band for an average score.
+ *
+ * Bands come from the average, so a single weak sub-category lowers the overall
+ * score without on its own forcing an Unacceptable verdict.
+ */
+export function getReviewQualityStatus(score: number): ReviewStatus {
+  if (score >= ACCEPTABLE_THRESHOLD) return 'Acceptable';
+  if (score >= REVISION_THRESHOLD) return 'Revision Recommended';
+  return 'Unacceptable';
 }
 
 export function getReviewQualityColor(score: number): string {
@@ -54,6 +69,18 @@ export function getReviewQualityColor(score: number): string {
   return `hsl(${hue} 80% 46%)`;
 }
 
-export function getCategoryStatusScore(status: ReviewStatus): number {
-  return STATUS_BASE_SCORE[status];
+/**
+ * Score for one category: the backend's finding-derived value when present,
+ * otherwise a status-based approximation for legacy payloads.
+ */
+export function getCategoryScore(category: CategoryResult): number {
+  if (typeof category.score === 'number' && Number.isFinite(category.score)) {
+    return clamp(category.score, 0, 10);
+  }
+  return getCategoryStatusScore(category.status);
 }
+
+export function getCategoryStatusScore(status: ReviewStatus): number {
+  return STATUS_FALLBACK_SCORE[status];
+}
+
