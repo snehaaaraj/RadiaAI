@@ -1,13 +1,19 @@
 """Chat endpoint schemas - request/response models for the RAG chat interface."""
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
 class ChatMessage(BaseModel):
     """A single message in a conversation turn."""
 
-    role: str = Field(description="'user' or 'assistant'")
-    content: str = Field(min_length=1, description="Message content")
+    # Restricted to a Literal (rather than a free-form str) so a caller cannot
+    # smuggle a "system" role turn into conversation_history and have it
+    # forwarded to the LLM as an extra system message - that would let an
+    # attacker inject instructions with system-level priority.
+    role: Literal["user", "assistant"] = Field(description="'user' or 'assistant'")
+    content: str = Field(min_length=1, max_length=4000, description="Message content")
 
 
 class ChatRequest(BaseModel):

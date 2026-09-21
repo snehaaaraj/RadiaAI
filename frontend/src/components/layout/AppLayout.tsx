@@ -4,11 +4,12 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { Outlet, useLocation } from 'react-router-dom';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
+import { ChatWidget } from '@/components/chat/ChatWidget';
 import { NavigationConfirmDialog } from '@/components/common/NavigationConfirmDialog';
 import { NavigationGuardProvider } from '@/context/NavigationGuardContext';
 import { useAppContext } from '@/context/useAppContext';
 import { useNavigationGuardContext } from '@/context/useNavigationGuardContext';
-import { HEADER_HEIGHT, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
+import { HEADER_HEIGHT, ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 
 function AppLayoutInner() {
   const { sidebarOpen, motionPreference, uiDensity } = useAppContext();
@@ -57,6 +58,8 @@ function AppLayoutInner() {
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />
+
+      {location.pathname !== ROUTES.CHAT && <ChatWidget />}
     </Box>
   );
 }

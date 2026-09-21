@@ -196,6 +196,13 @@ class LLMError(AzureServiceError):
         )
 
 
+class ChatTimeoutError(RadiaBaseException):
+    """Raised when retrieval or answer generation for the chat pipeline times out."""
+
+    http_status = HTTPStatus.GATEWAY_TIMEOUT
+    error_code = "CHAT_TIMEOUT"
+
+
 # ---------------------------------------------------------------------------
 # Auth errors
 # ---------------------------------------------------------------------------

@@ -174,6 +174,46 @@ class RAGService:
             else self._settings.azure_openai.temperature,
         )
 
+    def generate_chat_answer(
+        self,
+        system_prompt: str,
+        question: str,
+        context: RetrievedContext,
+        *,
+        conversation_history: list[dict[str, str]] | None = None,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+    ) -> str:
+        """
+        Run a multi-turn chat completion grounded in retrieved context.
+
+        Like ``generate_with_context``, but also splices prior conversation
+        turns between the system prompt and the current question so the chat
+        endpoint can support follow-up questions. *conversation_history* items
+        must already be restricted to the ``user``/``assistant`` roles by the
+        caller - they are passed straight through to the LLM as message turns,
+        never merged into the system prompt, so they cannot be mistaken for
+        grounding instructions.
+        """
+        context_text = context.format_for_prompt()
+        full_system = (
+            f"{system_prompt}\n\n"
+            f"## Retrieved Standards Context\n\n"
+            f"{context_text}"
+        )
+
+        messages = [{"role": "system", "content": full_system}]
+        messages.extend(conversation_history or [])
+        messages.append({"role": "user", "content": question})
+
+        return self._openai.chat_completion(
+            messages,
+            temperature=temperature
+            if temperature is not None
+            else self._settings.azure_openai.temperature,
+            max_tokens=max_tokens,
+        )
+
 
 def _diversify_by_source(results: list[dict[str, Any]], target_count: int) -> list[dict[str, Any]]:
     """
