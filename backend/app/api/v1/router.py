@@ -7,7 +7,7 @@ and registering it here. No changes needed elsewhere in the app.
 
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import chat, documents, health, ingest, review, search, standards
+from app.api.v1.endpoints import chat, documents, health, ingest, jama, review, search, standards
 
 # Master router for /api/v1
 router = APIRouter()
@@ -19,3 +19,4 @@ router.include_router(ingest.router, prefix="/ingest", tags=["Ingestion"])
 router.include_router(documents.router, prefix="/documents", tags=["Documents"])
 router.include_router(review.router, prefix="/review", tags=["Review"])
 router.include_router(standards.router, prefix="/standards", tags=["Standards"])
+router.include_router(jama.router, prefix="/jama", tags=["Jama"])

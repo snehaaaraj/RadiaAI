@@ -260,3 +260,47 @@ class IngestionError(RadiaBaseException):
             enhanced_detail["original_error"] = str(original_error)
 
         super().__init__(message, enhanced_detail)
+
+
+# ---------------------------------------------------------------------------
+# Jama Connect integration errors
+# ---------------------------------------------------------------------------
+
+
+class JamaNotConfiguredError(RadiaBaseException):
+    """Raised when a Jama endpoint is called but no credentials are configured."""
+
+    http_status = HTTPStatus.SERVICE_UNAVAILABLE
+    error_code = "JAMA_NOT_CONFIGURED"
+
+
+class JamaItemNotFoundError(RadiaBaseException):
+    """Raised when a requested Jama item does not exist or is not visible."""
+
+    http_status = HTTPStatus.NOT_FOUND
+    error_code = "JAMA_ITEM_NOT_FOUND"
+
+
+class JamaServiceError(RadiaBaseException):
+    """Raised when a call to the Jama REST API fails."""
+
+    http_status = HTTPStatus.BAD_GATEWAY
+    error_code = "JAMA_SERVICE_ERROR"
+
+    def __init__(
+        self,
+        message: str = "Jama API request failed",
+        operation: str | None = None,
+        status_code: int | None = None,
+        original_error: str | None = None,
+        detail: dict[str, Any] | None = None,
+    ) -> None:
+        enhanced_detail = detail or {}
+        if operation:
+            enhanced_detail["operation"] = operation
+        if status_code is not None:
+            enhanced_detail["jama_status_code"] = status_code
+        if original_error:
+            enhanced_detail["original_error"] = str(original_error)
+
+        super().__init__(message, enhanced_detail)

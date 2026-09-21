@@ -346,3 +346,50 @@ export interface ReviewHistoryListResponse {
   total: number;
   entries: ReviewHistoryEntry[];
 }
+
+// ---------------------------------------------------------------------------
+// Jama Connect integration
+// ---------------------------------------------------------------------------
+
+export interface JamaProject {
+  id: number;
+  name: string;
+  project_key: string | null;
+  is_folder: boolean;
+}
+
+export interface JamaProjectList {
+  projects: JamaProject[];
+}
+
+export interface JamaRequirementSummary {
+  id: number;
+  document_key: string | null;
+  global_id: string | null;
+  name: string;
+  item_type_id: number | null;
+  project_id: number | null;
+}
+
+export interface JamaRequirementSearchResult {
+  results: JamaRequirementSummary[];
+  total: number;
+  start_at: number;
+  max_results: number;
+}
+
+export interface JamaRequirement {
+  id: number;
+  document_key: string | null;
+  global_id: string | null;
+  name: string;
+  description: string;
+  status: string | null;
+  item_type_id: number | null;
+  project_id: number | null;
+  created_date: string | null;
+  modified_date: string | null;
+  web_url: string | null;
+  fields: Record<string, unknown>;
+}
+

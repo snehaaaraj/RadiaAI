@@ -27,6 +27,7 @@ from app.core.config import (
     AzureOpenAISettings,
     AzureSearchSettings,
     EntraIDSettings,
+    JamaSettings,
     SharePointSettings,
     get_settings,
 )
@@ -86,6 +87,17 @@ def _default_settings() -> AppSettings:
             drive_name="Requirements Management",
             standards_folder="0. Reference Material/AI Reference Material",
             cache_ttl_seconds=300,
+        ),
+        jama=JamaSettings.model_construct(
+            base_url="",
+            auth_type="basic",
+            username="",
+            password="",
+            client_id="",
+            client_secret="",
+            api_version="v1",
+            timeout_seconds=20.0,
+            verify_ssl=True,
         ),
     )
 
