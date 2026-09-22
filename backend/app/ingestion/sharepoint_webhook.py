@@ -236,6 +236,7 @@ class SharePointWebhookService:
     def _notification_url(self) -> str:
         base = self._settings.webhook_public_base_url.rstrip("/")
         return f"{base}/api/v1/ingest/webhook"
+
     # ------------------------------------------------------------------
     # Notification handling
     # ------------------------------------------------------------------
