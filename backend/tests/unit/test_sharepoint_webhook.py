@@ -91,7 +91,7 @@ def test_ensure_subscription_creates_and_persists_state(monkeypatch: pytest.Monk
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.method == "POST"
         body = json.loads(request.content)
-        assert body["resource"] == "/drives/drive-1/items/folder-item-1"
+        assert body["resource"] == "/drives/drive-1/root"
         assert body["notificationUrl"] == "https://myapp.vercel.app/api/v1/ingest/webhook"
         return httpx.Response(
             201,

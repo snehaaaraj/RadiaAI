@@ -52,8 +52,9 @@ _FALLBACK_CHECK_INTERVAL_SECONDS = 900  # 15 minutes
 
 _STATE_BLOB_NAME = "system/sharepoint-webhook-subscription.json"
 
-# Only "updated" is supported for drive/folder resources - Graph does not support
-# separate created/deleted change types for these resources.
+# Graph supports change notifications on the drive root, but not on an
+# arbitrary folder driveItem. The handler rescans the configured folder after
+# any change in the document library.
 _CHANGE_TYPE = "updated"
 
 
@@ -151,7 +152,7 @@ class SharePointWebhookService:
         self.ensure_subscription()
 
     def _create(self, now: datetime) -> None:
-        drive_id, folder_item_id = self._sharepoint.resolve_folder_context()
+        drive_id, _folder_item_id = self._sharepoint.resolve_folder_context()
         client_state = secrets.token_urlsafe(32)
         expiration = now + _SUBSCRIPTION_LIFETIME
         notification_url = self._notification_url()
@@ -159,7 +160,7 @@ class SharePointWebhookService:
         body = {
             "changeType": _CHANGE_TYPE,
             "notificationUrl": notification_url,
-            "resource": f"/drives/{drive_id}/items/{folder_item_id}",
+            "resource": f"/drives/{drive_id}/root",
             "expirationDateTime": _graph_timestamp(expiration),
             "clientState": client_state,
         }
