@@ -385,11 +385,16 @@ the full reference with descriptions.
 
 ```bash
 cd backend
-pytest                          # all tests (55 unit tests)
+pytest                          # all tests
 pytest -m unit                  # unit tests only
 pytest -m integration           # integration tests only (requires Azure)
 pytest --cov=app --cov=radia_ai # with coverage report
 ```
+
+Backend unit-test coverage is enforced at **70%** in CI. Coverage increases are
+staged with focused tests for authentication and authorization, configuration
+validation, chat/RAG, ingestion and webhook failures, blob persistence, search
+failures, and API contracts.
 
 ---
 

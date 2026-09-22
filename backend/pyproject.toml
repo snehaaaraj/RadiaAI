@@ -99,5 +99,6 @@ source = ["app"]
 omit = ["tests/*", "app/main.py"]
 
 [tool.coverage.report]
-fail_under = 45
+# Current staged baseline. Raise this with each expansion of the critical-path suite.
+fail_under = 65
 show_missing = true
