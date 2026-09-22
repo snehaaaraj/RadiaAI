@@ -2,11 +2,12 @@
 Document extraction utilities for the ingestion pipeline.
 
 Extracts plain text from common document formats (PDF, plain text, Markdown).
-Falls back to raw UTF-8 decoding for unsupported formats.
+Falls back to raw UTF-8 decoding for unsupported non-PDF formats.
 """
 
 from __future__ import annotations
 
+from app.core.exceptions import ConfigurationError
 from app.core.logging import get_logger
 
 logger = get_logger(__name__)
@@ -42,21 +43,14 @@ def extract_pages(data: bytes, filename: str) -> list[tuple[int, str]]:
 
 
 def _extract_pdf_pages(data: bytes) -> list[tuple[int, str]]:
-    """Extract per-page text from a PDF using PyMuPDF (fitz) if available, else basic fallback."""
+    """Extract per-page text from a PDF using PyMuPDF (fitz)."""
     try:
         import fitz  # PyMuPDF
+    except ImportError as exc:
+        raise ConfigurationError(
+            "PyMuPDF is required to extract PDF documents",
+            detail={"dependency": "PyMuPDF"},
+        ) from exc
 
-        doc = fitz.open(stream=data, filetype="pdf")
-        pages = [(i + 1, page.get_text()) for i, page in enumerate(doc)]
-        doc.close()
-        return pages
-    except ImportError:
-        logger.warning("pymupdf_not_installed_using_fallback")
-        # Very basic PDF text extraction fallback - page boundaries are unknown,
-        # so the whole document is reported as a single unnumbered page.
-        text = data.decode("latin-1", errors="replace")
-        # Strip binary noise - not reliable but better than nothing
-        import re
-
-        clean = re.sub(r"[^\x20-\x7E\n\r\t]", " ", text)
-        return [(1, clean)]
+    with fitz.open(stream=data, filetype="pdf") as doc:
+        return [(i + 1, page.get_text()) for i, page in enumerate(doc)]
