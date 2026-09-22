@@ -12,11 +12,11 @@ and reused for the lifetime of the application.
 
 from __future__ import annotations
 
-import contextlib
 import hashlib
 from typing import TYPE_CHECKING, Any, cast
 
 from azure.core.credentials import AzureKeyCredential
+from azure.core.exceptions import ResourceNotFoundError
 from azure.search.documents import SearchClient
 from azure.search.documents.indexes import SearchIndexClient
 from azure.search.documents.indexes.models import (
@@ -45,6 +45,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
 logger = get_logger(__name__)
+
+_SEARCH_UPLOAD_BATCH_SIZE = 100
 
 
 # ---------------------------------------------------------------------------
@@ -273,16 +275,33 @@ class SearchService:
             semantic_search=SemanticSearch(configurations=[semantic_config]),
         )
 
+        # NOTE: This runs on every application startup (including every serverless
+        # cold start on Vercel). It must never silently delete an existing index -
+        # doing so previously wiped all ingested documents when a *transient*
+        # error (throttling, a concurrent cold start racing on the same PUT,
+        # a network blip, etc.) was mistaken for a genuine schema conflict.
+        # Deleting a populated index is only ever appropriate as a deliberate,
+        # human-initiated maintenance action - never as an automatic fallback.
+        try:
+            self._index_client.get_index(self._settings.index_name)
+        except ResourceNotFoundError:
+            # Index does not exist yet - safe to create from scratch.
+            self._index_client.create_or_update_index(index)
+            logger.info("search_index_created", index_name=self._settings.index_name)
+            return
+
         try:
             self._index_client.create_or_update_index(index)
         except Exception:
-            # Incompatible existing index - delete and recreate
-            logger.warning(
-                "index_schema_incompatible_recreating", index_name=self._settings.index_name
+            # The index already exists and updating its schema failed (e.g. an
+            # incompatible field type change). Surface this loudly instead of
+            # deleting production data automatically - a real schema migration
+            # requires an explicit, deliberate recreation step.
+            logger.exception(
+                "search_index_schema_update_failed",
+                index_name=self._settings.index_name,
             )
-            with contextlib.suppress(Exception):
-                self._index_client.delete_index(self._settings.index_name)
-            self._index_client.create_or_update_index(index)
+            raise
 
         logger.info("search_index_ensured", index_name=self._settings.index_name)
 
@@ -292,8 +311,20 @@ class SearchService:
         """Upload (merge-or-upload) documents into the search index. Returns count uploaded."""
         if not documents:
             return 0
-        result = self._search_client.upload_documents(documents=documents)
-        succeeded = sum(1 for r in result if r.succeeded)
+
+        succeeded = 0
+        for offset in range(0, len(documents), _SEARCH_UPLOAD_BATCH_SIZE):
+            batch = documents[offset : offset + _SEARCH_UPLOAD_BATCH_SIZE]
+            result = self._search_client.upload_documents(documents=batch)
+            batch_succeeded = sum(1 for item in result if item.succeeded)
+            succeeded += batch_succeeded
+            logger.info(
+                "document_batch_uploaded",
+                batch_number=(offset // _SEARCH_UPLOAD_BATCH_SIZE) + 1,
+                batch_size=len(batch),
+                succeeded=batch_succeeded,
+            )
+
         logger.info("documents_uploaded", total=len(documents), succeeded=succeeded)
         return succeeded
 
