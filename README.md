@@ -8,7 +8,10 @@ grounded, traceable, and explainable requirement reviews.
 
 ## Architecture
 
-For a fuller technical breakdown, see [docs/architecture.md](docs/architecture.md).
+For a fuller technical breakdown and the current implementation status, see
+[docs/architecture.md](docs/architecture.md). The architecture describes the
+target design; features marked **In progress** or **Planned** there are not
+production-ready.
 
 ```
 ┌────────────────────────────────────────────────────────────┐

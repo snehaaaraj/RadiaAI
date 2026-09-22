@@ -2,6 +2,10 @@
 
 Radia AI is an explainable requirements-engineering platform for aerospace and systems teams. It combines a React frontend with a FastAPI backend to support requirement quality review, delta review, standards lookup, review history, and document-oriented workflows.
 
+> **Architecture status:** This document describes the target architecture. The
+> implementation-status table in §13 identifies capabilities that are currently
+> implemented, in progress, or planned.
+
 ## 1. System goals
 
 - Make requirement review repeatable and explainable
@@ -332,7 +336,7 @@ Review history persists across deployments and serverless invocations via Azure 
 
 ## 10. Document and RAG surfaces
 
-Radia AI also includes document-centric workflows:
+The target architecture includes these document-centric workflows:
 
 - chat over indexed content
 - document search (keyword / vector / hybrid)
@@ -378,15 +382,17 @@ The project supports:
 
 ## 13. Current implementation status
 
-Implemented and central to the product:
-
-- LLM-based requirement review grounded in indexed standards
-- explicit review completion reporting (§6)
-- delta review that verifies revisions without re-authoring them
-- standards catalog browsing
-- document ingestion, search, and chat over the index
-- workspace and launchpad UX
-- durable review history backed by Azure Blob Storage
+| Capability | Status | Current scope and remaining work |
+|---|---|---|
+| Standards-grounded requirement, set, and delta review | Implemented | Includes completion reporting, version metadata, and standards reference resolution. |
+| Review history | Implemented | Persists review history and dispositions in Azure Blob Storage. |
+| Document ingestion and search | Implemented | Supports SharePoint and file-upload ingestion, chunking, embedding, and keyword/vector/hybrid search. |
+| Chat over indexed documents | Implemented | Provides grounded RAG responses, citations, streaming, no-answer behavior, and search-failure handling. |
+| Document listing and document management | Planned | `GET /api/v1/documents` currently returns an empty placeholder response; document detail and deletion are not implemented. |
+| Document-oriented workflows | In progress | Ingestion, search, and chat are available; document inventory and management workflows remain incomplete. |
+| Dependency health probes | In progress | The health endpoint and response contract exist, but Azure OpenAI, Search, and Blob checks currently report stub statuses rather than live connectivity. |
+| Microsoft Entra ID authentication and authorization | Planned | Local development uses a synthetic user. Production JWT/JWKS validation, issuer and audience checks, and role extraction are not implemented. |
+| Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
 
 ## 14. Summary
 
