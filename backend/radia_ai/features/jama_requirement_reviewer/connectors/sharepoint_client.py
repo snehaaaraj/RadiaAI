@@ -267,6 +267,8 @@ class SharePointStandardsClient:
 
         Returns a list of dicts with keys: name, content (bytes), url, document_type.
         Used by the ingestion pipeline to index standards into Azure AI Search.
+        Raises if the SharePoint scan fails. An empty successful result is
+        meaningful: it allows ingestion to remove documents deleted upstream.
         """
         if not self._settings.is_configured:
             return []
@@ -316,4 +318,4 @@ class SharePointStandardsClient:
 
         except Exception:
             logger.exception("sharepoint_file_download_failed")
-            return []
+            raise

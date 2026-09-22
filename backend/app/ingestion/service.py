@@ -105,26 +105,24 @@ class IngestionService:
             return {"status": "skipped", "message": "SharePoint not configured"}
 
         files: list[SharePointFileContent] = self._sharepoint.fetch_file_contents()
-        if not files:
-            return {"status": "skipped", "message": "No files retrieved from SharePoint"}
-
+        indexed_files = self._search.get_indexed_files(source="sharepoint")
         indexed_hashes = self._search.get_indexed_file_hashes()
         results: IngestionResult = {"processed": 0, "skipped": 0, "failed": 0, "details": []}
+        scanned_filenames: set[str] = set()
+        synced_files: dict[str, str] = {}
 
         for file_info in files:
             try:
                 data = file_info["content"]
                 file_hash = compute_file_hash(data)
+                filename = file_info["name"]
+                scanned_filenames.add(filename)
 
                 if file_hash in indexed_hashes:
+                    synced_files[filename] = file_hash
                     results["skipped"] += 1
                     results["details"].append({"filename": file_info["name"], "status": "skipped"})
                     continue
-
-                # Delete old chunks for this file if re-indexing
-                old_hash = file_info.get("previous_hash")
-                if old_hash:
-                    self._search.delete_documents_by_file_hash(old_hash)
 
                 self._process_document(
                     data=data,
@@ -134,6 +132,7 @@ class IngestionService:
                     file_hash=file_hash,
                     sharepoint_url=file_info.get("url", ""),
                 )
+                synced_files[filename] = file_hash
                 results["processed"] += 1
                 results["details"].append({"filename": file_info["name"], "status": "indexed"})
 
@@ -149,6 +148,21 @@ class IngestionService:
                         "error": str(e),
                     }
                 )
+
+        # Delete chunks for files removed from SharePoint and old revisions of
+        # files that were successfully represented by the current scan.
+        stale_hashes = {
+            file_hash
+            for filename, hashes in indexed_files.items()
+            for file_hash in hashes
+            if filename not in scanned_filenames
+            or (filename in synced_files and file_hash != synced_files[filename])
+        }
+        for file_hash in stale_hashes:
+            self._search.delete_documents_by_file_hash(file_hash)
+
+        if not files:
+            results["details"].append({"status": "reconciled", "reason": "no files remain"})
 
         return cast(dict[str, Any], results)
 

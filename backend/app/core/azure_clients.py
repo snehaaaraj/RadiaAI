@@ -415,6 +415,28 @@ class SearchService:
             logger.warning("get_indexed_file_hashes_failed_returning_empty")
             return set()
 
+    def get_indexed_files(self, *, source: str) -> dict[str, set[str]]:
+        """Return indexed file hashes grouped by filename for one source.
+
+        This is used by source synchronizers to reconcile files that were
+        removed or replaced upstream without relying on an external manifest.
+        Errors are raised because an incomplete result could cause valid search
+        documents to be deleted.
+        """
+        results = self._search_client.search(
+            search_text="*",
+            filter=f"source eq '{source}'",
+            select=["filename", "file_hash"],
+            top=5000,
+        )
+        indexed: dict[str, set[str]] = {}
+        for result in results:
+            filename = result.get("filename")
+            file_hash = result.get("file_hash")
+            if filename and file_hash:
+                indexed.setdefault(filename, set()).add(file_hash)
+        return indexed
+
 
 # ---------------------------------------------------------------------------
 # Azure Blob Storage client

@@ -57,6 +57,11 @@ _STATE_BLOB_NAME = "system/sharepoint-webhook-subscription.json"
 _CHANGE_TYPE = "updated"
 
 
+def _graph_timestamp(value: datetime) -> str:
+    """Format a UTC timestamp in the Graph API's required ``Z`` form."""
+    return value.astimezone(UTC).isoformat(timespec="seconds").replace("+00:00", "Z")
+
+
 class SharePointWebhookService:
     """Creates, renews, and validates the Graph change-notification subscription."""
 
@@ -155,7 +160,7 @@ class SharePointWebhookService:
             "changeType": _CHANGE_TYPE,
             "notificationUrl": notification_url,
             "resource": f"/drives/{drive_id}/items/{folder_item_id}",
-            "expirationDateTime": expiration.isoformat(),
+            "expirationDateTime": _graph_timestamp(expiration),
             "clientState": client_state,
         }
         with httpx.Client() as client:
@@ -165,6 +170,15 @@ class SharePointWebhookService:
                 json=body,
                 timeout=30,
             )
+            if resp.is_error:
+                logger.error(
+                    "sharepoint_webhook_graph_subscription_rejected",
+                    status_code=resp.status_code,
+                    response_body=resp.text[:2000],
+                    notification_url=notification_url,
+                    resource=body["resource"],
+                    expiration=body["expirationDateTime"],
+                )
             resp.raise_for_status()
             subscription = resp.json()
 
@@ -191,7 +205,7 @@ class SharePointWebhookService:
             resp = client.patch(
                 f"{_GRAPH_SUBSCRIPTIONS_URL}/{subscription_id}",
                 headers={**self._sharepoint.auth_headers(), "Content-Type": "application/json"},
-                json={"expirationDateTime": expiration.isoformat()},
+                json={"expirationDateTime": _graph_timestamp(expiration)},
                 timeout=30,
             )
             resp.raise_for_status()
@@ -222,7 +236,6 @@ class SharePointWebhookService:
     def _notification_url(self) -> str:
         base = self._settings.webhook_public_base_url.rstrip("/")
         return f"{base}/api/v1/ingest/webhook"
-
     # ------------------------------------------------------------------
     # Notification handling
     # ------------------------------------------------------------------

@@ -115,3 +115,28 @@ def test_upload_documents_stops_when_a_batch_fails(test_settings: AppSettings) -
         search_service.upload_documents(documents)
 
     assert search_service._search_client.upload_documents.call_count == 2
+
+
+@pytest.mark.unit
+def test_get_indexed_files_groups_hashes_by_source_filename(test_settings: AppSettings) -> None:
+    search_service = SearchService(
+        test_settings.azure_search, openai_client=MagicMock(), app_settings=test_settings
+    )
+    search_service._search_client = MagicMock()
+    search_service._search_client.search.return_value = [
+        {"filename": "guide.pdf", "file_hash": "old-hash"},
+        {"filename": "guide.pdf", "file_hash": "old-hash"},
+        {"filename": "other.pdf", "file_hash": "other-hash"},
+        {"filename": "", "file_hash": "ignored"},
+    ]
+
+    assert search_service.get_indexed_files(source="sharepoint") == {
+        "guide.pdf": {"old-hash"},
+        "other.pdf": {"other-hash"},
+    }
+    search_service._search_client.search.assert_called_once_with(
+        search_text="*",
+        filter="source eq 'sharepoint'",
+        select=["filename", "file_hash"],
+        top=5000,
+    )
