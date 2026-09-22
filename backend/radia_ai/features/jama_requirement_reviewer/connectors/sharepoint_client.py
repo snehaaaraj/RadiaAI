@@ -15,6 +15,7 @@ from urllib.parse import quote
 
 import httpx
 from azure.identity import ClientSecretCredential
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import SharePointSettings
 from app.core.logging import get_logger
@@ -42,6 +43,25 @@ class SharePointFileContent(TypedDict):
 
 # Graph API base URL
 _GRAPH_BASE = "https://graph.microsoft.com/v1.0"
+
+
+@retry(
+    retry=retry_if_exception_type(httpx.TransportError),
+    wait=wait_exponential(multiplier=1, min=1, max=8),
+    stop=stop_after_attempt(3),
+    reraise=True,
+)
+def _download_file(client: httpx.Client, url: str, headers: dict[str, str]) -> httpx.Response:
+    """Download a SharePoint file, retrying transient network failures."""
+    response = client.get(
+        url,
+        headers=headers,
+        timeout=60,
+        follow_redirects=True,
+    )
+    response.raise_for_status()
+    return response
+
 
 # Maps file extension -> requirement review category tags
 _EXT_CATEGORY_MAP: dict[str, list[str]] = {
@@ -294,13 +314,7 @@ class SharePointStandardsClient:
                             f"{_GRAPH_BASE}/drives/{self._drive_id}/items/{item_id}/content"
                         )
 
-                    resp = client.get(
-                        cast(str, download_url),
-                        headers=self._headers(),
-                        timeout=60,
-                        follow_redirects=True,
-                    )
-                    resp.raise_for_status()
+                    resp = _download_file(client, cast(str, download_url), self._headers())
                     files.append(
                         {
                             "name": name,
