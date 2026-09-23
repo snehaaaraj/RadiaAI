@@ -78,6 +78,10 @@ class JamaClient:
     def is_configured(self) -> bool:
         return self._settings.is_configured
 
+    def probe(self) -> None:
+        """Verify authenticated access without retrieving the full project catalog."""
+        self.list_projects(max_results=1)
+
     # -- authentication -----------------------------------------------------
 
     def _ensure_configured(self) -> None:

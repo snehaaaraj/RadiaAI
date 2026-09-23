@@ -99,6 +99,9 @@ source = ["app"]
 omit = ["tests/*", "app/main.py"]
 
 [tool.coverage.report]
-# Current staged baseline. Raise this with each expansion of the critical-path suite.
-fail_under = 65
+# Raise this with each expansion of the critical-path suite (auth, config validation,
+# chat/RAG, ingestion failure paths, webhook validation, blob persistence, search
+# failure behavior, API contracts). Actual coverage is currently ~75%; keep this
+# threshold in sync with the value documented in README.md.
+fail_under = 70
 show_missing = true

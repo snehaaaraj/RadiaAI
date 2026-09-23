@@ -325,7 +325,8 @@ This repository is configured to deploy the frontend from the repo root using [v
 4. Ensure the backend `ALLOWED_ORIGINS` includes your Vercel domain(s)
 
 Quick validation after deploy:
-- `GET <azure-backend>/api/v1/health` returns 200
+- `GET <azure-backend>/api/v1/health/live` returns 200 (process is running)
+- `GET <azure-backend>/api/v1/health/ready` returns 200 with `dependencies` all `ok`/`not_configured` (external services reachable)
 - Frontend loads without API/CORS errors in browser console
 - Run one small PDF ingestion/review path end-to-end first, then scale up
 
@@ -335,7 +336,9 @@ Quick validation after deploy:
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/health` | Application health check |
+| GET | `/api/v1/health/live` | Liveness check - process is running, no external calls |
+| GET | `/api/v1/health/ready` | Readiness check - cached, bounded-timeout dependency reachability (Azure OpenAI, Azure AI Search, Blob Storage, SharePoint, Jama); returns 503 if a required dependency is down |
+| GET | `/api/v1/health` | Legacy alias for `/api/v1/health/ready` |
 | GET | `/api/v1/review/version` | Reviewer bundle version + determinism metadata |
 | GET | `/api/v1/standards` | Standards/reference libraries (SharePoint or fallback) |
 | POST | `/api/v1/review/requirement` | AI-powered individual requirement review |

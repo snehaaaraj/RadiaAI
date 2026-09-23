@@ -390,7 +390,7 @@ The project supports:
 | Chat over indexed documents | Implemented | Provides grounded RAG responses, citations, streaming, no-answer behavior, and search-failure handling. |
 | Document listing and document management | Planned | `GET /api/v1/documents` currently returns an empty placeholder response; document detail and deletion are not implemented. |
 | Document-oriented workflows | In progress | Ingestion, search, and chat are available; document inventory and management workflows remain incomplete. |
-| Dependency health probes | In progress | The health endpoint and response contract exist, but Azure OpenAI, Search, and Blob checks currently report stub statuses rather than live connectivity. |
+| Dependency health probes | Implemented | `GET /health/live` is a lightweight process check; `GET /health/ready` (and the legacy `GET /health` alias) performs bounded, cached, real connectivity probes against Azure OpenAI, Azure AI Search, and Blob Storage (required) plus SharePoint and Jama (optional-but-configured), returning HTTP 503 only when a required dependency is down. |
 | Microsoft Entra ID authentication and authorization | Planned | Local development uses a synthetic user. Production JWT/JWKS validation, issuer and audience checks, and role extraction are not implemented. |
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
 

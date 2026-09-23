@@ -206,6 +206,10 @@ class SharePointStandardsClient:
 
         return self._drive_id, folder_item_id
 
+    def probe(self) -> None:
+        """Verify Graph authentication and access to the configured standards folder."""
+        self.resolve_folder_context()
+
     def _list_folder_children(self, client: httpx.Client, drive_id: str) -> list[GraphDriveItem]:
         """Return the Graph API items from the configured standards folder."""
         folder = self._settings.standards_folder
