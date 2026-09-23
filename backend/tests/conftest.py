@@ -84,6 +84,10 @@ class InMemoryBlobClient:
             if name.startswith(prefix)
         ]
 
+    def probe(self) -> None:
+        """Always succeeds - stands in for a healthy blob store in health checks."""
+        return None
+
 
 def build_stub_finding(
     *,

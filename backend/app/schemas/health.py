@@ -2,13 +2,14 @@
 
 from enum import StrEnum
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class ServiceStatus(StrEnum):
     OK = "ok"
     DEGRADED = "degraded"
     DOWN = "down"
+    NOT_CONFIGURED = "not_configured"
 
 
 class DependencyHealth(BaseModel):
@@ -21,9 +22,17 @@ class DependencyHealth(BaseModel):
 
 
 class HealthResponse(BaseModel):
-    """Aggregated health response returned by GET /api/v1/health."""
+    """Aggregated readiness response returned by GET /api/v1/health/ready."""
 
     status: ServiceStatus
     version: str
     environment: str
-    dependencies: list[DependencyHealth] = []
+    dependencies: list[DependencyHealth] = Field(default_factory=list)
+
+
+class LivenessResponse(BaseModel):
+    """Lightweight process liveness response."""
+
+    status: ServiceStatus
+    version: str
+    environment: str

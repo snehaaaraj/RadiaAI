@@ -93,6 +93,10 @@ class OpenAIClient:
                 detail={"text_count": len(texts)},
             ) from e
 
+    def probe(self) -> None:
+        """Verify that the Azure OpenAI endpoint accepts authenticated requests."""
+        self._client.models.list()
+
     def chat_completion(
         self,
         messages: list[dict[str, str]],
@@ -213,6 +217,10 @@ class SearchService:
         )
 
     # -- Index management --
+
+    def probe(self) -> None:
+        """Verify that the configured search index is reachable."""
+        self._index_client.get_index(self._settings.index_name)
 
     def ensure_index(self) -> None:
         """Create or update the search index with the expected schema."""
@@ -462,6 +470,10 @@ class BlobStorageClient:
             content_settings=ContentSettings(content_type=content_type),
         )
         return cast(str, blob_client.url)
+
+    def probe(self) -> None:
+        """Verify that the configured blob container is reachable."""
+        self._container_client.get_container_properties()
 
     def download_blob(self, blob_name: str) -> bytes:
         """Download blob content as bytes."""
