@@ -29,6 +29,7 @@ from app.core.config import (
     EntraIDSettings,
     JamaSettings,
     SharePointSettings,
+    get_configured_environment,
     get_settings,
 )
 from app.core.exceptions import RadiaBaseException
@@ -40,8 +41,12 @@ from app.utils.request_id import generate_request_id, set_request_id
 logger = get_logger(__name__)
 
 
+class StartupConfigurationError(RuntimeError):
+    """Raised when invalid configuration prevents a safe application startup."""
+
+
 def _default_settings() -> AppSettings:
-    """Provide safe defaults so the app factory can be imported without env vars."""
+    """Provide non-production defaults for explicitly local or test environments."""
     return AppSettings.model_construct(
         app_name="Radia AI",
         app_version="0.1.0",
@@ -105,8 +110,28 @@ def _default_settings() -> AppSettings:
 def _resolve_settings() -> AppSettings:
     try:
         return get_settings()
-    except ValidationError:
-        return _default_settings()
+    except ValidationError as exc:
+        try:
+            environment = get_configured_environment()
+        except ValidationError as environment_exc:
+            raise StartupConfigurationError(
+                "Application startup configuration is invalid: ENVIRONMENT must be explicitly "
+                "set to local, development, test, staging, or production."
+            ) from environment_exc
+
+        if environment in ("local", "development", "test"):
+            return _default_settings().model_copy(update={"environment": environment})
+
+        formatted_errors = []
+        for error in exc.errors(include_url=False, include_input=False):
+            location = ".".join(str(part) for part in error["loc"])
+            if location in {"endpoint", "api_key", "chat_deployment", "embedding_deployment"}:
+                location = f"azure_openai.{location}"
+            formatted_errors.append(f"{location}: {error['msg']}")
+        errors = "; ".join(formatted_errors)
+        raise StartupConfigurationError(
+            f"Application startup configuration is invalid for {environment}: {errors}"
+        ) from exc
 
 
 def create_app() -> FastAPI:

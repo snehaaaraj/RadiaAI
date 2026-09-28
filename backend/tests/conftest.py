@@ -12,12 +12,17 @@ behaviour (a failure, a per-requirement outcome) call `review_engine.install(...
 
 from __future__ import annotations
 
+import os
 from typing import TYPE_CHECKING, Any
 
 import pytest
 from azure.core.exceptions import ResourceNotFoundError
 from fastapi.testclient import TestClient
 from httpx import ASGITransport, AsyncClient
+
+# Application import creates the ASGI app, so identify this process as a test
+# environment before importing it.
+os.environ.setdefault("ENVIRONMENT", "test")
 
 from app.core.config import AppSettings, get_settings
 from app.main import create_app

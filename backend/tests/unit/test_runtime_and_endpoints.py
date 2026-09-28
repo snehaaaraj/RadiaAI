@@ -18,6 +18,7 @@ from app.core.config import (
 )
 from app.core.security import _entra_auth, _stub_auth
 from app.dependencies.container import get_ingestion_service, get_search_service
+from app.main import StartupConfigurationError, _resolve_settings
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -75,6 +76,77 @@ def test_app_settings_rejects_debug_in_production() -> None:
                 connection_string="DefaultEndpointsProtocol=https;AccountName=test;AccountKey=test;",
             ),
         )
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    ("settings_type", "values"),
+    [
+        (
+            AzureOpenAISettings,
+            {
+                "endpoint": "https://example.openai.azure.com",
+                "api_key": "test-key",
+                "chat_deployment": "gpt-4o-test",
+                "embedding_deployment": "embedding-test",
+            },
+        ),
+        (
+            AzureOpenAISettings,
+            {
+                "endpoint": "https://test.openai.azure.com",
+                "api_key": " ",
+                "chat_deployment": "gpt-4o-test",
+                "embedding_deployment": "embedding-test",
+            },
+        ),
+        (
+            AzureSearchSettings,
+            {
+                "endpoint": "https://example.search.windows.net",
+                "api_key": "test-key",
+            },
+        ),
+        (
+            AzureBlobSettings,
+            {
+                "connection_string": (
+                    "DefaultEndpointsProtocol=https;AccountName=example;AccountKey=example;"
+                ),
+            },
+        ),
+    ],
+)
+def test_azure_settings_reject_empty_or_placeholder_values(
+    settings_type: type[AzureOpenAISettings | AzureSearchSettings | AzureBlobSettings],
+    values: dict[str, str],
+) -> None:
+    with pytest.raises(ValueError):
+        settings_type(**values)
+
+
+@pytest.mark.unit
+def test_resolve_settings_allows_fallback_in_explicit_test_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "test")
+    monkeypatch.setattr("app.main.get_settings", lambda: AppSettings(azure_openai={}))
+
+    settings = _resolve_settings()
+
+    assert settings.environment == "test"
+    assert str(settings.azure_openai.endpoint) == "https://example.openai.azure.com"
+
+
+@pytest.mark.unit
+def test_resolve_settings_fails_fast_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("ENVIRONMENT", "production")
+    monkeypatch.setattr("app.main.get_settings", lambda: AppSettings(azure_openai={}))
+
+    with pytest.raises(StartupConfigurationError, match="invalid for production") as exc_info:
+        _resolve_settings()
+
+    assert "azure_openai" in str(exc_info.value)
 
 
 @pytest.mark.unit

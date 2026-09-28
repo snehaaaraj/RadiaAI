@@ -16,7 +16,7 @@ production-ready.
 ```
 ┌────────────────────────────────────────────────────────────┐
 │                         Frontend                           │
-│      React + TypeScript + Vite + MUI + Framer Motion      │
+│      React + TypeScript + Vite + MUI + Framer Motion       │
 │                    port 5173 (Vite dev server)             │
 │                                                            │
 │  src/pages/                         ← shared app pages     │
@@ -32,11 +32,11 @@ production-ready.
 │            FastAPI + Python 3.12 + Pydantic v2             │
 │                       port 8000                            │
 │                                                            │
-│  LLM-based review pipeline:                                   │
-│    1. RAG retrieval (Azure AI Search) - ~5s                   │
-│    2. GPT-5 consolidated review                               │
-│    3. Enrich with SharePoint URLs                             │
-│    4. Report completion status (or why it failed)             │
+│  LLM-based review pipeline:                                │
+│    1. RAG retrieval (Azure AI Search) - ~5s                │
+│    2. GPT-5 consolidated review                            │
+│    3. Enrich with SharePoint URLs                          │
+│    4. Report completion status (or why it failed)          │
 │                                                            │
 │  On-demand ingestion (POST /api/v1/ingest):                │
 │    SharePoint → extract text → chunk → embed → index       │
@@ -133,15 +133,15 @@ The review system uses **LLM-based architecture** with GPT-5 + RAG:
 
 ```
                         ┌─────────────────────────┐
-    Input Requirement   │   LLM Review Pipeline    │
+    Input Requirement   │   LLM Review Pipeline   │
     ─────────────────►  │                         │
-                        │  1. Embed query          │
-                        │  2. Search (diverse)     │  ← Azure AI Search (~5s)
-                        │  3. GPT-5 consolidated   │  ← GPT-5 (~60s)
-                        │     review prompt        │
-                        │     (language/structure/ │
-                        │      verifiability/      │
-                        │      certification)      │
+                        │  1. Embed query         │
+                        │  2. Search (diverse)    │  ← Azure AI Search (~5s)
+                        │  3. GPT-5 consolidated  │  ← GPT-5 (~60s)
+                        │     review prompt       │
+                        │   (language/structure/  │
+                        │     verifiability/      │
+                        │     certification)      │
                         └────────────┬────────────┘
                                      │
                               Enrich references
