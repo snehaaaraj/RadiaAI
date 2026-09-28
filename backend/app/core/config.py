@@ -290,7 +290,11 @@ class _ExplicitEnvironmentSettings(BaseSettings):
 
 def get_configured_environment() -> DeploymentEnvironment:
     """Return the explicitly configured deployment environment."""
-    return _ExplicitEnvironmentSettings().environment
+    settings = cast(
+        _ExplicitEnvironmentSettings,
+        cast(Any, _ExplicitEnvironmentSettings)(),
+    )
+    return settings.environment
 
 
 class AppSettings(BaseSettings):

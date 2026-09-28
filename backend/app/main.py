@@ -122,10 +122,13 @@ def _resolve_settings() -> AppSettings:
         if environment in ("local", "development", "test"):
             return _default_settings().model_copy(update={"environment": environment})
 
-        errors = "; ".join(
-            f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
-            for error in exc.errors(include_url=False, include_input=False)
-        )
+        formatted_errors = []
+        for error in exc.errors(include_url=False, include_input=False):
+            location = ".".join(str(part) for part in error["loc"])
+            if location in {"endpoint", "api_key", "chat_deployment", "embedding_deployment"}:
+                location = f"azure_openai.{location}"
+            formatted_errors.append(f"{location}: {error['msg']}")
+        errors = "; ".join(formatted_errors)
         raise StartupConfigurationError(
             f"Application startup configuration is invalid for {environment}: {errors}"
         ) from exc
