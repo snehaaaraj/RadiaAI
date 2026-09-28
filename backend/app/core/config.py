@@ -7,9 +7,9 @@ environment (or a .env file during local development). Nothing is hardcoded here
 
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Literal, cast
+from typing import Annotated, Any, Literal, cast
 
-from pydantic import AnyHttpUrl, Field, field_validator
+from pydantic import AnyHttpUrl, Field, StringConstraints, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve .env location: check backend/.env first, then project root .env
@@ -18,6 +18,27 @@ _PROJECT_ROOT = _BACKEND_DIR.parent  # RadiaAi-2.0/
 _ENV_FILE = (
     str(_BACKEND_DIR / ".env") if (_BACKEND_DIR / ".env").exists() else str(_PROJECT_ROOT / ".env")
 )
+
+type DeploymentEnvironment = Literal["local", "development", "test", "staging", "production"]
+type RequiredSetting = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
+
+
+def _reject_placeholder(value: str) -> str:
+    normalized = value.casefold()
+    if (normalized.startswith("<") and normalized.endswith(">")) or normalized in {
+        "changeme",
+        "example",
+        "replace-me",
+    }:
+        raise ValueError("placeholder values are not allowed")
+    return value
+
+
+def _reject_placeholder_endpoint(value: AnyHttpUrl) -> AnyHttpUrl:
+    hostname = (value.host or "").casefold()
+    if hostname.startswith("example.") or hostname.startswith("<"):
+        raise ValueError("placeholder Azure endpoints are not allowed")
+    return value
 
 
 def _azure_openai_settings_factory() -> "AzureOpenAISettings":
@@ -52,10 +73,12 @@ class AzureOpenAISettings(BaseSettings):
     )
 
     endpoint: AnyHttpUrl = Field(..., description="Azure OpenAI resource endpoint")
-    api_key: str = Field(..., description="Azure OpenAI API key")
+    api_key: RequiredSetting = Field(..., description="Azure OpenAI API key")
     api_version: str = Field(default="2024-10-21", description="API version")
-    chat_deployment: str = Field(..., description="Chat completion deployment name (e.g. gpt-4o)")
-    embedding_deployment: str = Field(
+    chat_deployment: RequiredSetting = Field(
+        ..., description="Chat completion deployment name (e.g. gpt-4o)"
+    )
+    embedding_deployment: RequiredSetting = Field(
         ..., description="Embedding deployment name (e.g. text-embedding-3-large)"
     )
     embedding_dimensions: int = Field(default=3072, description="Embedding vector dimensions")
@@ -80,6 +103,11 @@ class AzureOpenAISettings(BaseSettings):
         ),
     )
 
+    _validate_endpoint = field_validator("endpoint")(_reject_placeholder_endpoint)
+    _validate_required_values = field_validator(
+        "api_key", "chat_deployment", "embedding_deployment"
+    )(_reject_placeholder)
+
 
 class AzureSearchSettings(BaseSettings):
     """Azure AI Search service configuration."""
@@ -89,11 +117,14 @@ class AzureSearchSettings(BaseSettings):
     )
 
     endpoint: AnyHttpUrl = Field(..., description="Azure AI Search endpoint")
-    api_key: str = Field(..., description="Azure AI Search admin key")
+    api_key: RequiredSetting = Field(..., description="Azure AI Search admin key")
     index_name: str = Field(default="radia-documents", description="Search index name")
     semantic_config_name: str = Field(
         default="radia-semantic-config", description="Semantic configuration name"
     )
+
+    _validate_endpoint = field_validator("endpoint")(_reject_placeholder_endpoint)
+    _validate_api_key = field_validator("api_key")(_reject_placeholder)
 
 
 class AzureBlobSettings(BaseSettings):
@@ -101,10 +132,23 @@ class AzureBlobSettings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="AZURE_BLOB_", env_file=_ENV_FILE, extra="ignore")
 
-    connection_string: str = Field(..., description="Blob Storage connection string")
+    connection_string: RequiredSetting = Field(..., description="Blob Storage connection string")
     container_name: str = Field(
         default="radia-documents", description="Blob container for uploaded documents"
     )
+
+    @field_validator("connection_string")
+    @classmethod
+    def validate_connection_string(cls, value: str) -> str:
+        """Reject template connection strings that cannot authenticate."""
+        normalized = value.casefold()
+        if (
+            "<" in value
+            or "accountname=example" in normalized
+            or "accountkey=example" in normalized
+        ):
+            raise ValueError("placeholder Azure Blob connection strings are not allowed")
+        return _reject_placeholder(value)
 
 
 class SharePointSettings(BaseSettings):
@@ -231,6 +275,24 @@ class EntraIDSettings(BaseSettings):
         return bool(self.tenant_id and self.client_id and self.audience)
 
 
+class _ExplicitEnvironmentSettings(BaseSettings):
+    """Read only an explicitly configured deployment environment."""
+
+    model_config = SettingsConfigDict(
+        env_file=_ENV_FILE,
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+    )
+
+    environment: DeploymentEnvironment
+
+
+def get_configured_environment() -> DeploymentEnvironment:
+    """Return the explicitly configured deployment environment."""
+    return _ExplicitEnvironmentSettings().environment
+
+
 class AppSettings(BaseSettings):
     """Top-level application settings that aggregate all sub-settings."""
 
@@ -244,7 +306,7 @@ class AppSettings(BaseSettings):
     # --- Application ---
     app_name: str = Field(default="Radia AI", description="Human-readable application name")
     app_version: str = Field(default="0.1.0")
-    environment: Literal["local", "development", "staging", "production"] = Field(
+    environment: DeploymentEnvironment = Field(
         default="local", description="Deployment environment"
     )
     debug: bool = Field(default=False, description="Enable debug mode (never True in production)")
