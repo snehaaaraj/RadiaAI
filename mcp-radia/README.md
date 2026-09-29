@@ -241,6 +241,7 @@ that lists the server's entire surface area. Each phase adds its registration ca
 | 2     | Jira + Confluence — `jira_get_issue`, `jira_search`, `confluence_*` | ✅ done |
 | 3     | GENESYS                                                             | ⏸️ placeholder |
 | 4     | `list_related_items(system, item_id)` cross-system linking          | ✅ done |
+| 5     | Jama hierarchy — `jama_get_children`; tool descriptions tuned for selection | ✅ done |
 
 ### Deliberate non-goals for this pass
 
@@ -261,6 +262,7 @@ All read-only, all annotated `readOnlyHint: true`.
 | ---------------------- | ---------------------------------------------------------------- | ----------------------------- |
 | `jama_get_item`        | `item_id` (required)                                             | Full item + raw custom fields |
 | `jama_search`          | `query`, `project_id`, `item_type_id`, `start_at`, `max_results` | Summaries + total             |
+| `jama_get_children`    | `item_id` (required), `start_at`, `max_results`                  | Direct children + total       |
 | `jira_get_issue`       | `issue_key` (required)                                           | Full issue + issue links      |
 | `jira_search`          | `jql` (required), `next_page_token`, `max_results`               | Summaries + page token        |
 | `confluence_get_page`  | `page_id` (required)                                             | Page + body as text           |
@@ -271,6 +273,14 @@ All read-only, all annotated `readOnlyHint: true`.
 caps page size at 50, enforced in the schema and clamped again in the connector. Descriptions
 arrive as HTML and are flattened to text; the untouched Jama field map stays available under
 `fields`.
+
+`jama_get_children` maps to `/items/{id}/children` and returns the **containment hierarchy** — the
+items nested inside a folder or set in the document tree. This is a different axis from
+`list_related_items`, which walks **traceability** (upstream/downstream). Keeping them as separate
+tools is deliberate: "what is filed under this" and "what derives from this" are different
+questions, and one tool answering both makes the model's choice ambiguous. It returns one level
+and one page per call, so a single tool call cannot fan out into an unbounded crawl; recurse by
+calling it again with a child's id.
 
 **Jira.** Uses the Cloud platform API v3.
 

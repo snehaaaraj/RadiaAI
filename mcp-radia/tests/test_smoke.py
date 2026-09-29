@@ -38,6 +38,7 @@ async def test_mcp_client_completes_handshake_and_lists_tools(server: MCPServer)
     assert {t.name for t in result.tools} == {
         "jama_get_item",
         "jama_search",
+        "jama_get_children",
         "jira_get_issue",
         "jira_search",
         "confluence_get_page",

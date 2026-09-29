@@ -15,8 +15,9 @@ Two authentication modes are supported, matching how Jama is actually reached:
 
 Read operations only:
 
-  - :meth:`JamaClient.get_item`  -> GET /rest/{version}/items/{id}
-  - :meth:`JamaClient.search`    -> GET /rest/{version}/abstractitems
+  - :meth:`JamaClient.get_item`      -> GET /rest/{version}/items/{id}
+  - :meth:`JamaClient.search`        -> GET /rest/{version}/abstractitems
+  - :meth:`JamaClient.get_children`  -> GET /rest/{version}/items/{id}/children
 """
 
 import asyncio
@@ -51,6 +52,7 @@ MAX_PAGE_SIZE = 50
 # Re-exported so callers can keep importing it from the connector they use.
 __all__ = [
     "MAX_PAGE_SIZE",
+    "JamaChildrenResult",
     "JamaClient",
     "JamaItem",
     "JamaSearchResult",
@@ -140,6 +142,23 @@ class JamaRelatedItem(BaseModel):
         description="'upstream' (this item derives from it) or 'downstream' (derives from this)."
     )
     item: JamaItemSummary = Field(description="The item on the other end.")
+
+
+class JamaChildrenResult(BaseModel):
+    """A page of a Jama item's direct children.
+
+    Containment, not traceability: these are the items nested *inside* the
+    parent in the document tree, which is a different axis from the
+    upstream/downstream relationships :class:`JamaRelatedItem` carries.
+    """
+
+    parent_id: int = Field(description="Numeric id of the item whose children these are.")
+    results: list[JamaItemSummary] = Field(
+        default_factory=list, description="Direct children on this page."
+    )
+    total: int = Field(default=0, description="Total direct children across all pages.")
+    start_at: int = Field(default=0, description="Zero-based index of the first child returned.")
+    max_results: int = Field(default=0, description="Page size actually applied.")
 
 
 class JamaSearchResult(BaseModel):
@@ -407,6 +426,48 @@ class JamaClient:
             )
         logger.info("jama_related_items_fetched", item_id=item_id, count=len(related))
         return related
+
+    async def get_children(
+        self,
+        item_id: int,
+        *,
+        start_at: int = 0,
+        max_results: int = MAX_PAGE_SIZE,
+    ) -> JamaChildrenResult:
+        """Return one page of an item's **direct** children.
+
+        Uses ``/items/{id}/children``, which is the containment hierarchy: the
+        items nested inside this one in the document tree (a folder's contents,
+        the requirements under a set). This is deliberately *not* the same as
+        :meth:`get_related_items`, which walks traceability links.
+
+        Only one level is returned, and only one page of it. Recursing the
+        whole subtree is left to the caller so a single tool call cannot fan
+        out into an unbounded number of API requests.
+        """
+        capped = max(1, min(max_results, MAX_PAGE_SIZE))
+        params: dict[str, Any] = {"startAt": max(0, start_at), "maxResults": capped}
+
+        path = f"items/{item_id}/children"
+        payload = await self._get(path, params=params)
+        rows = payload.get("data") or []
+        if not isinstance(rows, list):
+            raise ConnectorServiceError(
+                "Jama children returned an unexpected 'data' shape (expected a list).",
+                system=SYSTEM,
+                operation=path,
+            )
+
+        page_info = (payload.get("meta") or {}).get("pageInfo") or {}
+        results = [self._summary_from_raw(row) for row in rows if isinstance(row, dict)]
+        logger.info("jama_children_fetched", item_id=item_id, count=len(results))
+        return JamaChildrenResult(
+            parent_id=item_id,
+            results=results,
+            total=int(page_info.get("totalResults", len(results))),
+            start_at=int(page_info.get("startIndex", start_at)),
+            max_results=capped,
+        )
 
     async def search(
         self,

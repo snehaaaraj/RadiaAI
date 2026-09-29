@@ -11,6 +11,7 @@ from mcp_radia.config import ServerSettings
 from mcp_radia.server import build_server
 from tests.conftest import connected_client
 from tests.jama_fixtures import (
+    CHILDREN_PAYLOAD,
     ITEM_PAYLOAD,
     SEARCH_PAYLOAD,
     basic_settings,
@@ -38,7 +39,11 @@ async def test_both_jama_tools_are_advertised() -> None:
 
     # Scoped to jama_* so adding another connector does not fail this test;
     # test_smoke.py owns the assertion about the full surface.
-    assert {n for n in tools if n.startswith("jama_")} == {"jama_get_item", "jama_search"}
+    assert {n for n in tools if n.startswith("jama_")} == {
+        "jama_get_item",
+        "jama_search",
+        "jama_get_children",
+    }
 
 
 async def test_tools_are_annotated_read_only() -> None:
@@ -48,7 +53,7 @@ async def test_tools_are_annotated_read_only() -> None:
     async with connected_client(server) as session:
         tools = {t.name: t for t in (await session.list_tools()).tools}
 
-    for name in ("jama_get_item", "jama_search"):
+    for name in ("jama_get_item", "jama_search", "jama_get_children"):
         annotations = tools[name].annotations
         assert annotations is not None
         assert annotations.read_only_hint is True
@@ -141,7 +146,11 @@ async def test_tools_are_still_listed_when_jama_is_unconfigured() -> None:
     async with connected_client(server) as session:
         tools = {t.name for t in (await session.list_tools()).tools}
 
-    assert {n for n in tools if n.startswith("jama_")} == {"jama_get_item", "jama_search"}
+    assert {n for n in tools if n.startswith("jama_")} == {
+        "jama_get_item",
+        "jama_search",
+        "jama_get_children",
+    }
 
 
 async def test_out_of_range_page_size_is_rejected_by_the_schema() -> None:
@@ -153,3 +162,73 @@ async def test_out_of_range_page_size_is_rejected_by_the_schema() -> None:
 
     assert result.is_error
     assert handler.requests == [], "invalid arguments must not reach Jama"
+
+
+# -- jama_get_children -------------------------------------------------------
+
+
+async def test_get_children_schema_requires_only_item_id() -> None:
+    server, _ = _server_with(json_responder(CHILDREN_PAYLOAD))
+
+    async with connected_client(server) as session:
+        tools = {t.name: t for t in (await session.list_tools()).tools}
+
+    assert tools["jama_get_children"].input_schema["required"] == ["item_id"]
+
+
+async def test_calling_get_children_returns_structured_content() -> None:
+    server, handler = _server_with(json_responder(CHILDREN_PAYLOAD))
+
+    async with connected_client(server) as session:
+        result = await session.call_tool("jama_get_children", {"item_id": 12345})
+
+    assert not result.is_error
+    assert result.structured_content is not None
+    assert result.structured_content["parent_id"] == 12345
+    assert result.structured_content["total"] == 9
+    assert [r["id"] for r in result.structured_content["results"]] == [22001, 22002]
+    assert handler.last_request.url.path == "/rest/v1/items/12345/children"
+
+
+async def test_get_children_passes_paging_through_to_jama() -> None:
+    server, handler = _server_with(json_responder(CHILDREN_PAYLOAD))
+
+    async with connected_client(server) as session:
+        result = await session.call_tool(
+            "jama_get_children", {"item_id": 12345, "start_at": 50, "max_results": 10}
+        )
+
+    assert not result.is_error
+    assert handler.last_request.url.params["startAt"] == "50"
+    assert handler.last_request.url.params["maxResults"] == "10"
+
+
+async def test_get_children_on_a_missing_item_becomes_a_tool_error() -> None:
+    server, _ = _server_with(json_responder({"meta": {}}, status_code=404))
+
+    async with connected_client(server) as session:
+        result = await session.call_tool("jama_get_children", {"item_id": 999})
+
+    assert result.is_error
+
+
+async def test_get_children_rejects_a_non_positive_item_id() -> None:
+    server, handler = _server_with(json_responder(CHILDREN_PAYLOAD))
+
+    async with connected_client(server) as session:
+        result = await session.call_tool("jama_get_children", {"item_id": 0})
+
+    assert result.is_error
+    assert handler.requests == [], "invalid arguments must not reach Jama"
+
+
+async def test_get_children_description_distinguishes_it_from_the_linking_tool() -> None:
+    """Tool choice between containment and traceability rests entirely on this text."""
+    server, _ = _server_with(json_responder(CHILDREN_PAYLOAD))
+
+    async with connected_client(server) as session:
+        tools = {t.name: t for t in (await session.list_tools()).tools}
+
+    description = (tools["jama_get_children"].description or "").lower()
+    assert "list_related_items" in description
+    assert "containment" in description
