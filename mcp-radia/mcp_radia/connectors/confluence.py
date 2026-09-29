@@ -19,6 +19,7 @@ Read operations only:
   - :meth:`ConfluenceClient.search`   -> GET /wiki/rest/api/search
 """
 
+import re
 from typing import Any
 
 from pydantic import BaseModel, Field
@@ -38,6 +39,51 @@ MAX_PAGE_SIZE = 50
 DEFAULT_PAGE_SIZE = 25
 
 
+# Confluence storage format encodes an internal page link as
+#   <ac:link><ri:page ri:content-title="X" ri:space-key="Y"/></ac:link>
+# so the link target is an attribute, not an href. These survive only if read
+# before the body is flattened to text.
+_RI_PAGE_RE = re.compile(r"<ri:page\b([^>]*)/?>", re.IGNORECASE)
+_CONTENT_TITLE_RE = re.compile(r'ri:content-title="([^"]*)"', re.IGNORECASE)
+_SPACE_KEY_RE = re.compile(r'ri:space-key="([^"]*)"', re.IGNORECASE)
+_HREF_RE = re.compile(r'<a\b[^>]*\bhref="([^"]+)"', re.IGNORECASE)
+
+
+def extract_page_links(storage_xhtml: str | None) -> list["ConfluenceLink"]:
+    """Pull outbound links out of a storage-format body.
+
+    Returns internal page references (``<ri:page>``) and plain ``<a href>``
+    targets. These are Confluence's native cross-references and the only
+    reliable direction available: Confluence has no supported "what links to
+    this page" query.
+    """
+    if not storage_xhtml:
+        return []
+
+    links: list[ConfluenceLink] = []
+    seen: set[tuple[str, str | None]] = set()
+
+    for attrs in _RI_PAGE_RE.findall(storage_xhtml):
+        title_match = _CONTENT_TITLE_RE.search(attrs)
+        if not title_match:
+            continue
+        title = title_match.group(1)
+        space_match = _SPACE_KEY_RE.search(attrs)
+        space_key = space_match.group(1) if space_match else None
+        if (title, space_key) in seen:
+            continue
+        seen.add((title, space_key))
+        links.append(ConfluenceLink(title=title, space_key=space_key, kind="page"))
+
+    for href in _HREF_RE.findall(storage_xhtml):
+        if (href, None) in seen:
+            continue
+        seen.add((href, None))
+        links.append(ConfluenceLink(title=href, url=href, kind="url"))
+
+    return links
+
+
 def escape_cql_value(value: str) -> str:
     """Escape a user string for safe interpolation into a quoted CQL literal.
 
@@ -45,6 +91,15 @@ def escape_cql_value(value: str) -> str:
     otherwise let free text change the meaning of the query.
     """
     return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
+class ConfluenceLink(BaseModel):
+    """An outbound reference found in a page body."""
+
+    title: str = Field(description="Linked page title, or the raw URL for an external link.")
+    space_key: str | None = Field(default=None, description="Space of the linked page, if given.")
+    url: str | None = Field(default=None, description="Target URL, for plain hyperlinks.")
+    kind: str = Field(default="page", description="'page' for an internal link, 'url' otherwise.")
 
 
 class ConfluencePage(BaseModel):
@@ -61,6 +116,10 @@ class ConfluencePage(BaseModel):
     )
     author_id: str | None = Field(default=None, description="Account id of the revision author.")
     web_url: str | None = Field(default=None, description="Browser URL for a human to open.")
+    outbound_links: list[ConfluenceLink] = Field(
+        default_factory=list,
+        description="Links this page makes to other pages or URLs - its native cross-references.",
+    )
 
 
 class ConfluenceSearchHit(BaseModel):
@@ -135,6 +194,8 @@ class ConfluenceClient(AtlassianClient):
             version_created_at=version.get("createdAt") if isinstance(version, dict) else None,
             author_id=version.get("authorId") if isinstance(version, dict) else None,
             web_url=self._web_url(links.get("webui") if isinstance(links, dict) else None),
+            # Parsed from the raw storage XHTML: flattening to text drops them.
+            outbound_links=extract_page_links(raw_body if isinstance(raw_body, str) else None),
         )
         logger.info("confluence_page_fetched", page_id=page.id, body_chars=len(page.body))
         return page

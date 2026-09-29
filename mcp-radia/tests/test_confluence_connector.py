@@ -2,7 +2,11 @@
 
 import pytest
 
-from mcp_radia.connectors.confluence import MAX_PAGE_SIZE, escape_cql_value
+from mcp_radia.connectors.confluence import (
+    MAX_PAGE_SIZE,
+    escape_cql_value,
+    extract_page_links,
+)
 from mcp_radia.connectors.errors import (
     ConnectorNotConfiguredError,
     ConnectorServiceError,
@@ -210,3 +214,62 @@ async def test_unconfigured_client_does_not_call_out() -> None:
         await client.get_page("1")
 
     assert handler.requests == []
+
+
+# -- outbound links (used by cross-system linking) ---------------------------
+
+
+def test_extract_page_links_finds_internal_page_references() -> None:
+    """Storage format encodes internal links as ri:page attributes, not hrefs."""
+    body = '<ac:link><ri:page ri:content-title="Thermal Spec" ri:space-key="ENG"/></ac:link>'
+
+    links = extract_page_links(body)
+
+    assert len(links) == 1
+    assert links[0].title == "Thermal Spec"
+    assert links[0].space_key == "ENG"
+    assert links[0].kind == "page"
+
+
+def test_extract_page_links_finds_plain_hyperlinks() -> None:
+    links = extract_page_links('<p><a href="https://example.com/x">x</a></p>')
+
+    assert [(link.kind, link.url) for link in links] == [("url", "https://example.com/x")]
+
+
+def test_extract_page_links_deduplicates_repeated_targets() -> None:
+    body = (
+        '<ri:page ri:content-title="A" ri:space-key="ENG"/>'
+        '<ri:page ri:content-title="A" ri:space-key="ENG"/>'
+    )
+
+    assert len(extract_page_links(body)) == 1
+
+
+def test_extract_page_links_ignores_a_page_ref_without_a_title() -> None:
+    assert extract_page_links('<ri:page ri:space-key="ENG"/>') == []
+
+
+@pytest.mark.parametrize("value", [None, "", "<p>no links here</p>"])
+def test_extract_page_links_returns_empty_when_there_are_none(value: str | None) -> None:
+    assert extract_page_links(value) == []
+
+
+async def test_get_page_exposes_outbound_links() -> None:
+    payload = {
+        "id": "1",
+        "title": "T",
+        "body": {
+            "storage": {
+                "value": '<p>See <ac:link><ri:page ri:content-title="Other"/></ac:link></p>',
+                "representation": "storage",
+            }
+        },
+    }
+    client, _ = make_confluence_client(json_responder(payload))
+
+    page = await client.get_page("1")
+
+    assert [link.title for link in page.outbound_links] == ["Other"]
+    # The flattened body must still be clean text.
+    assert "<" not in page.body

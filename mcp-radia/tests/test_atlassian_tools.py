@@ -40,15 +40,14 @@ def _server_with(
     return server, jira_handler, confluence_handler
 
 
-async def test_all_six_tools_are_advertised() -> None:
+async def test_the_atlassian_tools_are_advertised() -> None:
     server, _, _ = _server_with(json_responder(ISSUE_PAYLOAD), json_responder(PAGE_PAYLOAD))
 
     async with connected_client(server) as session:
         names = {t.name for t in (await session.list_tools()).tools}
 
-    assert names == {
-        "jama_get_item",
-        "jama_search",
+    # Scoped to this phase's tools; test_smoke.py owns the full-surface assertion.
+    assert {n for n in names if n.startswith(("jira_", "confluence_"))} == {
         "jira_get_issue",
         "jira_search",
         "confluence_get_page",
@@ -56,7 +55,7 @@ async def test_all_six_tools_are_advertised() -> None:
     }
 
 
-async def test_every_tool_is_read_only() -> None:
+async def test_every_advertised_tool_is_read_only() -> None:
     server, _, _ = _server_with(json_responder(ISSUE_PAYLOAD), json_responder(PAGE_PAYLOAD))
 
     async with connected_client(server) as session:

@@ -4,8 +4,9 @@ A standalone [Model Context Protocol](https://modelcontextprotocol.io) server th
 RadiaAI's engineering systems of record — **Jama, Jira, Confluence and Genesys** — through one
 read-only MCP surface, as a digital-thread integration layer.
 
-> **Status: Phase 2.** Jama, Jira and Confluence are connected read-only (6 tools). Genesys and
-> cross-system linking land in later phases — see [Roadmap](#roadmap).
+> **Status: Phase 4 — feature-complete for this pass.** Jama, Jira and Confluence are connected
+> read-only, with cross-system linking on top: **7 tools**. GENESYS is a
+> [placeholder](#vitech-genesys--placeholder) and registers no tools.
 
 ## Relationship to the rest of this repo
 
@@ -101,6 +102,26 @@ Create a token at
 [id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
 Prefer a dedicated service account over a person's credentials.
 
+### Vitech GENESYS — placeholder
+
+**Not implemented.** No `genesys_*` tools are registered, and `list_related_items` returns a note
+rather than results for `system="genesys"`.
+
+This is Vitech GENESYS, the MBSE tool now owned by Zuken — **not Genesys Cloud CX**, the
+contact-centre platform that shares the name. Its REST contract could not be verified: Vitech's
+public API docs (the Getting Started PDF, the AdminTools help page) now redirect to Zuken
+marketing pages, and the reference sits behind a customer login or each instance's own Swagger.
+
+Rather than ship a speculative client, [`connectors/genesys.py`](mcp_radia/connectors/genesys.py)
+keeps only `GenesysSettings` (so a `.env` written today stays valid), the model shapes the real
+connector should return, and a client whose operations raise `ConnectorNotImplementedError`.
+
+**To implement:** enable Swagger in *AdminTools → Configure REST API*, read the real contract from
+its Swagger UI, and build against it. The data model to expect: a **project** is a model
+repository; an **entity** is the unit of content (Requirement, Component, Function, …) with
+free-form **attributes** and typed **relationships** — those relationships being exactly what the
+linking layer wants.
+
 ## Run
 
 Two transports share one tool registry.
@@ -185,12 +206,19 @@ mcp-radia/
 │   │   ├── atlassian.py    # shared Cloud settings + HTTP base
 │   │   ├── jama.py         # Jama settings, models, async client
 │   │   ├── jira.py         # Jira Cloud v3
-│   │   └── confluence.py   # Confluence Cloud v2 + v1 search
+│   │   ├── confluence.py   # Confluence Cloud v2 + v1 search
+│   │   └── genesys.py      # Vitech GENESYS - placeholder, not implemented
+│   ├── linking/            # cross-system tracing, no datastore
+│   │   ├── models.py
+│   │   ├── references.py   # finds item keys written into prose
+│   │   └── service.py      # queries every connector live
 │   └── tools/              # single registration point for every MCP tool
 │       ├── _guard.py       # ConnectorError -> ToolError, READ_ONLY annotation
 │       ├── jama.py
 │       ├── jira.py
-│       └── confluence.py
+│       ├── confluence.py
+│       ├── genesys.py      # registers nothing (placeholder)
+│       └── linking.py
 └── tests/
 ```
 
@@ -211,8 +239,8 @@ that lists the server's entire surface area. Each phase adds its registration ca
 | 0     | Scaffold: server, config, logging, both transports, smoke tests     | ✅ done |
 | 1     | Jama connector — `jama_get_item`, `jama_search`                     | ✅ done |
 | 2     | Jira + Confluence — `jira_get_issue`, `jira_search`, `confluence_*` | ✅ done |
-| 3     | Genesys — `genesys_get_record`, `genesys_search` (naming TBC)       | todo   |
-| 4     | `list_related_items(system, item_id)` cross-system linking          | todo   |
+| 3     | GENESYS                                                             | ⏸️ placeholder |
+| 4     | `list_related_items(system, item_id)` cross-system linking          | ✅ done |
 
 ### Deliberate non-goals for this pass
 
@@ -237,6 +265,7 @@ All read-only, all annotated `readOnlyHint: true`.
 | `jira_search`          | `jql` (required), `next_page_token`, `max_results`               | Summaries + page token        |
 | `confluence_get_page`  | `page_id` (required)                                             | Page + body as text           |
 | `confluence_search`    | `query`, `space_key`, `content_type`, `cql`, `start`, `limit`    | Hits + total                  |
+| `list_related_items`   | `system`, `item_id` (required), `include_text_references`        | Related items + notes         |
 
 **Jama.** `jama_search` maps to `/abstractitems`; `query` becomes its `contains` parameter. Jama
 caps page size at 50, enforced in the schema and clamped again in the connector. Descriptions
@@ -264,6 +293,50 @@ arrive as HTML and are flattened to text; the untouched Jama field map stays ava
   equivalent yet.
 - `query`/`space_key`/`content_type` are composed into CQL with quotes and backslashes escaped, so
   free text cannot alter the query's meaning. Pass `cql` directly for anything that cannot express.
+
+## Cross-system linking
+
+`list_related_items(system, item_id)` traces one item to everything related to it. It queries the
+connectors **live on every call — there is no link datastore.** The answer is therefore always
+current and nothing has to be kept in sync; the cost is that one call fans out to several API
+requests.
+
+**Native cross-references** (always on) — what each system records as first-class data:
+
+| System     | Source                                          | `relation` values            |
+| ---------- | ----------------------------------------------- | ---------------------------- |
+| Jira       | `issuelinks` + parent                           | `blocks`, `relates to`, `parent` … |
+| Jama       | `/items/{id}/upstreamrelated` + `downstreamrelated` | `upstream`, `downstream` |
+| Confluence | `<ri:page>` and `<a href>` links in the page body | `links-to`                 |
+| GENESYS    | *not implemented* — returns a note              | —                            |
+
+**Text references** (`include_text_references=true`, **off by default**). The interesting hops in
+a digital thread often aren't formal links at all — someone types "traced to BMS-451" into a Jama
+custom field, or names `SRS-42` in a Confluence page. When enabled, the item's text (including
+Jama custom fields) is scanned for key-shaped identifiers, which are then resolved against Jira
+and Jama.
+
+This is a **heuristic**, so:
+
+- Results are tagged `discovered_via="text"`; native links are `"native"`. You can always tell
+  them apart.
+- A key that resolves to nothing is returned as `system="unresolved"` rather than dropped — a
+  reference you can't resolve is still a lead.
+- Standards that look like keys (`ISO-26262`, `UTF-8`, `DO-178`) are filtered out.
+- Lookups are capped at 10 per call, and the cap is reported in `notes`.
+
+**Always read `notes`.** It is where the tool admits what limited the answer: a connector that
+isn't configured, GENESYS being unimplemented, a truncated scan, or the fact that Confluence can
+only report *outbound* links. An unconfigured system is reported there rather than silently
+looking like "nothing related".
+
+### Not in this pass
+
+**A persisted link store is a future enhancement, not part of this work.** Querying live means
+reverse lookups are limited to whatever each system indexes — Confluence, for instance, has no
+supported "what links to this page" query, so inbound references are invisible. A persisted,
+periodically-refreshed link graph is what would make reverse lookups and whole-thread traversal
+possible and fast. That is a deliberate next step, not an oversight.
 
 ## Notes on the SDK
 

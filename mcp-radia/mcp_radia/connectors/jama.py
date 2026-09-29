@@ -133,6 +133,15 @@ class JamaItem(BaseModel):
     )
 
 
+class JamaRelatedItem(BaseModel):
+    """An item related to another through a Jama relationship."""
+
+    direction: str = Field(
+        description="'upstream' (this item derives from it) or 'downstream' (derives from this)."
+    )
+    item: JamaItemSummary = Field(description="The item on the other end.")
+
+
 class JamaSearchResult(BaseModel):
     """A page of Jama search results."""
 
@@ -370,6 +379,34 @@ class JamaClient:
         item = self._item_from_raw(data)
         logger.info("jama_item_fetched", item_id=item_id, document_key=item.document_key)
         return item
+
+    async def get_related_items(self, item_id: int) -> list[JamaRelatedItem]:
+        """Return items linked to this one by Jama relationships, both directions.
+
+        Uses ``/items/{id}/upstreamrelated`` and ``/downstreamrelated``, which
+        return the related items themselves. The sibling ``*relationships``
+        endpoints carry the relationship *type* but only item ids, which would
+        cost an extra lookup per link; direction is the traceability signal
+        that matters most here.
+        """
+        related: list[JamaRelatedItem] = []
+        for direction, path in (
+            ("upstream", "upstreamrelated"),
+            ("downstream", "downstreamrelated"),
+        ):
+            payload = await self._get(
+                f"items/{item_id}/{path}", params={"maxResults": MAX_PAGE_SIZE, "startAt": 0}
+            )
+            rows = payload.get("data") or []
+            if not isinstance(rows, list):
+                continue
+            related.extend(
+                JamaRelatedItem(direction=direction, item=self._summary_from_raw(row))
+                for row in rows
+                if isinstance(row, dict)
+            )
+        logger.info("jama_related_items_fetched", item_id=item_id, count=len(related))
+        return related
 
     async def search(
         self,

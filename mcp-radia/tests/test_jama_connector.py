@@ -338,3 +338,52 @@ async def test_concurrent_calls_share_a_single_token_request() -> None:
 
     token_requests = [r for r in handler.requests if r.url.path == "/rest/oauth/token"]
     assert len(token_requests) == 1
+
+
+# -- relationships (used by cross-system linking) ----------------------------
+
+RELATED_PAYLOAD = {
+    "data": [{"id": 999, "documentKey": "SRS-99", "project": 7, "fields": {"name": "Parent req"}}]
+}
+
+
+async def test_get_related_items_queries_both_directions() -> None:
+    client, handler = make_client(basic_settings(), json_responder(RELATED_PAYLOAD))
+
+    related = await client.get_related_items(12345)
+
+    paths = [r.url.path for r in handler.requests]
+    assert "/rest/v1/items/12345/upstreamrelated" in paths
+    assert "/rest/v1/items/12345/downstreamrelated" in paths
+    assert {link.direction for link in related} == {"upstream", "downstream"}
+
+
+async def test_get_related_items_maps_the_far_end() -> None:
+    client, _ = make_client(basic_settings(), json_responder(RELATED_PAYLOAD))
+
+    related = await client.get_related_items(12345)
+
+    assert related[0].item.document_key == "SRS-99"
+    assert related[0].item.name == "Parent req"
+    assert related[0].item.web_url is not None
+
+
+async def test_get_related_items_is_empty_when_nothing_is_linked() -> None:
+    client, _ = make_client(basic_settings(), json_responder({"data": []}))
+
+    assert await client.get_related_items(12345) == []
+
+
+async def test_get_related_items_tolerates_a_malformed_direction() -> None:
+    """One bad half must not lose the other half's links."""
+
+    def _respond(request: httpx2.Request) -> httpx2.Response:
+        if "upstreamrelated" in request.url.path:
+            return httpx2.Response(200, json={"data": "nonsense"}, request=request)
+        return httpx2.Response(200, json=RELATED_PAYLOAD, request=request)
+
+    client, _ = make_client(basic_settings(), _respond)
+
+    related = await client.get_related_items(12345)
+
+    assert [link.direction for link in related] == ["downstream"]

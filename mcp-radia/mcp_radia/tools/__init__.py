@@ -9,12 +9,16 @@ from mcp.server.mcpserver import MCPServer
 from mcp_radia.config import ServerSettings
 from mcp_radia.connectors.atlassian import AtlassianSettings
 from mcp_radia.connectors.confluence import ConfluenceClient
+from mcp_radia.connectors.genesys import GenesysClient, GenesysSettings
 from mcp_radia.connectors.jama import JamaClient, JamaSettings
 from mcp_radia.connectors.jira import JiraClient
+from mcp_radia.linking.service import LinkingService
 from mcp_radia.logging import get_logger
 from mcp_radia.tools.confluence import register_confluence_tools
+from mcp_radia.tools.genesys import register_genesys_tools
 from mcp_radia.tools.jama import register_jama_tools
 from mcp_radia.tools.jira import register_jira_tools
+from mcp_radia.tools.linking import register_linking_tools
 
 logger = get_logger(__name__)
 
@@ -26,6 +30,8 @@ def register_tools(
     jama_client: JamaClient | None = None,
     jira_client: JiraClient | None = None,
     confluence_client: ConfluenceClient | None = None,
+    genesys_client: GenesysClient | None = None,
+    linking_service: LinkingService | None = None,
 ) -> list[str]:
     """Register all MCP tools on ``server`` and return their names.
 
@@ -44,6 +50,8 @@ def register_tools(
         jama_client: Override the Jama connector (tests).
         jira_client: Override the Jira connector (tests).
         confluence_client: Override the Confluence connector (tests).
+        genesys_client: Override the GENESYS connector (tests).
+        linking_service: Override the linking service (tests).
 
     Returns:
         The names of every registered tool, in registration order.
@@ -52,12 +60,23 @@ def register_tools(
     # share one settings object unless a caller injects its own client.
     atlassian = AtlassianSettings()
 
+    jama = jama_client or JamaClient(JamaSettings())
+    jira = jira_client or JiraClient(atlassian)
+    confluence = confluence_client or ConfluenceClient(atlassian)
+    genesys = genesys_client or GenesysClient(GenesysSettings())
+
     registered: list[str] = []
-    registered += register_jama_tools(server, jama_client or JamaClient(JamaSettings()))
-    registered += register_jira_tools(server, jira_client or JiraClient(atlassian))
-    registered += register_confluence_tools(
-        server, confluence_client or ConfluenceClient(atlassian)
+    registered += register_jama_tools(server, jama)
+    registered += register_jira_tools(server, jira)
+    registered += register_confluence_tools(server, confluence)
+    # Registers nothing today: the GENESYS connector is a placeholder.
+    registered += register_genesys_tools(server, genesys)
+    # Linking reuses the same connector instances, so it shares their
+    # connection pools and cached auth tokens rather than opening its own.
+    registered += register_linking_tools(
+        server,
+        linking_service
+        or LinkingService(jama=jama, jira=jira, confluence=confluence, genesys=genesys),
     )
-    # Phase 4 extends this list with cross-system linking.
     logger.debug("tools_registered", tools=registered, count=len(registered))
     return registered

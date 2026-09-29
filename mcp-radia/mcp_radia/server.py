@@ -5,8 +5,10 @@ from mcp.server.mcpserver import MCPServer
 from mcp_radia import __version__
 from mcp_radia.config import ServerSettings
 from mcp_radia.connectors.confluence import ConfluenceClient
+from mcp_radia.connectors.genesys import GenesysClient
 from mcp_radia.connectors.jama import JamaClient
 from mcp_radia.connectors.jira import JiraClient
+from mcp_radia.linking.service import LinkingService
 from mcp_radia.logging import get_logger
 from mcp_radia.tools import register_tools
 
@@ -32,6 +34,8 @@ def build_server(
     jama_client: JamaClient | None = None,
     jira_client: JiraClient | None = None,
     confluence_client: ConfluenceClient | None = None,
+    genesys_client: GenesysClient | None = None,
+    linking_service: LinkingService | None = None,
 ) -> MCPServer:
     """Build a fully configured MCP server instance.
 
@@ -43,6 +47,8 @@ def build_server(
         jama_client: Override the Jama connector, for tests.
         jira_client: Override the Jira connector, for tests.
         confluence_client: Override the Confluence connector, for tests.
+        genesys_client: Override the GENESYS connector, for tests.
+        linking_service: Override the linking service, for tests.
     """
     server = MCPServer(
         name=SERVER_NAME,
@@ -57,6 +63,8 @@ def build_server(
         jama_client=jama_client,
         jira_client=jira_client,
         confluence_client=confluence_client,
+        genesys_client=genesys_client,
+        linking_service=linking_service,
     )
     logger.info(
         "mcp_server_built",

@@ -42,6 +42,7 @@ async def test_mcp_client_completes_handshake_and_lists_tools(server: MCPServer)
         "jira_search",
         "confluence_get_page",
         "confluence_search",
+        "list_related_items",
     }
 
 

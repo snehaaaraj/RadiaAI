@@ -8,6 +8,7 @@ subclass corresponds to a failure the caller can act on differently:
   - :class:`ConnectorAuthError`          - credentials present but rejected.
   - :class:`ItemNotFoundError`           - the request was fine, the thing is not there.
   - :class:`ConnectorServiceError`       - anything else (5xx, timeouts, bad payloads).
+  - :class:`ConnectorNotImplementedError` - the connector is a placeholder.
 """
 
 from typing import Any
@@ -55,3 +56,11 @@ class ItemNotFoundError(ConnectorError):
 
 class ConnectorServiceError(ConnectorError):
     """The remote system errored, was unreachable, or returned an unusable payload."""
+
+
+class ConnectorNotImplementedError(ConnectorError):
+    """The connector exists as a placeholder but has no working implementation.
+
+    Distinct from :class:`ConnectorNotConfiguredError`: no amount of credentials
+    will make this call work until the connector is built.
+    """
