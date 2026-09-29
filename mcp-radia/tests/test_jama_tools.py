@@ -34,9 +34,11 @@ async def test_both_jama_tools_are_advertised() -> None:
     server, _ = _server_with(json_responder(ITEM_PAYLOAD))
 
     async with connected_client(server) as session:
-        tools = {t.name: t for t in (await session.list_tools()).tools}
+        tools = {t.name for t in (await session.list_tools()).tools}
 
-    assert set(tools) == {"jama_get_item", "jama_search"}
+    # Scoped to jama_* so adding another connector does not fail this test;
+    # test_smoke.py owns the assertion about the full surface.
+    assert {n for n in tools if n.startswith("jama_")} == {"jama_get_item", "jama_search"}
 
 
 async def test_tools_are_annotated_read_only() -> None:
@@ -46,10 +48,11 @@ async def test_tools_are_annotated_read_only() -> None:
     async with connected_client(server) as session:
         tools = {t.name: t for t in (await session.list_tools()).tools}
 
-    for tool in tools.values():
-        assert tool.annotations is not None
-        assert tool.annotations.read_only_hint is True
-        assert tool.annotations.destructive_hint is False
+    for name in ("jama_get_item", "jama_search"):
+        annotations = tools[name].annotations
+        assert annotations is not None
+        assert annotations.read_only_hint is True
+        assert annotations.destructive_hint is False
 
 
 async def test_get_item_schema_requires_item_id() -> None:
@@ -138,7 +141,7 @@ async def test_tools_are_still_listed_when_jama_is_unconfigured() -> None:
     async with connected_client(server) as session:
         tools = {t.name for t in (await session.list_tools()).tools}
 
-    assert tools == {"jama_get_item", "jama_search"}
+    assert {n for n in tools if n.startswith("jama_")} == {"jama_get_item", "jama_search"}
 
 
 async def test_out_of_range_page_size_is_rejected_by_the_schema() -> None:

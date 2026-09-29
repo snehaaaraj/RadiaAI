@@ -1,22 +1,15 @@
 """MCP tools backed by the Jama connector.
 
-The tool functions are a thin translation layer only: they take MCP arguments,
-call the connector, and convert :class:`ConnectorError` into ``ToolError`` so
-the client gets an actionable message instead of a stack trace. All business
-logic lives in :mod:`mcp_radia.connectors.jama`.
-
-Both tools are read-only and annotated as such.
+Thin translation only: take MCP arguments, call the connector, convert
+connector failures into ``ToolError`` via the shared guard. All logic lives in
+:mod:`mcp_radia.connectors.jama`.
 """
 
-from collections.abc import Awaitable, Callable
 from typing import Annotated
 
 from mcp.server.mcpserver import MCPServer
-from mcp.server.mcpserver.exceptions import ToolError
-from mcp.types import ToolAnnotations
 from pydantic import Field
 
-from mcp_radia.connectors.errors import ConnectorError
 from mcp_radia.connectors.jama import (
     MAX_PAGE_SIZE,
     JamaClient,
@@ -24,29 +17,9 @@ from mcp_radia.connectors.jama import (
     JamaSearchResult,
 )
 from mcp_radia.logging import get_logger
+from mcp_radia.tools._guard import READ_ONLY, guard
 
 logger = get_logger(__name__)
-
-READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=True)
-
-
-async def _guard[T](operation: str, call: Callable[[], Awaitable[T]]) -> T:
-    """Run a connector call, converting connector failures into MCP tool errors.
-
-    ``ToolError`` messages are shown to the model, so they carry the remediation
-    hint the connector produced (missing credentials, no permission, ...) rather
-    than a generic failure.
-    """
-    try:
-        return await call()
-    except ConnectorError as exc:
-        logger.warning(
-            "jama_tool_failed",
-            operation=operation,
-            error_type=type(exc).__name__,
-            status_code=exc.status_code,
-        )
-        raise ToolError(str(exc)) from exc
 
 
 def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
@@ -65,7 +38,7 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
     async def jama_get_item(
         item_id: Annotated[int, Field(description="Numeric Jama item id, e.g. 12345.", gt=0)],
     ) -> JamaItem:
-        return await _guard("jama_get_item", lambda: client.get_item(item_id))
+        return await guard("jama_get_item", lambda: client.get_item(item_id))
 
     @server.tool(
         name="jama_search",
@@ -101,7 +74,7 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             ),
         ] = MAX_PAGE_SIZE,
     ) -> JamaSearchResult:
-        return await _guard(
+        return await guard(
             "jama_search",
             lambda: client.search(
                 query=query,

@@ -4,8 +4,8 @@ A standalone [Model Context Protocol](https://modelcontextprotocol.io) server th
 RadiaAI's engineering systems of record — **Jama, Jira, Confluence and Genesys** — through one
 read-only MCP surface, as a digital-thread integration layer.
 
-> **Status: Phase 1.** Jama is connected read-only (`jama_get_item`, `jama_search`). Jira,
-> Confluence and Genesys land in later phases — see [Roadmap](#roadmap).
+> **Status: Phase 2.** Jama, Jira and Confluence are connected read-only (6 tools). Genesys and
+> cross-system linking land in later phases — see [Roadmap](#roadmap).
 
 ## Relationship to the rest of this repo
 
@@ -81,6 +81,25 @@ These use the plain `JAMA_*` prefix, the same names the backend uses. The two se
 independent because this server only ever reads `mcp-radia/.env` — but if you deploy both into one
 container with shared process environment, they will see the same variables. Give mcp-radia its own
 Jama service account if you want the access separated.
+
+### Atlassian Cloud — Jira + Confluence (`ATLASSIAN_*`)
+
+| Variable                    | Default | Purpose                                      |
+| --------------------------- | ------- | -------------------------------------------- |
+| `ATLASSIAN_SITE_URL`        | *empty* | Site root, e.g. `https://org.atlassian.net`  |
+| `ATLASSIAN_EMAIL`           | *empty* | Account email owning the token               |
+| `ATLASSIAN_API_TOKEN`       | *empty* | API token (**not** the account password)     |
+| `ATLASSIAN_TIMEOUT_SECONDS` | `20`    | Per-request timeout                          |
+| `ATLASSIAN_VERIFY_SSL`      | `true`  | Verify TLS certificates                      |
+
+**Jira and Confluence share one credential set.** That is how Atlassian Cloud works: both products
+sit under the same site and accept the same API token, and the owning account's product
+permissions decide what is readable. Confluence is reached at `{site}/wiki` automatically — don't
+put `/wiki` in `ATLASSIAN_SITE_URL`.
+
+Create a token at
+[id.atlassian.com/manage-profile/security/api-tokens](https://id.atlassian.com/manage-profile/security/api-tokens).
+Prefer a dedicated service account over a person's credentials.
 
 ## Run
 
@@ -162,9 +181,16 @@ mcp-radia/
 │   ├── server.py           # build_server(): constructs the MCPServer
 │   ├── connectors/         # one module per external system
 │   │   ├── errors.py       # shared ConnectorError hierarchy
-│   │   └── jama.py         # Jama settings, models, async client
+│   │   ├── text.py         # HTML / ADF -> plain text
+│   │   ├── atlassian.py    # shared Cloud settings + HTTP base
+│   │   ├── jama.py         # Jama settings, models, async client
+│   │   ├── jira.py         # Jira Cloud v3
+│   │   └── confluence.py   # Confluence Cloud v2 + v1 search
 │   └── tools/              # single registration point for every MCP tool
-│       └── jama.py         # jama_get_item, jama_search
+│       ├── _guard.py       # ConnectorError -> ToolError, READ_ONLY annotation
+│       ├── jama.py
+│       ├── jira.py
+│       └── confluence.py
 └── tests/
 ```
 
@@ -184,7 +210,7 @@ that lists the server's entire surface area. Each phase adds its registration ca
 | ----- | ------------------------------------------------------------------ | ------ |
 | 0     | Scaffold: server, config, logging, both transports, smoke tests     | ✅ done |
 | 1     | Jama connector — `jama_get_item`, `jama_search`                     | ✅ done |
-| 2     | Jira + Confluence — `jira_get_issue`, `jira_search`, `confluence_*` | todo   |
+| 2     | Jira + Confluence — `jira_get_issue`, `jira_search`, `confluence_*` | ✅ done |
 | 3     | Genesys — `genesys_get_record`, `genesys_search` (naming TBC)       | todo   |
 | 4     | `list_related_items(system, item_id)` cross-system linking          | todo   |
 
@@ -203,18 +229,41 @@ that lists the server's entire surface area. Each phase adds its registration ca
 
 All read-only, all annotated `readOnlyHint: true`.
 
-| Tool             | Arguments                                                        | Returns                        |
-| ---------------- | ---------------------------------------------------------------- | ------------------------------ |
-| `jama_get_item`  | `item_id` (required)                                             | Full item + raw custom fields  |
-| `jama_search`    | `query`, `project_id`, `item_type_id`, `start_at`, `max_results` | Page of summaries + total      |
+| Tool                   | Arguments                                                        | Returns                       |
+| ---------------------- | ---------------------------------------------------------------- | ----------------------------- |
+| `jama_get_item`        | `item_id` (required)                                             | Full item + raw custom fields |
+| `jama_search`          | `query`, `project_id`, `item_type_id`, `start_at`, `max_results` | Summaries + total             |
+| `jira_get_issue`       | `issue_key` (required)                                           | Full issue + issue links      |
+| `jira_search`          | `jql` (required), `next_page_token`, `max_results`               | Summaries + page token        |
+| `confluence_get_page`  | `page_id` (required)                                             | Page + body as text           |
+| `confluence_search`    | `query`, `space_key`, `content_type`, `cql`, `start`, `limit`    | Hits + total                  |
 
-Notes:
+**Jama.** `jama_search` maps to `/abstractitems`; `query` becomes its `contains` parameter. Jama
+caps page size at 50, enforced in the schema and clamped again in the connector. Descriptions
+arrive as HTML and are flattened to text; the untouched Jama field map stays available under
+`fields`.
 
-- `jama_search` maps to Jama's `/abstractitems`; `query` becomes its `contains` parameter.
-- Jama caps page size at 50. `max_results` is schema-limited to that, and the connector clamps
-  defensively as well.
-- Item descriptions arrive from Jama as HTML and are flattened to plain text before returning;
-  the untouched Jama field map is still available under `fields`.
+**Jira.** Uses the Cloud platform API v3.
+
+- Search goes to `/rest/api/3/search/jql`. The older `/rest/api/3/search` was deprecated in 2024.
+  That endpoint is **token-paginated and returns no total count** — hence `next_page_token` and
+  `is_last` on the result, and no `total` field. Page by feeding the token back in.
+- `/search/jql` returns only `id` and `key` unless `fields` is sent, which is an easy way to get
+  mysteriously empty issues. The connector always sends an explicit field list.
+- Descriptions are Atlassian Document Format (ADF) JSON, not text, and are flattened by
+  `connectors/text.py`.
+- `issuelinks` are flattened into a single `links` list with the direction and the phrasing as
+  read *from this issue* — this is the native cross-reference Phase 4 will build on.
+
+**Confluence.** Deliberately spans two API versions, because neither covers both operations:
+
+- `confluence_get_page` uses **v2** (`/wiki/api/v2/pages/{id}?body-format=storage`). Note the
+  parameter: the v1 idiom `expand=body.storage` is silently ignored by v2 and returns an empty
+  body.
+- `confluence_search` uses **v1** (`/wiki/rest/api/search?cql=...`). CQL search has no v2
+  equivalent yet.
+- `query`/`space_key`/`content_type` are composed into CQL with quotes and backslashes escaped, so
+  free text cannot alter the query's meaning. Pass `cql` directly for anything that cannot express.
 
 ## Notes on the SDK
 

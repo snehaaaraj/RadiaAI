@@ -33,7 +33,16 @@ async def test_mcp_client_completes_handshake_and_lists_tools(server: MCPServer)
     async with connected_client(server) as session:
         result = await session.list_tools()
 
-    assert {t.name for t in result.tools} == {"jama_get_item", "jama_search"}
+    # Deliberately an exact set: this is the one test that must be updated
+    # when the server's surface area changes, so growth is never accidental.
+    assert {t.name for t in result.tools} == {
+        "jama_get_item",
+        "jama_search",
+        "jira_get_issue",
+        "jira_search",
+        "confluence_get_page",
+        "confluence_search",
+    }
 
 
 @pytest.mark.unit

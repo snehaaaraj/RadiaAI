@@ -20,8 +20,6 @@ Read operations only:
 """
 
 import asyncio
-import html
-import re
 import time
 from typing import Any, Literal
 
@@ -36,6 +34,7 @@ from mcp_radia.connectors.errors import (
     ConnectorServiceError,
     ItemNotFoundError,
 )
+from mcp_radia.connectors.text import strip_html
 from mcp_radia.logging import get_logger
 
 logger = get_logger(__name__)
@@ -49,26 +48,15 @@ _TOKEN_EXPIRY_SKEW_SECONDS = 60
 # Jama caps page size at 50 on most collection endpoints; asking for more errors.
 MAX_PAGE_SIZE = 50
 
-_TAG_RE = re.compile(r"<[^>]+>")
-_WS_RE = re.compile(r"[ \t\r\f\v]+")
-
-
-def strip_html(value: str | None) -> str:
-    """Convert a Jama rich-text (HTML) field into readable plain text.
-
-    Jama stores descriptions as HTML. Handing raw markup to a model wastes
-    tokens and reads badly, so block-level breaks become newlines and the rest
-    of the tags are dropped.
-    """
-    if not value:
-        return ""
-    text = re.sub(r"(?i)<br\s*/?>", "\n", value)
-    text = re.sub(r"(?i)</p\s*>", "\n", text)
-    text = _TAG_RE.sub("", text)
-    text = html.unescape(text)
-    # Collapse runs of spaces but keep newlines, so paragraph structure survives.
-    lines = [_WS_RE.sub(" ", line).strip() for line in text.splitlines()]
-    return "\n".join(line for line in lines if line != "").strip()
+# Re-exported so callers can keep importing it from the connector they use.
+__all__ = [
+    "MAX_PAGE_SIZE",
+    "JamaClient",
+    "JamaItem",
+    "JamaSearchResult",
+    "JamaSettings",
+    "strip_html",
+]
 
 
 class JamaSettings(BaseSettings):
