@@ -34,8 +34,11 @@ def register_confluence_tools(server: MCPServer, client: ConfluenceClient) -> li
             "notes from that review say?', 'show me page 123456789'.\n"
             "\n"
             "Needs a numeric page id, which normally comes from confluence_search - a page "
-            "TITLE will not work here, so search first. Covers prose documentation only, "
-            "not requirements (Jama) and not work tickets (Jira)."
+            "TITLE will not work here, so search first. Only works for hits whose type is "
+            "'page': confluence_search also returns blog posts, databases and other content "
+            "types, and passing one of those ids here fails with 'not found'. Pass "
+            "content_type='page' to confluence_search to avoid that. Covers prose "
+            "documentation only, not requirements (Jama) and not work tickets (Jira)."
         ),
         annotations=READ_ONLY,
     )
@@ -60,11 +63,19 @@ def register_confluence_tools(server: MCPServer, client: ConfluenceClient) -> li
             "Use when asked things like: 'is there a design doc for the charging module?', "
             "'find the onboarding runbook', 'what did we write up about the thermal test?'.\n"
             "\n"
+            "Pass 'query' as a few plain keywords - 'engineering leadership meeting' - not a "
+            "whole sentence, and do NOT put quotation marks inside it: quotes are escaped "
+            "into the search literal and will match nothing. Dates are often formatted in "
+            "the title rather than the body, so search the topic words and pick the right "
+            "date from the results instead of putting the date in the query.\n"
+            "\n"
             "Searches WRITTEN DOCUMENTATION only. It does not search requirements "
             "(jama_search) or work tickets (jira_search) - if a question is about what the "
             "product must do, prefer jama_search; if it is about work status, prefer "
-            "jira_search. Returns excerpts, not full pages: call confluence_get_page with "
-            "a hit's id for the whole body."
+            "jira_search. Results include blog posts and databases as well as pages, so set "
+            "content_type='page' when the next step is to open a hit with "
+            "confluence_get_page. Returns excerpts, not full pages: call "
+            "confluence_get_page with a hit's id for the whole body."
         ),
         annotations=READ_ONLY,
     )

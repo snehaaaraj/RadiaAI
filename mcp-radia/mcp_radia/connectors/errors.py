@@ -11,7 +11,97 @@ subclass corresponds to a failure the caller can act on differently:
   - :class:`ConnectorNotImplementedError` - the connector is a placeholder.
 """
 
+import json
 from typing import Any
+
+#: Key under which a connector stores the remote API's own error wording, so
+#: :meth:`ConnectorError.__str__` can surface it to the model.
+REMOTE_MESSAGE_KEY = "remote_message"
+
+#: Remote messages are truncated to this many characters. Long enough for a
+#: real remediation hint, short enough that an HTML error page cannot flood the
+#: model's context.
+_MAX_REMOTE_MESSAGE = 400
+
+
+def _clean(text: str) -> str:
+    return " ".join(text.split())
+
+
+def _truncate(text: str) -> str:
+    text = _clean(text)
+    if len(text) <= _MAX_REMOTE_MESSAGE:
+        return text
+    return text[: _MAX_REMOTE_MESSAGE - 1].rstrip() + "…"
+
+
+def _candidates(payload: Any) -> list[str]:
+    """Pull human-readable strings out of a parsed JSON error body.
+
+    Covers the shapes the connectors actually meet: Atlassian's
+    ``{"errorMessages": [...], "errors": {...}}``, Jama's
+    ``{"meta": {"message": ...}}``, and the ``message`` / ``error`` /
+    ``error_description`` conventions used by OAuth endpoints.
+    """
+    if isinstance(payload, str):
+        return [payload]
+    if not isinstance(payload, dict):
+        return []
+
+    found: list[str] = []
+
+    messages = payload.get("errorMessages")
+    if isinstance(messages, list):
+        found.extend(str(m) for m in messages if m)
+
+    errors = payload.get("errors")
+    if isinstance(errors, dict):
+        found.extend(f"{k}: {v}" for k, v in errors.items() if v)
+    elif isinstance(errors, list):
+        found.extend(str(e) for e in errors if e)
+
+    for key in ("message", "error_description", "error", "detail", "title"):
+        value = payload.get(key)
+        if isinstance(value, str) and value:
+            found.append(value)
+
+    # Jama nests its wording under meta.
+    meta = payload.get("meta")
+    if isinstance(meta, dict):
+        found.extend(_candidates(meta))
+
+    return found
+
+
+def extract_remote_message(body: str) -> str | None:
+    """Return the remote API's own error wording, or ``None`` if there is none.
+
+    The status code alone rarely says what to change - Jira answers a bare
+    ``ORDER BY`` query with 400 and the words "Unbounded JQL queries are not
+    allowed here", which is the only part a model can act on. Connectors feed
+    the raw response body here so that wording survives into the tool error.
+    """
+    if not body or not body.strip():
+        return None
+
+    try:
+        payload = json.loads(body)
+    except ValueError:
+        # Not JSON. An HTML error page is noise, so only pass through short
+        # plain-text bodies, which some gateways do return.
+        text = _clean(body)
+        if not text or text.startswith("<") or len(text) > _MAX_REMOTE_MESSAGE:
+            return None
+        return text
+
+    found = [_clean(c) for c in _candidates(payload)]
+    # Deduplicate while keeping order: APIs often repeat the same wording in
+    # two fields, and showing it twice wastes the model's attention.
+    seen: set[str] = set()
+    unique = [c for c in found if c and not (c in seen or seen.add(c))]
+    if not unique:
+        return None
+    return _truncate(" | ".join(unique))
 
 
 class ConnectorError(Exception):
