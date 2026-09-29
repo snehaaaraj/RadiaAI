@@ -4,6 +4,7 @@ from mcp.server.mcpserver import MCPServer
 
 from mcp_radia import __version__
 from mcp_radia.config import ServerSettings
+from mcp_radia.connectors.jama import JamaClient
 from mcp_radia.logging import get_logger
 from mcp_radia.tools import register_tools
 
@@ -23,11 +24,19 @@ deletes data in the underlying systems.
 """
 
 
-def build_server(settings: ServerSettings) -> MCPServer:
+def build_server(
+    settings: ServerSettings,
+    *,
+    jama_client: JamaClient | None = None,
+) -> MCPServer:
     """Build a fully configured MCP server instance.
 
     Kept separate from the CLI so tests can drive a server over in-memory
     streams without spawning a process or binding a port.
+
+    Args:
+        settings: Server runtime settings.
+        jama_client: Override the Jama connector, for tests.
     """
     server = MCPServer(
         name=SERVER_NAME,
@@ -36,7 +45,7 @@ def build_server(settings: ServerSettings) -> MCPServer:
         instructions=INSTRUCTIONS,
         log_level=settings.log_level,
     )
-    registered = register_tools(server, settings)
+    registered = register_tools(server, settings, jama_client=jama_client)
     logger.info(
         "mcp_server_built",
         server_name=SERVER_NAME,

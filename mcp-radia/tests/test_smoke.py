@@ -17,9 +17,14 @@ def test_build_server_reports_identity(server: MCPServer) -> None:
 
 
 @pytest.mark.unit
-async def test_phase_0_registers_no_tools(server: MCPServer) -> None:
-    """The scaffold must be honest about exposing nothing yet."""
-    assert await server.list_tools() == []
+async def test_every_registered_tool_is_read_only(server: MCPServer) -> None:
+    """The server-wide read-only guarantee, asserted across whatever is registered."""
+    tools = await server.list_tools()
+
+    assert tools, "expected at least one tool to be registered"
+    for tool in tools:
+        assert tool.annotations is not None, f"{tool.name} has no annotations"
+        assert tool.annotations.read_only_hint is True, f"{tool.name} is not marked read-only"
 
 
 @pytest.mark.unit
@@ -28,7 +33,7 @@ async def test_mcp_client_completes_handshake_and_lists_tools(server: MCPServer)
     async with connected_client(server) as session:
         result = await session.list_tools()
 
-    assert result.tools == []
+    assert {t.name for t in result.tools} == {"jama_get_item", "jama_search"}
 
 
 @pytest.mark.unit

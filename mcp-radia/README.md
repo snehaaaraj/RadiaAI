@@ -4,9 +4,8 @@ A standalone [Model Context Protocol](https://modelcontextprotocol.io) server th
 RadiaAI's engineering systems of record — **Jama, Jira, Confluence and Genesys** — through one
 read-only MCP surface, as a digital-thread integration layer.
 
-> **Status: Phase 0 (scaffold).** The server starts, completes an MCP handshake over either
-> transport, and exposes **zero tools**. Connectors land in later phases — see
-> [Roadmap](#roadmap).
+> **Status: Phase 1.** Jama is connected read-only (`jama_get_item`, `jama_search`). Jira,
+> Confluence and Genesys land in later phases — see [Roadmap](#roadmap).
 
 ## Relationship to the rest of this repo
 
@@ -46,8 +45,9 @@ pip install -e ".[dev]"
 cp .env.example .env
 ```
 
-Phase 0 needs **no credentials** — it talks to no external system. Every setting has a working
-default, so the server runs against an empty `.env`. All settings are prefixed `MCP_RADIA_`:
+The server runs against an empty `.env` — every setting has a working default, and an
+unconfigured connector still lists its tools, failing per-call with a message naming the variable
+to set. Server settings are prefixed `MCP_RADIA_`:
 
 | Variable                | Default     | Purpose                                        |
 | ----------------------- | ----------- | ---------------------------------------------- |
@@ -58,6 +58,29 @@ default, so the server runs against an empty `.env`. All settings are prefixed `
 | `MCP_RADIA_HTTP_PATH`   | `/mcp`      | Path the HTTP transport is mounted at           |
 
 Port `8081` is the default specifically so it does not collide with the RadiaAI backend on `8000`.
+
+### Jama (`JAMA_*`)
+
+| Variable               | Default | Purpose                                          |
+| ---------------------- | ------- | ------------------------------------------------ |
+| `JAMA_BASE_URL`        | *empty* | Instance root, e.g. `https://org.jamacloud.com`  |
+| `JAMA_AUTH_TYPE`       | `basic` | `basic` or `oauth`                               |
+| `JAMA_USERNAME`        | *empty* | Username or API ID — `basic` only                |
+| `JAMA_PASSWORD`        | *empty* | Password or API key — `basic` only               |
+| `JAMA_CLIENT_ID`       | *empty* | OAuth client id — `oauth` only                   |
+| `JAMA_CLIENT_SECRET`   | *empty* | OAuth client secret — `oauth` only               |
+| `JAMA_API_VERSION`     | `v1`    | REST version path segment                        |
+| `JAMA_TIMEOUT_SECONDS` | `20`    | Per-request timeout                              |
+| `JAMA_VERIFY_SSL`      | `true`  | Only disable for a self-signed test instance     |
+
+Only the credential pair matching `JAMA_AUTH_TYPE` is required. A half-migrated `.env` (basic
+credentials while `JAMA_AUTH_TYPE=oauth`) counts as **not configured** rather than silently
+authenticating the wrong way.
+
+These use the plain `JAMA_*` prefix, the same names the backend uses. The two services still stay
+independent because this server only ever reads `mcp-radia/.env` — but if you deploy both into one
+container with shared process environment, they will see the same variables. Give mcp-radia its own
+Jama service account if you want the access separated.
 
 ## Run
 
@@ -117,10 +140,12 @@ pytest -m unit          # unit tests only
 ruff check . && ruff format --check . && mypy mcp_radia
 ```
 
-No test in this suite touches the network. The smoke tests drive the server through a **real MCP
-client session over in-memory streams**, so the handshake and `tools/list` are exercised for real
-without binding a port or spawning a process. Connector tests in later phases mock HTTP at the
-transport layer.
+No test in this suite touches the network, and that is **enforced, not assumed**: an autouse
+fixture in [`tests/conftest.py`](tests/conftest.py) fails any test that resolves a hostname or
+opens a non-loopback socket. Connector tests serve canned responses through
+`httpx2.MockTransport`; tool tests drive a **real MCP client session over in-memory streams**, so
+handshake, schema generation, `tools/call` and error translation are all exercised for real
+without binding a port or spawning a process.
 
 There is currently **no CI workflow** for this package — the repo's existing workflows are
 path-filtered to `backend/**` and `frontend/**`, so they neither run against nor are affected by
@@ -131,13 +156,21 @@ this directory. Run the commands above locally before committing.
 ```
 mcp-radia/
 ├── mcp_radia/
-│   ├── cli.py          # argparse entrypoint; stdio + http subcommands
-│   ├── config.py       # pydantic-settings, MCP_RADIA_* prefix
-│   ├── logging.py      # structlog -> stderr
-│   ├── server.py       # build_server(): constructs the MCPServer
-│   └── tools/          # single registration point for every MCP tool
+│   ├── cli.py              # argparse entrypoint; stdio + http subcommands
+│   ├── config.py           # pydantic-settings, MCP_RADIA_* prefix
+│   ├── logging.py          # structlog -> stderr
+│   ├── server.py           # build_server(): constructs the MCPServer
+│   ├── connectors/         # one module per external system
+│   │   ├── errors.py       # shared ConnectorError hierarchy
+│   │   └── jama.py         # Jama settings, models, async client
+│   └── tools/              # single registration point for every MCP tool
+│       └── jama.py         # jama_get_item, jama_search
 └── tests/
 ```
+
+Connectors know nothing about MCP; the `tools/` layer knows nothing about HTTP. The only thing
+crossing that line is the `ConnectorError` hierarchy, which `tools/jama.py` translates into
+`ToolError` so the client gets an actionable message.
 
 The importable package is `mcp_radia` (underscore) inside the `mcp-radia` project directory, since
 a hyphen is not legal in a Python package name.
@@ -150,7 +183,7 @@ that lists the server's entire surface area. Each phase adds its registration ca
 | Phase | Scope                                                              | Status |
 | ----- | ------------------------------------------------------------------ | ------ |
 | 0     | Scaffold: server, config, logging, both transports, smoke tests     | ✅ done |
-| 1     | Jama connector — `jama_get_item`, `jama_search`                     | todo   |
+| 1     | Jama connector — `jama_get_item`, `jama_search`                     | ✅ done |
 | 2     | Jira + Confluence — `jira_get_issue`, `jira_search`, `confluence_*` | todo   |
 | 3     | Genesys — `genesys_get_record`, `genesys_search` (naming TBC)       | todo   |
 | 4     | `list_related_items(system, item_id)` cross-system linking          | todo   |
@@ -165,6 +198,23 @@ that lists the server's entire surface area. Each phase adds its registration ca
   this pass**.
 - **No backend integration.** Making the RadiaAI backend an MCP client of this server is a separate
   task.
+
+## Tools
+
+All read-only, all annotated `readOnlyHint: true`.
+
+| Tool             | Arguments                                                        | Returns                        |
+| ---------------- | ---------------------------------------------------------------- | ------------------------------ |
+| `jama_get_item`  | `item_id` (required)                                             | Full item + raw custom fields  |
+| `jama_search`    | `query`, `project_id`, `item_type_id`, `start_at`, `max_results` | Page of summaries + total      |
+
+Notes:
+
+- `jama_search` maps to Jama's `/abstractitems`; `query` becomes its `contains` parameter.
+- Jama caps page size at 50. `max_results` is schema-limited to that, and the connector clamps
+  defensively as well.
+- Item descriptions arrive from Jama as HTML and are flattened to plain text before returning;
+  the untouched Jama field map is still available under `fields`.
 
 ## Notes on the SDK
 

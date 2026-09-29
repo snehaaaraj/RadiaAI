@@ -17,7 +17,10 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 # silently pick up backend/.env or the repo-root .env and couple this server to
 # the backend's configuration. Only the .env beside our own pyproject.toml counts.
 _PROJECT_DIR = Path(__file__).resolve().parent.parent
-_ENV_FILE = str(_PROJECT_DIR / ".env")
+
+#: The only .env this server ever reads. Connector settings classes import this
+#: so every one of them loads from the same file.
+ENV_FILE = str(_PROJECT_DIR / ".env")
 
 type DeploymentEnvironment = Literal["local", "development", "test", "staging", "production"]
 type LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -32,7 +35,7 @@ class ServerSettings(BaseSettings):
 
     model_config = SettingsConfigDict(
         env_prefix="MCP_RADIA_",
-        env_file=_ENV_FILE,
+        env_file=ENV_FILE,
         extra="ignore",
     )
 
