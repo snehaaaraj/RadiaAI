@@ -221,6 +221,7 @@ class JamaClient:
             global_id=raw.get("globalId"),
             name=str(fields.get("name", "") or ""),
             description=_strip_html(fields.get("description")),
+            rationale=_strip_html(fields.get("rationale")),
             status=str(status) if status is not None else None,
             item_type_id=raw.get("itemType"),
             project_id=project_id,

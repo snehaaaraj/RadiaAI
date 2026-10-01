@@ -384,6 +384,7 @@ export interface JamaRequirement {
   global_id: string | null;
   name: string;
   description: string;
+  rationale: string;
   status: string | null;
   item_type_id: number | null;
   project_id: number | null;
@@ -392,4 +393,3 @@ export interface JamaRequirement {
   web_url: string | null;
   fields: Record<string, unknown>;
 }
-

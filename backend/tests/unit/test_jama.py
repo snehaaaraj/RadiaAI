@@ -75,6 +75,7 @@ def jama_client(test_app) -> Iterator[None]:
                 "fields": {
                     "name": "Braking response requirement",
                     "description": "<p>The system <b>shall</b> stop within 50&nbsp;m.</p>",
+                    "rationale": "<p>To ensure adequate stopping distance.</p>",
                     "status": "Approved",
                 },
             }
@@ -127,6 +128,7 @@ def test_get_requirement_endpoint_normalizes_description(
     assert data["document_key"] == "SYS-REQ-1"
     assert data["status"] == "Approved"
     assert "shall stop within" in data["description"]
+    assert data["rationale"] == "To ensure adequate stopping distance."
     assert data["web_url"].endswith("/items/101?projectId=1")
 
 
