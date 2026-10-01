@@ -1,6 +1,7 @@
 """Unit tests for the Jama connector. All HTTP is mocked; nothing leaves the process."""
 
 import base64
+import json
 
 import httpx2
 import pytest
@@ -118,7 +119,42 @@ async def test_get_item_maps_payload_to_model() -> None:
     assert handler.last_request.url.path == "/rest/v1/items/12345"
 
 
-async def test_get_item_builds_a_web_url_a_human_can_open() -> None:
+async def test_get_item_omits_fields_already_surfaced_as_attributes() -> None:
+    """Jama repeats name/description/status inside 'fields'; the copy is dropped.
+
+    description in particular is raw HTML and dominated the payload, so this is
+    the difference between a usable response and one that blows a context window.
+    """
+    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+
+    item = await client.get_item(12345)
+
+    assert "description" not in item.fields
+    assert "name" not in item.fields
+    assert "status" not in item.fields
+    # The typed attributes still carry the same information.
+    assert item.name == "Battery shall report state of charge"
+    assert item.status == "Approved"
+    assert "state of charge" in item.description
+
+
+async def test_get_item_keeps_custom_fields() -> None:
+    """Dropping duplicates must not touch the custom fields, which nothing else exposes."""
+    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+
+    item = await client.get_item(12345)
+
+    assert item.fields["customField123"] == "traced-to-JIRA-451"
+
+
+async def test_get_item_drops_the_raw_html_copy_of_the_description() -> None:
+    """The HTML never reaches the caller - only the flattened text does."""
+    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+
+    item = await client.get_item(12345)
+
+    assert "<p>" not in json.dumps(item.model_dump())
+
     client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
 
     item = await client.get_item(12345)

@@ -33,7 +33,7 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             "Read the full content of ONE Jama Connect requirement that you can already "
             "identify, by its numeric item id. Returns the item's name, full description "
             "as plain text, workflow status, project, created/modified timestamps, a web "
-            "URL, and every field including custom fields.\n"
+            "URL, and any custom fields defined on the item type.\n"
             "\n"
             "Use when asked things like: 'show me Jama item 12345', 'what does that "
             "requirement actually say?', 'pull up the full text of item 12345'.\n"

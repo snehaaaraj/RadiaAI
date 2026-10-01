@@ -35,7 +35,7 @@ def _truncate(text: str) -> str:
     return text[: _MAX_REMOTE_MESSAGE - 1].rstrip() + "…"
 
 
-def _candidates(payload: Any) -> list[str]:
+def _candidates(payload: object) -> list[str]:
     """Pull human-readable strings out of a parsed JSON error body.
 
     Covers the shapes the connectors actually meet: Atlassian's
@@ -58,7 +58,13 @@ def _candidates(payload: Any) -> list[str]:
     if isinstance(errors, dict):
         found.extend(f"{k}: {v}" for k, v in errors.items() if v)
     elif isinstance(errors, list):
-        found.extend(str(e) for e in errors if e)
+        # Confluence v2 returns a list of error objects; recurse so their
+        # 'title'/'detail' wording is used rather than a raw dict repr.
+        for entry in errors:
+            if isinstance(entry, dict):
+                found.extend(_candidates(entry))
+            elif entry:
+                found.append(str(entry))
 
     for key in ("message", "error_description", "error", "detail", "title"):
         value = payload.get(key)
@@ -98,7 +104,11 @@ def extract_remote_message(body: str) -> str | None:
     # Deduplicate while keeping order: APIs often repeat the same wording in
     # two fields, and showing it twice wastes the model's attention.
     seen: set[str] = set()
-    unique = [c for c in found if c and not (c in seen or seen.add(c))]
+    unique: list[str] = []
+    for candidate in found:
+        if candidate and candidate not in seen:
+            seen.add(candidate)
+            unique.append(candidate)
     if not unique:
         return None
     return _truncate(" | ".join(unique))
@@ -115,13 +125,22 @@ class ConnectorError(Exception):
         operation: str | None = None,
         status_code: int | None = None,
         detail: dict[str, Any] | None = None,
+        remote_message: str | None = None,
     ) -> None:
         super().__init__(message)
         self.message = message
         self.system = system
         self.operation = operation
         self.status_code = status_code
-        self.detail = detail or {}
+        self.detail = dict(detail or {})
+        if remote_message:
+            self.detail[REMOTE_MESSAGE_KEY] = remote_message
+
+    @property
+    def remote_message(self) -> str | None:
+        """What the remote API itself said, if the connector captured it."""
+        value = self.detail.get(REMOTE_MESSAGE_KEY)
+        return value if isinstance(value, str) and value else None
 
     def __str__(self) -> str:
         parts = [f"[{self.system}] {self.message}"]
@@ -129,6 +148,10 @@ class ConnectorError(Exception):
             parts.append(f"operation={self.operation}")
         if self.status_code is not None:
             parts.append(f"status={self.status_code}")
+        # Last, and quoted, because this is the part a model can actually act
+        # on - "add a search restriction" beats "status=400".
+        if self.remote_message:
+            parts.append(f'{self.system} said: "{self.remote_message}"')
         return " ".join(parts)
 
 

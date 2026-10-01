@@ -34,6 +34,7 @@ from mcp_radia.connectors.errors import (
     ConnectorNotConfiguredError,
     ConnectorServiceError,
     ItemNotFoundError,
+    extract_remote_message,
 )
 from mcp_radia.connectors.text import strip_html
 from mcp_radia.logging import get_logger
@@ -48,6 +49,12 @@ _TOKEN_EXPIRY_SKEW_SECONDS = 60
 
 # Jama caps page size at 50 on most collection endpoints; asking for more errors.
 MAX_PAGE_SIZE = 50
+
+# Jama repeats these inside the raw ``fields`` map, but each is already
+# surfaced as a typed attribute on JamaItem - and ``description`` is repeated as
+# raw HTML, which measured ~75% of a single item's payload on a real instance.
+# Dropping them removes duplication only; nothing here is otherwise unavailable.
+_FIELDS_SURFACED_ELSEWHERE = frozenset({"name", "description", "status"})
 
 # Re-exported so callers can keep importing it from the connector they use.
 __all__ = [
@@ -131,7 +138,12 @@ class JamaItem(BaseModel):
     web_url: str | None = Field(default=None, description="Browser URL for a human to open.")
     fields: dict[str, Any] = Field(
         default_factory=dict,
-        description="Raw Jama field map, including any custom fields on the item type.",
+        description=(
+            "Jama's field map, carrying custom fields defined on the item type. "
+            "Name, description and status are omitted here because each is already "
+            "returned as its own attribute - description in particular is stored as "
+            "raw HTML and dominated the payload."
+        ),
     )
 
 
@@ -316,12 +328,14 @@ class JamaClient:
     def _raise_for_status(exc: httpx2.HTTPStatusError, path: str) -> None:
         """Translate an HTTP error status into the right connector exception."""
         status = exc.response.status_code
+        remote = extract_remote_message(exc.response.text)
         if status == 404:
             raise ItemNotFoundError(
                 "The requested Jama resource was not found.",
                 system=SYSTEM,
                 operation=path,
                 status_code=status,
+                remote_message=remote,
             ) from exc
         if status in (401, 403):
             raise ConnectorAuthError(
@@ -330,12 +344,14 @@ class JamaClient:
                 system=SYSTEM,
                 operation=path,
                 status_code=status,
+                remote_message=remote,
             ) from exc
         raise ConnectorServiceError(
             "The Jama API returned an error response.",
             system=SYSTEM,
             operation=path,
             status_code=status,
+            remote_message=remote,
         ) from exc
 
     # -- mapping ------------------------------------------------------------
@@ -379,7 +395,7 @@ class JamaClient:
             created_date=raw.get("createdDate"),
             modified_date=raw.get("modifiedDate"),
             web_url=self._web_url(item_id, project_id),
-            fields=fields,
+            fields={k: v for k, v in fields.items() if k not in _FIELDS_SURFACED_ELSEWHERE},
         )
 
     # -- public API ---------------------------------------------------------
