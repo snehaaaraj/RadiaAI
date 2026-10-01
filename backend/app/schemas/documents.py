@@ -35,6 +35,29 @@ class DocumentSummary(BaseModel):
     ingested_at: datetime | None = None
 
 
+class DocumentChunk(BaseModel):
+    """A single indexed chunk belonging to a document."""
+
+    chunk_id: str
+    content: str
+    chunk_index: int
+    page_number: int | None = None
+    section: str = ""
+
+
+class DocumentDetail(DocumentSummary):
+    """Document-level metadata with all indexed chunks."""
+
+    chunks: list[DocumentChunk] = Field(default_factory=list)
+
+
+class DocumentDeleteResponse(BaseModel):
+    """Confirmation that an indexed document was removed."""
+
+    document_id: str
+    message: str
+
+
 class IngestRequest(BaseModel):
     """Request body for triggering ingestion of already-uploaded documents."""
 

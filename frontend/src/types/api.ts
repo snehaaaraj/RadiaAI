@@ -147,6 +147,23 @@ export interface DocumentSummary {
   ingested_at: string | null;
 }
 
+export interface DocumentChunk {
+  chunk_id: string;
+  content: string;
+  chunk_index: number;
+  page_number: number | null;
+  section: string;
+}
+
+export interface DocumentDetail extends DocumentSummary {
+  chunks: DocumentChunk[];
+}
+
+export interface DocumentDeleteResponse {
+  document_id: string;
+  message: string;
+}
+
 export interface IngestRequest {
   source: string;
   document_ids?: string[];

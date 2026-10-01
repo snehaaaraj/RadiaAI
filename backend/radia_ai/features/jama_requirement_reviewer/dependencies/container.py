@@ -20,6 +20,7 @@ from fastapi import Depends, FastAPI, Request
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
+from app.documents.repository import DocumentCatalogRepository
 from app.ingestion.service import IngestionService
 from app.ingestion.sharepoint_webhook import SharePointWebhookService
 from app.ingestion.status_store import IngestionStatusStore
@@ -110,8 +111,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.exception("search_index_creation_failed")
 
+    document_catalog = DocumentCatalogRepository(settings.azure_search)
+    try:
+        document_catalog.ensure_index()
+        if document_catalog.is_empty():
+            document_catalog.backfill(search_service.iter_indexed_document_chunks())
+    except Exception:
+        logger.exception("document_catalog_initialization_failed")
+
     app.state.openai_client = openai_client
     app.state.search_service = search_service
+    app.state.document_catalog_repository = document_catalog
     app.state.blob_client = blob_client
 
     # RAG service
@@ -138,6 +148,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         search_service=search_service,
         blob_client=blob_client,
         sharepoint_client=sharepoint_client,
+        document_catalog=document_catalog,
     )
     app.state.ingestion_service = ingestion_service
 
@@ -386,6 +397,16 @@ def get_search_service(request: Request) -> SearchService:
 
 
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
+
+
+def get_document_catalog_repository(request: Request) -> DocumentCatalogRepository:
+    """Resolve the document catalog from application state."""
+    return cast(DocumentCatalogRepository, request.app.state.document_catalog_repository)
+
+
+DocumentCatalogRepositoryDep = Annotated[
+    DocumentCatalogRepository, Depends(get_document_catalog_repository)
+]
 
 
 def get_rag_service(request: Request) -> RAGService:
