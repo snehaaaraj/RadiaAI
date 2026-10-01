@@ -21,6 +21,7 @@ import { useAppContext } from '@/context/useAppContext';
 import { useHealth } from '@/hooks/useHealth';
 import { useIngestDocuments } from '@/hooks/useIngestDocuments';
 import { useIngestionStatus } from '@/hooks/useIngestionStatus';
+import { useIngestionJobStatus } from '@/hooks/useIngestionJobStatus';
 import { formatRelativeTime } from '@/utils/formatRelativeTime';
 import { ROUTES } from '@/utils/constants';
 
@@ -53,6 +54,10 @@ export default function Home() {
   const { data: health, isLoading } = useHealth();
   const { mutate: ingestDocuments, isPending: isIngesting, isSuccess, isError, data: ingestResult } = useIngestDocuments();
   const { data: ingestionStatus } = useIngestionStatus();
+  const { data: ingestionJob } = useIngestionJobStatus(ingestResult?.job_id ?? null);
+  const ingestionFailureMessage = ingestionJob?.failure_details
+    .map((failure) => [failure.filename, failure.error].filter(Boolean).join(': '))
+    .join('; ');
   const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
 
@@ -125,8 +130,18 @@ export default function Home() {
           initial={reduceMotion ? false : { opacity: 0, y: -10 }}
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
         >
-          <Alert severity="success" onClose={() => {}}>
-            {ingestResult?.message ?? 'Ingestion triggered successfully'}
+          <Alert
+            severity={
+              ingestionJob?.status === 'failed'
+                ? 'error'
+                : ingestionJob?.status === 'completed'
+                  ? 'success'
+                  : 'info'
+            }
+          >
+            {ingestionJob?.status === 'failed'
+              ? `${ingestionJob.message} ${ingestionFailureMessage ?? ''}`
+              : ingestionJob?.message ?? ingestResult?.message ?? 'Ingestion job queued.'}
           </Alert>
         </motion.div>
       )}

@@ -1,11 +1,12 @@
 """
 Document extraction utilities for the ingestion pipeline.
 
-Extracts plain text from common document formats (PDF, plain text, Markdown).
-Falls back to raw UTF-8 decoding for unsupported non-PDF formats.
+Extracts plain text from the formats accepted by ingestion.
 """
 
 from __future__ import annotations
+
+import io
 
 from app.core.exceptions import ConfigurationError
 from app.core.logging import get_logger
@@ -31,15 +32,11 @@ def extract_pages(data: bytes, filename: str) -> list[tuple[int, str]]:
 
     if lower.endswith(".pdf"):
         return _extract_pdf_pages(data)
+    if lower.endswith(".docx"):
+        return [(1, _extract_docx(data))]
     if lower.endswith((".txt", ".md", ".csv", ".json", ".xml")):
-        return [(1, data.decode("utf-8", errors="replace"))]
-
-    # Fallback: try UTF-8 decode
-    try:
-        return [(1, data.decode("utf-8", errors="replace"))]
-    except Exception:
-        logger.warning("text_extraction_fallback_failed", filename=filename)
-        return [(1, "")]
+        return [(1, data.decode("utf-8"))]
+    raise ValueError(f"Unsupported document type: {filename}")
 
 
 def _extract_pdf_pages(data: bytes) -> list[tuple[int, str]]:
@@ -54,3 +51,16 @@ def _extract_pdf_pages(data: bytes) -> list[tuple[int, str]]:
 
     with fitz.open(stream=data, filetype="pdf") as doc:
         return [(i + 1, page.get_text()) for i, page in enumerate(doc)]
+
+
+def _extract_docx(data: bytes) -> str:
+    """Extract paragraph text from a validated DOCX document."""
+    try:
+        from docx import Document
+    except ImportError as exc:
+        raise ConfigurationError(
+            "python-docx is required to extract DOCX documents",
+            detail={"dependency": "python-docx"},
+        ) from exc
+    document = Document(io.BytesIO(data))
+    return "\n".join(paragraph.text for paragraph in document.paragraphs)

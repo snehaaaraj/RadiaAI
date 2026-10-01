@@ -17,6 +17,7 @@ from app.core.logging import get_logger
 from app.documents.repository import DocumentCatalogRepository
 from app.ingestion.chunker import chunk_pages
 from app.ingestion.extractor import extract_pages
+from app.ingestion.validation import validate_document
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointFileContent,
     SharePointStandardsClient,
@@ -200,6 +201,7 @@ class IngestionService:
         sharepoint_url: str = "",
     ) -> None:
         """Core pipeline: extract → chunk → embed → index."""
+        validate_document(data, filename, "", allow_paths=True)
         pages: list[tuple[int | None, str]] = list(extract_pages(data, filename))
         if not any(text.strip() for _page_number, text in pages):
             logger.warning("empty_document_skipped", filename=filename)

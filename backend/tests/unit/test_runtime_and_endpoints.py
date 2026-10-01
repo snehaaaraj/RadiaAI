@@ -17,7 +17,7 @@ from app.core.config import (
     get_settings,
 )
 from app.core.security import _entra_auth, _stub_auth
-from app.dependencies.container import get_ingestion_service, get_search_service
+from app.dependencies.container import get_ingestion_job_store, get_search_service
 from app.main import StartupConfigurationError, _resolve_settings
 
 if TYPE_CHECKING:
@@ -217,6 +217,38 @@ class DummyIngestionService:
         return {"status": "indexed", "filename": filename}
 
 
+class DummyIngestionJobStore:
+    def __init__(self) -> None:
+        self.jobs: dict[str, dict[str, object]] = {}
+        self.requests: list[dict[str, object]] = []
+
+    def enqueue(self, **kwargs):
+        self.requests.append(kwargs)
+        job = {
+            "job_id": f"00000000-0000-0000-0000-{len(self.requests):012d}",
+            "message": "Ingestion job queued.",
+            "status": "queued",
+            "source": kwargs["source"],
+            "trigger": kwargs["trigger"],
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-01T00:00:00Z",
+            "attempt": 0,
+            "processed": 0,
+            "skipped": 0,
+            "failed": 0,
+            "failure_details": [],
+        }
+        self.jobs[job["job_id"]] = job
+        return job, True
+
+    def get(self, job_id: str):
+        from app.ingestion.job_store import JobNotFoundError
+
+        if job_id not in self.jobs:
+            raise JobNotFoundError(job_id)
+        return self.jobs[job_id]
+
+
 @pytest.mark.unit
 def test_search_endpoint_returns_structured_results(client: TestClient) -> None:
     dummy = DummySearchService(calls=[])
@@ -245,55 +277,77 @@ def test_search_endpoint_returns_structured_results(client: TestClient) -> None:
 
 @pytest.mark.unit
 def test_trigger_ingestion_uses_blob_branch(client: TestClient) -> None:
-    dummy = DummyIngestionService(blob_calls=[], sharepoint_calls=0, raw_calls=[])
+    dummy = DummyIngestionJobStore()
     app = cast(FastAPI, client.app)
-    app.dependency_overrides[get_ingestion_service] = lambda: dummy
+    app.dependency_overrides[get_ingestion_job_store] = lambda: dummy
     try:
         response = client.post(
             "/api/v1/ingest",
             json={"source": "blob", "document_ids": ["a.txt", "b.txt"]},
         )
     finally:
-        app.dependency_overrides.pop(get_ingestion_service, None)
+        app.dependency_overrides.pop(get_ingestion_job_store, None)
 
     assert response.status_code == 202
     body = response.json()
     assert body["success"] is True
-    assert body["data"]["queued_count"] == 2
-    assert dummy.blob_calls == [["a.txt", "b.txt"]]
-    assert dummy.sharepoint_calls == 0
+    assert body["data"]["queued_count"] == 1
+    assert dummy.requests[0]["source"] == "blob"
+    assert dummy.requests[0]["document_ids"] == ["a.txt", "b.txt"]
 
 
 @pytest.mark.unit
 def test_trigger_ingestion_uses_sharepoint_branch(client: TestClient) -> None:
-    dummy = DummyIngestionService(blob_calls=[], sharepoint_calls=0, raw_calls=[])
+    dummy = DummyIngestionJobStore()
     app = cast(FastAPI, client.app)
-    app.dependency_overrides[get_ingestion_service] = lambda: dummy
+    app.dependency_overrides[get_ingestion_job_store] = lambda: dummy
     try:
         response = client.post("/api/v1/ingest", json={"source": "sharepoint"})
     finally:
-        app.dependency_overrides.pop(get_ingestion_service, None)
+        app.dependency_overrides.pop(get_ingestion_job_store, None)
 
     assert response.status_code == 202
-    assert response.json()["data"]["queued_count"] == 3
-    assert dummy.sharepoint_calls == 1
+    assert response.json()["data"]["queued_count"] == 1
+    assert dummy.requests[0]["source"] == "sharepoint"
 
 
 @pytest.mark.unit
 def test_upload_and_ingest_reads_uploaded_file(client: TestClient) -> None:
-    dummy = DummyIngestionService(blob_calls=[], sharepoint_calls=0, raw_calls=[])
+    dummy = DummyIngestionJobStore()
     app = cast(FastAPI, client.app)
-    app.dependency_overrides[get_ingestion_service] = lambda: dummy
+    app.dependency_overrides[get_ingestion_job_store] = lambda: dummy
     try:
         response = client.post(
             "/api/v1/ingest/upload",
             files={"file": ("spec.txt", b"hello world", "text/plain")},
         )
     finally:
-        app.dependency_overrides.pop(get_ingestion_service, None)
+        app.dependency_overrides.pop(get_ingestion_job_store, None)
 
     assert response.status_code == 202
     body = response.json()
     assert body["success"] is True
     assert body["data"]["queued_count"] == 1
-    assert dummy.raw_calls == [(b"hello world", "spec.txt", "upload")]
+    assert dummy.requests[0]["upload"] == (b"hello world", "spec.txt", "text/plain")
+
+
+@pytest.mark.unit
+def test_ingestion_rejects_unsupported_source(client: TestClient) -> None:
+    response = client.post("/api/v1/ingest", json={"source": "external"})
+    assert response.status_code == 422
+
+
+@pytest.mark.unit
+def test_ingestion_job_status_is_retrievable(client: TestClient) -> None:
+    dummy = DummyIngestionJobStore()
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides[get_ingestion_job_store] = lambda: dummy
+    try:
+        queued = client.post("/api/v1/ingest", json={"source": "blob"})
+        job_id = queued.json()["data"]["job_id"]
+        status_response = client.get(f"/api/v1/ingest/jobs/{job_id}")
+    finally:
+        app.dependency_overrides.pop(get_ingestion_job_store, None)
+
+    assert status_response.status_code == 200
+    assert status_response.json()["data"]["status"] == "queued"

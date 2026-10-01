@@ -9,16 +9,24 @@ POST /api/v1/ingest/webhook - Microsoft Graph change-notification receiver; auto
                               SharePoint ingestion when the standards folder changes.
 """
 
-import uuid
+from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, File, Request, UploadFile, status
+from fastapi import APIRouter, File, Header, HTTPException, Request, UploadFile, status
 from fastapi.responses import PlainTextResponse
 
+from app.core.config import get_settings
 from app.core.logging import get_logger
+from app.ingestion.job_store import IdempotencyConflictError, JobNotFoundError
+from app.ingestion.validation import read_validated_upload
 from app.schemas.common import APIResponse
-from app.schemas.documents import IngestionStatusResponse, IngestRequest, IngestResponse
+from app.schemas.documents import (
+    IngestionJobResponse,
+    IngestionStatusResponse,
+    IngestRequest,
+    IngestResponse,
+)
 from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
-    IngestionServiceDep,
+    IngestionJobStoreDep,
     IngestionStatusStoreDep,
     SharePointWebhookServiceDep,
 )
@@ -31,45 +39,36 @@ logger = get_logger(__name__)
     "",
     response_model=APIResponse[IngestResponse],
     summary="Trigger document ingestion",
-    description="Ingests documents from blob storage or SharePoint into Azure AI Search.",
+    description="Queues ingestion from blob storage or SharePoint into Azure AI Search.",
     status_code=status.HTTP_202_ACCEPTED,
 )
 async def trigger_ingestion(
     body: IngestRequest,
     request: Request,
-    ingestion_service: IngestionServiceDep,
-    status_store: IngestionStatusStoreDep,
+    job_store: IngestionJobStoreDep,
+    idempotency_key: str | None = Header(
+        default=None, alias="Idempotency-Key", min_length=1, max_length=255
+    ),
 ) -> APIResponse[IngestResponse]:
-    """Trigger ingestion from blob or SharePoint."""
-    job_id = str(uuid.uuid4())
-    logger.info("ingest_triggered", source=body.source, job_id=job_id)
-
-    if body.source == "sharepoint":
-        result = ingestion_service.ingest_from_sharepoint()
-    else:
-        result = ingestion_service.ingest_from_blob(
-            document_ids=body.document_ids if body.document_ids else None,
+    """Durably queue ingestion from blob storage or SharePoint."""
+    try:
+        job, created = job_store.enqueue(
+            source=body.source,
+            trigger="manual",
+            document_ids=body.document_ids,
+            idempotency_key=idempotency_key,
         )
-
-    processed = result.get("processed", 0)
-    skipped = result.get("skipped", 0)
-    failed = result.get("failed", 0)
-    message = f"Processed: {processed}, Skipped (unchanged): {skipped}, Failed: {failed}"
-
-    status_store.record(
-        source=body.source,
-        trigger="manual",
-        outcome=status_store.outcome_from_result(result),
-        processed=processed,
-        skipped=skipped,
-        failed=failed,
-        message=message,
-    )
-
+    except IdempotencyConflictError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("ingestion_job_enqueue_failed", source=body.source)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Unable to queue ingestion job."
+        ) from exc
     response = IngestResponse(
-        job_id=job_id,
-        queued_count=processed,
-        message=message,
+        job_id=job["job_id"],
+        queued_count=1 if created else 0,
+        message=job["message"],
     )
     return APIResponse(data=response, request_id=request.state.request_id)
 
@@ -83,23 +82,58 @@ async def trigger_ingestion(
 )
 async def upload_and_ingest(
     request: Request,
-    ingestion_service: IngestionServiceDep,
+    job_store: IngestionJobStoreDep,
     file: UploadFile = File(...),
+    idempotency_key: str | None = Header(
+        default=None, alias="Idempotency-Key", min_length=1, max_length=255
+    ),
 ) -> APIResponse[IngestResponse]:
-    """Upload a single file for ingestion."""
-    job_id = str(uuid.uuid4())
-    data = await file.read()
-    filename = file.filename or "unknown"
-    logger.info("upload_ingest_triggered", filename=filename, job_id=job_id)
-
-    result = ingestion_service.ingest_raw_document(data=data, filename=filename)
-
+    """Validate, stage, and durably queue one document upload."""
+    settings = getattr(request.app.state, "settings", None) or get_settings()
+    data, filename = await read_validated_upload(
+        file, max_bytes=settings.ingestion_max_upload_bytes
+    )
+    try:
+        job, created = job_store.enqueue(
+            source="upload",
+            trigger="manual",
+            upload=(data, filename, file.content_type or ""),
+            idempotency_key=idempotency_key,
+        )
+    except IdempotencyConflictError as exc:
+        raise HTTPException(status.HTTP_409_CONFLICT, str(exc)) from exc
+    except Exception as exc:
+        logger.exception("upload_ingestion_enqueue_failed", filename=filename)
+        raise HTTPException(
+            status.HTTP_503_SERVICE_UNAVAILABLE, "Unable to queue ingestion job."
+        ) from exc
     response = IngestResponse(
-        job_id=job_id,
-        queued_count=1 if result.get("status") == "indexed" else 0,
-        message=f"Status: {result.get('status', 'unknown')} - {result.get('reason', result.get('error', 'OK'))}",
+        job_id=job["job_id"],
+        queued_count=1 if created else 0,
+        message=job["message"],
     )
     return APIResponse(data=response, request_id=request.state.request_id)
+
+
+@router.get(
+    "/jobs/{job_id}",
+    response_model=APIResponse[IngestionJobResponse],
+    summary="Get an ingestion job",
+)
+async def get_ingestion_job(
+    job_id: UUID,
+    request: Request,
+    job_store: IngestionJobStoreDep,
+) -> APIResponse[IngestionJobResponse]:
+    """Return durable per-job progress and failure details."""
+    try:
+        job = job_store.get(str(job_id))
+    except JobNotFoundError as exc:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Ingestion job not found.") from exc
+    return APIResponse(
+        data=IngestionJobResponse.model_validate(job),
+        request_id=request.state.request_id,
+    )
 
 
 @router.get(
@@ -134,7 +168,6 @@ async def get_ingestion_status(
 async def sharepoint_webhook(
     request: Request,
     webhook_service: SharePointWebhookServiceDep,
-    background_tasks: BackgroundTasks,
 ) -> PlainTextResponse | dict[str, str]:
     """
     Receive Microsoft Graph change notifications for the SharePoint standards folder.
@@ -145,18 +178,28 @@ async def sharepoint_webhook(
       2. Change notifications - a JSON body with a `value` array of notification
          objects, each carrying the `clientState` secret set at subscription time.
 
-    Ingestion (and subscription renewal) is deferred to a background task so the
-    acknowledgement is returned to Graph immediately.
+    Each notification is checked against the persisted subscription before a
+    durable queue message is created.
     """
     validation_token = request.query_params.get("validationToken")
     if validation_token is not None:
         logger.info("sharepoint_webhook_validation_handshake")
         return PlainTextResponse(content=validation_token, status_code=status.HTTP_200_OK)
 
-    body = await request.json()
-    notifications = body.get("value", [])
-    logger.info("sharepoint_webhook_notification_accepted", count=len(notifications))
-    background_tasks.add_task(webhook_service.handle_notification, notifications)
+    try:
+        body = await request.json()
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid JSON payload.") from exc
+    if not isinstance(body, dict) or not isinstance(body.get("value"), list):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Expected a notifications value array.")
+    notifications = body["value"]
+    if not notifications or len(notifications) > 100:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid notification batch size.")
+    if not all(isinstance(item, dict) for item in notifications):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid notification item.")
+    logger.info("sharepoint_webhook_notification_received", count=len(notifications))
+    if not webhook_service.handle_notification(notifications):
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Webhook notification validation failed.")
     return {"status": "accepted"}
 
 

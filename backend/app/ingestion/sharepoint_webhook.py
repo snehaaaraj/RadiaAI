@@ -18,6 +18,8 @@ Renewal strategy:
 
 from __future__ import annotations
 
+import hashlib
+import hmac
 import json
 import secrets
 import time
@@ -30,8 +32,7 @@ from azure.core.exceptions import ResourceNotFoundError
 from app.core.azure_clients import BlobStorageClient
 from app.core.config import SharePointSettings
 from app.core.logging import get_logger
-from app.ingestion.service import IngestionService
-from app.ingestion.status_store import IngestionStatusStore
+from app.ingestion.job_store import IngestionJobStore
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointStandardsClient,
 )
@@ -71,14 +72,12 @@ class SharePointWebhookService:
         settings: SharePointSettings,
         sharepoint_client: SharePointStandardsClient,
         blob_client: BlobStorageClient,
-        ingestion_service: IngestionService,
-        status_store: IngestionStatusStore | None = None,
+        job_store: IngestionJobStore,
     ) -> None:
         self._settings = settings
         self._sharepoint = sharepoint_client
         self._blob = blob_client
-        self._ingestion = ingestion_service
-        self._status_store = status_store
+        self._jobs = job_store
         self._last_fallback_check: float = 0.0
 
     # ------------------------------------------------------------------
@@ -244,11 +243,10 @@ class SharePointWebhookService:
 
     def handle_notification(self, notifications: list[dict[str, Any]]) -> bool:
         """
-        Validate incoming change notifications and trigger re-ingestion.
+        Validate every notification and durably queue SharePoint re-ingestion.
 
-        Returns True if at least one notification carried a valid clientState and
-        ingestion was triggered; False otherwise (e.g. no stored subscription state,
-        or every notification failed clientState verification).
+        Returns True only when all notifications match the active subscription and
+        the job has been persisted to the queue.
         """
         state = self._load_state()
         if state is None:
@@ -256,43 +254,38 @@ class SharePointWebhookService:
             return False
 
         expected_client_state = state.get("client_state")
-        valid = any(n.get("clientState") == expected_client_state for n in notifications)
-
-        if not valid:
-            logger.warning("sharepoint_webhook_notification_client_state_mismatch")
+        expected_subscription_id = state.get("subscription_id")
+        expected_resource = state.get("resource")
+        if not isinstance(expected_client_state, str) or not expected_client_state:
+            logger.error("sharepoint_webhook_subscription_state_incomplete")
             return False
+        if not isinstance(expected_subscription_id, str) or not expected_subscription_id:
+            logger.error("sharepoint_webhook_subscription_state_incomplete")
+            return False
+        if not isinstance(expected_resource, str) or not expected_resource:
+            logger.error("sharepoint_webhook_subscription_state_incomplete")
+            return False
+        for notification in notifications:
+            client_state = notification.get("clientState")
+            if (
+                not isinstance(client_state, str)
+                or not client_state.isascii()
+                or not hmac.compare_digest(client_state, expected_client_state)
+                or notification.get("subscriptionId") != expected_subscription_id
+                or not isinstance(notification.get("resource"), str)
+                or notification["resource"].strip("/").casefold()
+                != expected_resource.strip("/").casefold()
+            ):
+                logger.warning("sharepoint_webhook_notification_rejected")
+                return False
 
         logger.info("sharepoint_webhook_notification_received", count=len(notifications))
-
-        try:
-            result = self._ingestion.ingest_from_sharepoint()
-            self._record_status(result)
-        except Exception as exc:
-            logger.exception("sharepoint_webhook_triggered_ingestion_failed")
-            self._record_status({"status": "error", "message": str(exc)})
-
-        # Opportunistically renew if we're getting close to expiry.
-        self.ensure_subscription()
-        return True
-
-    def _record_status(self, result: dict[str, Any]) -> None:
-        """Persist the ingestion outcome so the frontend can poll for it."""
-        if self._status_store is None:
-            return
-        processed = result.get("processed", 0)
-        skipped = result.get("skipped", 0)
-        failed = result.get("failed", 0)
-        outcome = self._status_store.outcome_from_result(result)
-        message = result.get(
-            "message",
-            f"Processed: {processed}, Skipped (unchanged): {skipped}, Failed: {failed}",
-        )
-        self._status_store.record(
+        bucket = int(time.time() // 60)
+        raw_key = f"{expected_subscription_id}:{expected_resource}:{bucket}"
+        idempotency_key = "sharepoint-webhook:" + hashlib.sha256(raw_key.encode()).hexdigest()
+        self._jobs.enqueue(
             source="sharepoint",
             trigger="webhook",
-            outcome=outcome,
-            processed=processed,
-            skipped=skipped,
-            failed=failed,
-            message=message,
+            idempotency_key=idempotency_key,
         )
+        return True

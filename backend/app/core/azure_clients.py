@@ -448,13 +448,11 @@ class SearchService:
             results = self._search_client.search(
                 search_text="*",
                 select=["file_hash"],
-                top=5000,
             )
             return {r["file_hash"] for r in results if r.get("file_hash")}
         except Exception:
-            # Index may not exist yet or may not have the file_hash field
-            logger.warning("get_indexed_file_hashes_failed_returning_empty")
-            return set()
+            logger.exception("get_indexed_file_hashes_failed")
+            raise
 
     def get_indexed_files(self, *, source: str) -> dict[str, set[str]]:
         """Return indexed file hashes grouped by filename for one source.
@@ -468,7 +466,6 @@ class SearchService:
             search_text="*",
             filter=f"source eq '{source}'",
             select=["filename", "file_hash"],
-            top=5000,
         )
         indexed: dict[str, set[str]] = {}
         for result in results:

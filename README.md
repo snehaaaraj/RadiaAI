@@ -38,8 +38,8 @@ production-ready.
 │    3. Enrich with SharePoint URLs                          │
 │    4. Report completion status (or why it failed)          │
 │                                                            │
-│  On-demand ingestion (POST /api/v1/ingest):                │
-│    SharePoint → extract text → chunk → embed → index       │
+│  Ingestion API: persist job → Azure Storage Queue          │
+│  Azure Functions worker: extract → chunk → embed → index   │
 │    File-hash caching skips unchanged documents             │
 └──────────┬──────────┬────────────────┬─────────────────────┘
            │          │                │
@@ -177,16 +177,46 @@ Failure reasons: `review_engine_unavailable`, `no_standards_context`,
 
 ## Ingestion Pipeline
 
-Standards documents are ingested from SharePoint on demand via `POST /api/v1/ingest`:
+Standards documents are queued from SharePoint on demand via `POST /api/v1/ingest`:
 
-1. **Download** from SharePoint via Microsoft Graph API
-2. **Extract text** using PyMuPDF (PDF), python-docx (DOCX), or UTF-8 (TXT/MD)
-3. **Chunk** into ~512-word overlapping segments
-4. **Embed** via Azure OpenAI text-embedding-3-large (3072 dimensions)
-5. **Index** into Azure AI Search with vector + keyword + semantic search
-6. **Cache** file hashes - skip re-processing unchanged documents
+1. The API persists an ingestion job in Blob Storage and sends its job ID to Azure Storage Queue.
+2. An Azure Functions queue-trigger worker downloads from SharePoint via Microsoft Graph API.
+3. **Extract text** from validated PDF, DOCX, TXT, MD, CSV, JSON, and XML files.
+4. **Chunk** into ~512-word overlapping segments.
+5. **Embed** via Azure OpenAI text-embedding-3-large (3072 dimensions).
+6. **Index** into Azure AI Search with vector + keyword + semantic search.
+7. **Cache** file hashes - skip re-processing unchanged documents and make queue redelivery safe.
 
-Single files can also be uploaded directly via `POST /api/v1/ingest/upload`.
+Single files can also be uploaded through `POST /api/v1/ingest/upload`. The API validates
+the extension, MIME type and content before staging the bytes in Blob Storage. The default
+maximum upload size is 4 MiB to stay within the Vercel request-body limit.
+
+### Durable queue and job status
+
+The FastAPI API runs on Vercel and only submits durable work; it does not run ingestion in
+the request or use in-process background tasks. Deploy `backend/` as an Azure Functions
+Python v2 app with the same `backend/requirements.txt` dependencies and configure:
+
+- `AZURE_BLOB_CONNECTION_STRING` and `AZURE_BLOB_CONTAINER_NAME` (shared with the API)
+- `AzureWebJobsStorage` (host coordination/timer storage; may point at the same account)
+- `INGESTION_QUEUE_NAME` (same value in API and Functions; default `radia-ingestion`)
+- `INGESTION_MAX_ATTEMPTS` (fixed at 5 to match the queue host's poison-message ceiling)
+- `INGESTION_MAX_UPLOAD_BYTES` (default 4 MiB; maximum 4,500,000 bytes)
+- the `AZURE_OPENAI_*`, `AZURE_SEARCH_*`, and `SHAREPOINT_*` settings used by the API
+
+The Functions host configuration in `backend/host.json` allows up to 10 minutes per job,
+retries failed queue messages up
+to five deliveries with queue-trigger backoff and moves exhausted messages to
+`<queue-name>-poison`. Per-job state
+and failure details are durable in Blob Storage. The API returns a `job_id`; clients can
+poll `GET /api/v1/ingest/jobs/{job_id}` for `queued`, `processing`, `retrying`, `completed`,
+or `failed`. Supply an `Idempotency-Key` header when retrying the same API request; reuse
+of that key with a different request returns HTTP 409. Document file hashes are also used
+to make safe retries after partial indexing.
+
+Run the queue consumer locally from `backend/` with Azure Functions Core Tools using
+`func start`. Storage Queue is created by the API on first submission; the configured
+document Blob container must already exist.
 
 ### Automatic ingestion via SharePoint webhook (optional)
 
@@ -199,22 +229,23 @@ on the folder:
 1. Graph POSTs a change notification to `POST /api/v1/ingest/webhook`
 2. The `clientState` secret on the notification is verified against the
    subscription record stored in Blob Storage
-3. `ingest_from_sharepoint()` runs in the background (file-hash caching still
-   applies, so only changed documents are re-indexed)
+3. The webhook validates every notification's `clientState`, subscription ID, and
+   expected resource, then durably queues SharePoint ingestion. The queue worker
+   re-scans SharePoint (file-hash caching still applies).
 
 Because Graph subscriptions expire after a few days, the subscription is
-renewed opportunistically on every notification, plus a throttled fallback
-check on every `GET /api/v1/standards` call (which the frontend already makes
-on page load) in case SharePoint is quiet for an extended period.
+renewed on API startup and by a throttled fallback check on `GET /api/v1/standards`
+(which the frontend already makes on page load). Notifications are acknowledged
+after queue submission without waiting for subscription-renewal network calls.
 
 Enable it with `SHAREPOINT_WEBHOOK_ENABLED=true` and
 `SHAREPOINT_WEBHOOK_PUBLIC_BASE_URL=https://<your-app-domain>` (see
 `.env.example`). `POST /api/v1/ingest/webhook/subscribe` can be called to
 manually (re)create the subscription, e.g. after first enabling the feature.
 
-**Seeing when ingestion completes:** since webhook-triggered ingestion runs
-server-side with no direct connection back to the browser, the Home page
-polls `GET /api/v1/ingest/status` every 30 seconds and shows a "Last ingested"
+**Seeing when ingestion completes:** the Home page polls the returned job ID at
+`GET /api/v1/ingest/jobs/{job_id}` while work is queued or running. It also polls
+`GET /api/v1/ingest/status` every 30 seconds and shows a "Last ingested"
 chip next to the system status indicator, noting how long ago it ran, whether
 it was triggered automatically (`auto (SharePoint change)`) or manually, and
 the processed/failed counts. This works for both the webhook and the manual
@@ -349,6 +380,7 @@ Quick validation after deploy:
 | POST | `/api/v1/ingest` | Trigger document ingestion (blob or SharePoint) |
 | POST | `/api/v1/ingest/upload` | Upload and ingest a single document file |
 | GET | `/api/v1/ingest/status` | Outcome of the most recent ingestion run (manual or webhook) |
+| GET | `/api/v1/ingest/jobs/{job_id}` | Durable status and failure details for one ingestion job |
 | POST | `/api/v1/ingest/webhook` | Microsoft Graph change-notification receiver (auto-ingestion) |
 | POST | `/api/v1/ingest/webhook/subscribe` | Manually (re)create the SharePoint webhook subscription |
 | GET | `/api/v1/documents` | List indexed documents |
@@ -371,7 +403,9 @@ the full reference with descriptions.
 | `AZURE_OPENAI_MAX_TOKENS` | Max completion tokens (16384 recommended for GPT-5) |
 | `AZURE_SEARCH_ENDPOINT` | Azure AI Search endpoint |
 | `AZURE_SEARCH_INDEX_NAME` | Search index name (default: `radia-documents`) |
-| `AZURE_BLOB_CONNECTION_STRING` | Blob Storage connection string |
+| `AZURE_BLOB_CONNECTION_STRING` | Blob Storage connection string; also used for the ingestion queue |
+| `INGESTION_QUEUE_NAME` | Durable ingestion queue name (default: `radia-ingestion`) |
+| `INGESTION_MAX_ATTEMPTS` / `INGESTION_MAX_UPLOAD_BYTES` | Fixed five queue deliveries / upload cap (default 4 MiB) |
 | `SHAREPOINT_*` | SharePoint Graph API credentials for standards library |
 | `SHAREPOINT_WEBHOOK_ENABLED` / `SHAREPOINT_WEBHOOK_PUBLIC_BASE_URL` | Optional auto-ingestion webhook (see Ingestion Pipeline) |
 | `ENTRA_*` | Microsoft Entra ID settings (leave empty for local dev) |

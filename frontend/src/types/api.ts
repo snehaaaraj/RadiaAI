@@ -165,7 +165,7 @@ export interface DocumentDeleteResponse {
 }
 
 export interface IngestRequest {
-  source: string;
+  source: 'blob' | 'sharepoint';
   document_ids?: string[];
 }
 
@@ -184,6 +184,21 @@ export interface IngestionStatusResponse {
   skipped: number;
   failed: number;
   message: string;
+}
+
+export interface IngestionJobResponse {
+  job_id: string;
+  source: string;
+  trigger: 'manual' | 'webhook';
+  status: 'queued' | 'processing' | 'retrying' | 'completed' | 'failed';
+  created_at: string;
+  updated_at: string;
+  attempt: number;
+  processed: number;
+  skipped: number;
+  failed: number;
+  message: string;
+  failure_details: Array<Record<string, string>>;
 }
 
 // ---------------------------------------------------------------------------

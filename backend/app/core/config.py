@@ -315,6 +315,21 @@ class AppSettings(BaseSettings):
     )
     debug: bool = Field(default=False, description="Enable debug mode (never True in production)")
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
+    ingestion_queue_name: str = Field(
+        default="radia-ingestion", description="Azure Storage Queue for durable ingestion jobs"
+    )
+    ingestion_max_attempts: int = Field(
+        default=5,
+        ge=5,
+        le=5,
+        description="Queue-trigger delivery count; fixed at five to match poison handling",
+    )
+    ingestion_max_upload_bytes: int = Field(
+        default=4 * 1024 * 1024,
+        ge=1,
+        le=4_500_000,
+        description="Maximum upload size, kept below Vercel's request-body limit",
+    )
 
     # --- API ---
     api_prefix: str = Field(default="/api/v1")

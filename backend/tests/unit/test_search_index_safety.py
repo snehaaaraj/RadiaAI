@@ -138,5 +138,35 @@ def test_get_indexed_files_groups_hashes_by_source_filename(test_settings: AppSe
         search_text="*",
         filter="source eq 'sharepoint'",
         select=["filename", "file_hash"],
-        top=5000,
     )
+
+
+@pytest.mark.unit
+def test_get_indexed_file_hashes_uses_search_paging(test_settings: AppSettings) -> None:
+    search_service = SearchService(
+        test_settings.azure_search, openai_client=MagicMock(), app_settings=test_settings
+    )
+    search_service._search_client = MagicMock()
+    search_service._search_client.search.return_value = [
+        {"file_hash": f"hash-{index}"} for index in range(6000)
+    ]
+
+    hashes = search_service.get_indexed_file_hashes()
+
+    assert len(hashes) == 6000
+    search_service._search_client.search.assert_called_once_with(
+        search_text="*",
+        select=["file_hash"],
+    )
+
+
+@pytest.mark.unit
+def test_get_indexed_file_hashes_surfaces_search_errors(test_settings: AppSettings) -> None:
+    search_service = SearchService(
+        test_settings.azure_search, openai_client=MagicMock(), app_settings=test_settings
+    )
+    search_service._search_client = MagicMock()
+    search_service._search_client.search.side_effect = HttpResponseError("search unavailable")
+
+    with pytest.raises(HttpResponseError, match="search unavailable"):
+        search_service.get_indexed_file_hashes()

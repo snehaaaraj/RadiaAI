@@ -79,7 +79,6 @@ def _remove_stubs(client: TestClient) -> None:
     assert isinstance(app, FastAPI)
     app.dependency_overrides.pop(get_document_catalog_repository, None)
     app.dependency_overrides.pop(get_search_service, None)
-    app.dependency_overrides.pop(get_settings, None)
 
 
 @pytest.mark.unit
@@ -116,7 +115,11 @@ def test_list_documents_uses_catalog_filters_and_paging(client: TestClient) -> N
 
 @pytest.mark.unit
 def test_list_documents_validates_page_size(client: TestClient) -> None:
-    response = client.get("/api/v1/documents", params={"page_size": 101})
+    _install_stubs(client)
+    try:
+        response = client.get("/api/v1/documents", params={"page_size": 101})
+    finally:
+        _remove_stubs(client)
     assert response.status_code == 422
 
 
@@ -150,13 +153,15 @@ def test_delete_document_removes_indexed_copy_only(client: TestClient) -> None:
 
 @pytest.mark.unit
 def test_delete_document_is_disabled_outside_local_and_development(
-    client: TestClient, test_settings: AppSettings
+    client: TestClient, test_settings: AppSettings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     catalog, search = _install_stubs(client)
     app = client.app
     assert isinstance(app, FastAPI)
-    app.dependency_overrides[get_settings] = lambda: test_settings.model_copy(
-        update={"environment": "production"}
+    monkeypatch.setitem(
+        app.dependency_overrides,
+        get_settings,
+        lambda: test_settings.model_copy(update={"environment": "production"}),
     )
     try:
         response = client.delete(f"/api/v1/documents/{catalog.document.document_id}")

@@ -93,6 +93,6 @@ class IngestionStatusStore:
     @staticmethod
     def outcome_from_result(result: dict[str, Any]) -> IngestionOutcome:
         """Derive a success/error outcome from an ingestion result dict."""
-        if result.get("status") == "error":
+        if result.get("status") == "error" or int(result.get("failed", 0)) > 0:
             return "error"
         return "success"

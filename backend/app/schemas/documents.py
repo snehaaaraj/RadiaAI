@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -61,9 +62,11 @@ class DocumentDeleteResponse(BaseModel):
 class IngestRequest(BaseModel):
     """Request body for triggering ingestion of already-uploaded documents."""
 
-    source: str = Field(description="Connector source identifier")
+    source: Literal["blob", "sharepoint"] = Field(description="Connector source identifier")
     document_ids: list[str] = Field(
-        default_factory=list, description="Subset to ingest; empty = all"
+        default_factory=list,
+        max_length=500,
+        description="Subset to ingest; empty = all",
     )
 
 
@@ -88,3 +91,20 @@ class IngestionStatusResponse(BaseModel):
     skipped: int = 0
     failed: int = 0
     message: str = ""
+
+
+class IngestionJobResponse(BaseModel):
+    """Durable status of one queued ingestion job."""
+
+    job_id: str
+    source: str
+    trigger: Literal["manual", "webhook"]
+    status: Literal["queued", "processing", "retrying", "completed", "failed"]
+    created_at: datetime
+    updated_at: datetime
+    attempt: int = 0
+    processed: int = 0
+    skipped: int = 0
+    failed: int = 0
+    message: str = ""
+    failure_details: list[dict[str, str]] = Field(default_factory=list)
