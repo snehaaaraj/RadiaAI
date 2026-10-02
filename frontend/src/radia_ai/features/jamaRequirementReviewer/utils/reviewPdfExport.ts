@@ -50,17 +50,20 @@ function statusScoreLabel(category: CategoryResult): string {
 const PAGE_MARGIN = 40;
 
 function addHeading(doc: jsPDF, title: string, subtitle: string | undefined, cursorY: number): number {
+  const contentWidth = doc.internal.pageSize.getWidth() - PAGE_MARGIN * 2;
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(16);
-  doc.text(title, PAGE_MARGIN, cursorY);
-  cursorY += 20;
+  const titleLines = doc.splitTextToSize(title, contentWidth);
+  doc.text(titleLines, PAGE_MARGIN, cursorY);
+  cursorY += titleLines.length * 20;
   if (subtitle) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(10);
     doc.setTextColor(90);
-    doc.text(subtitle, PAGE_MARGIN, cursorY);
+    const subtitleLines = doc.splitTextToSize(subtitle, contentWidth);
+    doc.text(subtitleLines, PAGE_MARGIN, cursorY);
     doc.setTextColor(0);
-    cursorY += 18;
+    cursorY += subtitleLines.length * 12 + 6;
   }
   return cursorY;
 }
@@ -69,9 +72,10 @@ function addMetadataTable(doc: jsPDF, cursorY: number, rows: [string, string][])
   autoTable(doc, {
     startY: cursorY,
     theme: 'plain',
-    styles: { fontSize: 9, cellPadding: 2 },
+    styles: { fontSize: 9, cellPadding: 2, overflow: 'linebreak', valign: 'top' },
     columnStyles: { 0: { fontStyle: 'bold', cellWidth: 130 } },
     body: rows,
+    tableWidth: 'auto',
     margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -88,8 +92,9 @@ function addCategoryTable(doc: jsPDF, cursorY: number, categories: CategoryResul
     startY: cursorY,
     head: [['Category', 'Score']],
     body: categories.map((c) => [categoryLabel(c.category), statusScoreLabel(c)]),
-    styles: { fontSize: 9, cellPadding: 4 },
+    styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'top' },
     headStyles: { fillColor: [27, 79, 216] },
+    tableWidth: 'auto',
     margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
   });
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,8 +118,9 @@ function addFindingsSection(doc: jsPDF, cursorY: number, findings: ReviewFinding
     autoTable(doc, {
       startY: cursorY,
       theme: 'plain',
-      styles: { fontSize: 9, cellPadding: 4 },
+      styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'top' },
       body: [['No findings were detected for this review.']],
+      tableWidth: 'auto',
       margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
     });
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -135,6 +141,7 @@ function addFindingsSection(doc: jsPDF, cursorY: number, findings: ReviewFinding
     ]),
     styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak', valign: 'top' },
     headStyles: { fillColor: [27, 79, 216] },
+    tableWidth: 'auto',
     columnStyles: {
       0: { cellWidth: 20 },
       1: { cellWidth: 60 },
@@ -213,8 +220,9 @@ export function exportReviewSetToPdf(sections: ReviewPdfSection[], setName = 'se
       getReviewQualityScore(s.result.category_results).toFixed(1),
       String(s.result.findings.length),
     ]),
-    styles: { fontSize: 9, cellPadding: 4 },
+    styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'top' },
     headStyles: { fillColor: [27, 79, 216] },
+    tableWidth: 'auto',
     margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
   });
 

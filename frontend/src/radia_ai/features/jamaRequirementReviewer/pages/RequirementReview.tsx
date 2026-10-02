@@ -150,8 +150,12 @@ export default function RequirementReview() {
 
   const handleJamaRequirementSelected = (requirement: JamaRequirement) => {
     const nextId = requirement.document_key ?? String(requirement.id);
-    const parts = [requirement.name, requirement.description].filter(
-      (part) => part && part.trim().length > 0
+    const parts = [
+      requirement.name ? `Title: ${requirement.name}` : '',
+      requirement.description ? `Description: ${requirement.description}` : '',
+      requirement.rationale ? `Rationale: ${requirement.rationale}` : '',
+    ].filter(
+      (part) => part.trim().length > 0
     );
     const nextText = normalizeRequirementText(parts.join('\n\n'));
     setRequirementId(nextId);

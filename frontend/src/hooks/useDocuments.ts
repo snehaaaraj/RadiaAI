@@ -1,13 +1,38 @@
-import { useQuery } from '@tanstack/react-query';
-import { fetchDocuments } from '@/api/documents';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  deleteDocument,
+  fetchDocument,
+  fetchDocuments,
+  type DocumentListParams,
+} from '@/api/documents';
 
-export const DOCUMENTS_QUERY_KEY = (page: number, pageSize: number) =>
-  ['documents', page, pageSize] as const;
+export const DOCUMENTS_QUERY_KEY = (params: DocumentListParams = {}) =>
+  ['documents', params] as const;
 
-export function useDocuments(page = 1, pageSize = 20) {
+export function useDocuments(params: DocumentListParams = {}) {
   return useQuery({
-    queryKey: DOCUMENTS_QUERY_KEY(page, pageSize),
-    queryFn: () => fetchDocuments(page, pageSize),
+    queryKey: DOCUMENTS_QUERY_KEY(params),
+    queryFn: () => fetchDocuments(params),
+    placeholderData: keepPreviousData,
     staleTime: 60_000,
+  });
+}
+
+export function useDocument(documentId: string | null) {
+  return useQuery({
+    queryKey: ['documents', 'detail', documentId] as const,
+    queryFn: () => fetchDocument(documentId as string),
+    enabled: documentId !== null,
+    staleTime: 60_000,
+  });
+}
+
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteDocument,
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['documents'] });
+    },
   });
 }

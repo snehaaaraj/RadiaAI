@@ -12,7 +12,6 @@ from tests.conftest import InMemoryBlobClient
 
 from app.core.config import SharePointSettings
 from app.ingestion.sharepoint_webhook import SharePointWebhookService
-from app.ingestion.status_store import IngestionStatusStore
 
 
 class StubSharePointClient:
@@ -29,15 +28,23 @@ class StubSharePointClient:
         return "drive-1", "folder-item-1"
 
 
-class StubIngestionService:
-    """Records calls to ingest_from_sharepoint without touching Azure."""
+class StubJobStore:
+    """Records durable queue submissions without touching Azure."""
 
     def __init__(self) -> None:
-        self.calls = 0
+        self.jobs: list[dict[str, Any]] = []
 
-    def ingest_from_sharepoint(self) -> dict[str, Any]:
-        self.calls += 1
-        return {"processed": 1, "skipped": 0, "failed": 0, "details": []}
+    def enqueue(self, **kwargs: Any) -> tuple[dict[str, Any], bool]:
+        self.jobs.append(kwargs)
+        return {"job_id": "job-1"}, True
+
+
+def _valid_notification() -> dict[str, str]:
+    return {
+        "clientState": "correct-secret",
+        "subscriptionId": "sub-existing",
+        "resource": "/drives/drive-1/root",
+    }
 
 
 def _configured_settings(**overrides: Any) -> SharePointSettings:
@@ -73,7 +80,7 @@ def test_ensure_subscription_noop_when_webhook_not_configured() -> None:
         settings=settings,
         sharepoint_client=StubSharePointClient(),
         blob_client=InMemoryBlobClient(),
-        ingestion_service=StubIngestionService(),
+        job_store=StubJobStore(),
     )
 
     service.ensure_subscription()
@@ -107,7 +114,7 @@ def test_ensure_subscription_creates_and_persists_state(monkeypatch: pytest.Monk
         settings=settings,
         sharepoint_client=sharepoint_client,
         blob_client=blob_client,
-        ingestion_service=StubIngestionService(),
+        job_store=StubJobStore(),
     )
     service.ensure_subscription()
 
@@ -143,7 +150,7 @@ def test_ensure_subscription_skips_when_far_from_expiry(monkeypatch: pytest.Monk
         settings=settings,
         sharepoint_client=StubSharePointClient(),
         blob_client=blob_client,
-        ingestion_service=StubIngestionService(),
+        job_store=StubJobStore(),
     )
     service.ensure_subscription()
 
@@ -183,7 +190,7 @@ def test_ensure_subscription_renews_when_close_to_expiry(monkeypatch: pytest.Mon
         settings=settings,
         sharepoint_client=StubSharePointClient(),
         blob_client=blob_client,
-        ingestion_service=StubIngestionService(),
+        job_store=StubJobStore(),
     )
     service.ensure_subscription()
 
@@ -203,28 +210,29 @@ def test_handle_notification_triggers_ingestion_on_valid_client_state() -> None:
                 "subscription_id": "sub-existing",
                 "expiration": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
                 "client_state": "correct-secret",
-                "resource": "/drives/drive-1/items/folder-item-1",
+                "resource": "/drives/drive-1/root",
                 "notification_url": "https://myapp.vercel.app/api/v1/ingest/webhook",
             }
         ).encode("utf-8"),
     )
-    ingestion_service = StubIngestionService()
+    job_store = StubJobStore()
 
     service = SharePointWebhookService(
         settings=settings,
         sharepoint_client=StubSharePointClient(),
         blob_client=blob_client,
-        ingestion_service=ingestion_service,
+        job_store=job_store,
     )
 
-    triggered = service.handle_notification([{"clientState": "correct-secret"}])
+    triggered = service.handle_notification([_valid_notification()])
 
     assert triggered is True
-    assert ingestion_service.calls == 1
+    assert job_store.jobs[0]["source"] == "sharepoint"
+    assert job_store.jobs[0]["trigger"] == "webhook"
 
 
 @pytest.mark.unit
-def test_handle_notification_records_ingestion_status() -> None:
+def test_handle_notification_queues_durable_ingestion_job() -> None:
     settings = _configured_settings()
     blob_client = InMemoryBlobClient()
     blob_client.upload_blob(
@@ -234,28 +242,50 @@ def test_handle_notification_records_ingestion_status() -> None:
                 "subscription_id": "sub-existing",
                 "expiration": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
                 "client_state": "correct-secret",
-                "resource": "/drives/drive-1/items/folder-item-1",
+                "resource": "/drives/drive-1/root",
                 "notification_url": "https://myapp.vercel.app/api/v1/ingest/webhook",
             }
         ).encode("utf-8"),
     )
-    status_store = IngestionStatusStore(blob_client)
+    job_store = StubJobStore()
 
     service = SharePointWebhookService(
         settings=settings,
         sharepoint_client=StubSharePointClient(),
         blob_client=blob_client,
-        ingestion_service=StubIngestionService(),
-        status_store=status_store,
+        job_store=job_store,
     )
 
-    service.handle_notification([{"clientState": "correct-secret"}])
+    assert service.handle_notification([_valid_notification()]) is True
+    assert len(job_store.jobs) == 1
 
-    latest = status_store.get_latest()
-    assert latest is not None
-    assert latest["trigger"] == "webhook"
-    assert latest["outcome"] == "success"
-    assert latest["processed"] == 1
+
+@pytest.mark.unit
+def test_handle_notification_rejects_batch_with_mismatched_subscription() -> None:
+    blob_client = InMemoryBlobClient()
+    blob_client.upload_blob(
+        "system/sharepoint-webhook-subscription.json",
+        json.dumps(
+            {
+                "subscription_id": "sub-existing",
+                "expiration": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
+                "client_state": "correct-secret",
+                "resource": "/drives/drive-1/root",
+            }
+        ).encode("utf-8"),
+    )
+    job_store = StubJobStore()
+    service = SharePointWebhookService(
+        settings=_configured_settings(),
+        sharepoint_client=StubSharePointClient(),
+        blob_client=blob_client,
+        job_store=job_store,
+    )
+    invalid_notification = _valid_notification()
+    invalid_notification["subscriptionId"] = "another-subscription"
+
+    assert service.handle_notification([_valid_notification(), invalid_notification]) is False
+    assert job_store.jobs == []
 
 
 @pytest.mark.unit
@@ -269,39 +299,41 @@ def test_handle_notification_rejects_invalid_client_state() -> None:
                 "subscription_id": "sub-existing",
                 "expiration": (datetime.now(UTC) + timedelta(days=3)).isoformat(),
                 "client_state": "correct-secret",
-                "resource": "/drives/drive-1/items/folder-item-1",
+                "resource": "/drives/drive-1/root",
                 "notification_url": "https://myapp.vercel.app/api/v1/ingest/webhook",
             }
         ).encode("utf-8"),
     )
-    ingestion_service = StubIngestionService()
+    job_store = StubJobStore()
 
     service = SharePointWebhookService(
         settings=settings,
         sharepoint_client=StubSharePointClient(),
         blob_client=blob_client,
-        ingestion_service=ingestion_service,
+        job_store=job_store,
     )
 
-    triggered = service.handle_notification([{"clientState": "wrong-secret"}])
+    notification = _valid_notification()
+    notification["clientState"] = "wrong-secret"
+    triggered = service.handle_notification([notification])
 
     assert triggered is False
-    assert ingestion_service.calls == 0
+    assert job_store.jobs == []
 
 
 @pytest.mark.unit
 def test_handle_notification_without_existing_subscription_state() -> None:
     settings = _configured_settings()
-    ingestion_service = StubIngestionService()
+    job_store = StubJobStore()
 
     service = SharePointWebhookService(
         settings=settings,
         sharepoint_client=StubSharePointClient(),
         blob_client=InMemoryBlobClient(),
-        ingestion_service=ingestion_service,
+        job_store=job_store,
     )
 
-    triggered = service.handle_notification([{"clientState": "anything"}])
+    triggered = service.handle_notification([_valid_notification()])
 
     assert triggered is False
-    assert ingestion_service.calls == 0
+    assert job_store.jobs == []

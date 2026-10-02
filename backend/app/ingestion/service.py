@@ -8,13 +8,16 @@ Tracks file hashes to skip re-processing unchanged documents.
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Any, TypedDict, cast
 
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService, compute_file_hash
 from app.core.config import AppSettings
 from app.core.logging import get_logger
+from app.documents.repository import DocumentCatalogRepository
 from app.ingestion.chunker import chunk_pages
 from app.ingestion.extractor import extract_pages
+from app.ingestion.validation import validate_document
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointFileContent,
     SharePointStandardsClient,
@@ -50,12 +53,14 @@ class IngestionService:
         search_service: SearchService,
         blob_client: BlobStorageClient | None = None,
         sharepoint_client: SharePointStandardsClient | None = None,
+        document_catalog: DocumentCatalogRepository | None = None,
     ) -> None:
         self._settings = settings
         self._openai = openai_client
         self._search = search_service
         self._blob = blob_client
         self._sharepoint = sharepoint_client
+        self._document_catalog = document_catalog
 
     def ingest_from_blob(self, document_ids: list[str] | None = None) -> dict[str, Any]:
         """Ingest documents from Azure Blob Storage into the search index."""
@@ -160,6 +165,8 @@ class IngestionService:
         }
         for file_hash in stale_hashes:
             self._search.delete_documents_by_file_hash(file_hash)
+            if self._document_catalog is not None:
+                self._document_catalog.delete(file_hash)
 
         if not files:
             results["details"].append({"status": "reconciled", "reason": "no files remain"})
@@ -194,6 +201,7 @@ class IngestionService:
         sharepoint_url: str = "",
     ) -> None:
         """Core pipeline: extract → chunk → embed → index."""
+        validate_document(data, filename, "", allow_paths=True)
         pages: list[tuple[int | None, str]] = list(extract_pages(data, filename))
         if not any(text.strip() for _page_number, text in pages):
             logger.warning("empty_document_skipped", filename=filename)
@@ -238,5 +246,19 @@ class IngestionService:
                 }
             )
 
-        self._search.upload_documents(search_docs)
+        uploaded = self._search.upload_documents(search_docs)
+        if self._document_catalog is not None:
+            if uploaded != len(search_docs):
+                raise RuntimeError(
+                    f"Indexed {uploaded} of {len(search_docs)} chunks for {filename}; "
+                    "document catalog was not updated"
+                )
+            self._document_catalog.upsert(
+                document_id=file_hash,
+                filename=filename,
+                source=source,
+                document_type=document_type,
+                chunk_count=uploaded,
+                ingested_at=datetime.now(UTC),
+            )
         logger.info("document_indexed", filename=filename, chunks=len(search_docs))

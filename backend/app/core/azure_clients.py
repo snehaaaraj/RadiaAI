@@ -338,16 +338,49 @@ class SearchService:
 
     def delete_documents_by_file_hash(self, file_hash: str) -> None:
         """Delete all chunks belonging to a specific file hash."""
+        chunks = self.get_document_chunks(file_hash)
+        chunk_ids = [chunk["chunk_id"] for chunk in chunks]
+        for offset in range(0, len(chunk_ids), _SEARCH_UPLOAD_BATCH_SIZE):
+            batch = [
+                {"chunk_id": chunk_id}
+                for chunk_id in chunk_ids[offset : offset + _SEARCH_UPLOAD_BATCH_SIZE]
+            ]
+            results = self._search_client.delete_documents(documents=batch)
+            if any(not result.succeeded for result in results):
+                raise RuntimeError(
+                    f"Could not delete every indexed chunk for file hash {file_hash}"
+                )
+        if chunk_ids:
+            logger.info("chunks_deleted", file_hash=file_hash, count=len(chunk_ids))
+
+    def get_document_chunks(self, file_hash: str) -> list[dict[str, Any]]:
+        """Return every indexed chunk belonging to a file, ordered by chunk position."""
         results = self._search_client.search(
             search_text="*",
             filter=f"file_hash eq '{file_hash}'",
-            select=["chunk_id"],
-            top=1000,
+            select=["chunk_id", "content", "chunk_index", "page_number", "section"],
         )
-        docs_to_delete = [{"chunk_id": r["chunk_id"]} for r in results]
-        if docs_to_delete:
-            self._search_client.delete_documents(documents=docs_to_delete)
-            logger.info("chunks_deleted", file_hash=file_hash, count=len(docs_to_delete))
+        chunks = [dict(chunk) for page in results.by_page() for chunk in page]
+        chunks.sort(key=lambda chunk: int(chunk.get("chunk_index") or 0))
+        return chunks
+
+    def iter_indexed_document_chunks(self) -> Iterator[dict[str, Any]]:
+        """Iterate all index rows needed to backfill a newly created document catalog."""
+        results = self._search_client.search(
+            search_text="*",
+            select=[
+                "chunk_id",
+                "source",
+                "filename",
+                "document_type",
+                "file_hash",
+                "chunk_index",
+                "page_number",
+                "section",
+            ],
+        )
+        for page in results.by_page():
+            yield from (dict(row) for row in page)
 
     # -- Search --
 
@@ -415,13 +448,11 @@ class SearchService:
             results = self._search_client.search(
                 search_text="*",
                 select=["file_hash"],
-                top=5000,
             )
             return {r["file_hash"] for r in results if r.get("file_hash")}
         except Exception:
-            # Index may not exist yet or may not have the file_hash field
-            logger.warning("get_indexed_file_hashes_failed_returning_empty")
-            return set()
+            logger.exception("get_indexed_file_hashes_failed")
+            raise
 
     def get_indexed_files(self, *, source: str) -> dict[str, set[str]]:
         """Return indexed file hashes grouped by filename for one source.
@@ -435,7 +466,6 @@ class SearchService:
             search_text="*",
             filter=f"source eq '{source}'",
             select=["filename", "file_hash"],
-            top=5000,
         )
         indexed: dict[str, set[str]] = {}
         for result in results:

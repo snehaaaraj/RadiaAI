@@ -20,6 +20,8 @@ from fastapi import Depends, FastAPI, Request
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
+from app.documents.repository import DocumentCatalogRepository
+from app.ingestion.job_store import IngestionJobStore
 from app.ingestion.service import IngestionService
 from app.ingestion.sharepoint_webhook import SharePointWebhookService
 from app.ingestion.status_store import IngestionStatusStore
@@ -110,8 +112,17 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.exception("search_index_creation_failed")
 
+    document_catalog = DocumentCatalogRepository(settings.azure_search)
+    try:
+        document_catalog.ensure_index()
+        if document_catalog.is_empty():
+            document_catalog.backfill(search_service.iter_indexed_document_chunks())
+    except Exception:
+        logger.exception("document_catalog_initialization_failed")
+
     app.state.openai_client = openai_client
     app.state.search_service = search_service
+    app.state.document_catalog_repository = document_catalog
     app.state.blob_client = blob_client
 
     # RAG service
@@ -138,8 +149,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         search_service=search_service,
         blob_client=blob_client,
         sharepoint_client=sharepoint_client,
+        document_catalog=document_catalog,
     )
     app.state.ingestion_service = ingestion_service
+    app.state.ingestion_job_store = IngestionJobStore(settings)
 
     # Ingestion status store - lets the frontend poll for the outcome of the most
     # recent ingestion run, whether triggered manually or via the SharePoint webhook.
@@ -152,8 +165,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         settings=settings.sharepoint,
         sharepoint_client=sharepoint_client,
         blob_client=blob_client,
-        ingestion_service=ingestion_service,
-        status_store=ingestion_status_store,
+        job_store=app.state.ingestion_job_store,
     )
     app.state.sharepoint_webhook_service = sharepoint_webhook_service
     if settings.sharepoint.is_webhook_configured:
@@ -388,6 +400,16 @@ def get_search_service(request: Request) -> SearchService:
 SearchServiceDep = Annotated[SearchService, Depends(get_search_service)]
 
 
+def get_document_catalog_repository(request: Request) -> DocumentCatalogRepository:
+    """Resolve the document catalog from application state."""
+    return cast(DocumentCatalogRepository, request.app.state.document_catalog_repository)
+
+
+DocumentCatalogRepositoryDep = Annotated[
+    DocumentCatalogRepository, Depends(get_document_catalog_repository)
+]
+
+
 def get_rag_service(request: Request) -> RAGService:
     """Resolve RAG service from application state."""
     return cast(RAGService, request.app.state.rag_service)
@@ -419,8 +441,7 @@ def get_sharepoint_webhook_service(request: Request) -> SharePointWebhookService
             settings=settings.sharepoint,
             sharepoint_client=sharepoint_client,
             blob_client=blob_client,
-            ingestion_service=get_ingestion_service(request),
-            status_store=get_ingestion_status_store(request),
+            job_store=get_ingestion_job_store(request),
         )
         request.app.state.sharepoint_webhook_service = service
     return service
@@ -445,3 +466,15 @@ def get_ingestion_status_store(request: Request) -> IngestionStatusStore:
 
 
 IngestionStatusStoreDep = Annotated[IngestionStatusStore, Depends(get_ingestion_status_store)]
+
+
+def get_ingestion_job_store(request: Request) -> IngestionJobStore:
+    """Resolve the durable queue and per-job status repository."""
+    store = getattr(request.app.state, "ingestion_job_store", None)
+    if store is None:
+        store = IngestionJobStore(_resolve_settings(request.app))
+        request.app.state.ingestion_job_store = store
+    return store
+
+
+IngestionJobStoreDep = Annotated[IngestionJobStore, Depends(get_ingestion_job_store)]

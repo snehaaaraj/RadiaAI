@@ -6,6 +6,8 @@ The pattern used here (FastAPI Depends on a callable) means that switching betwe
 authentication modes requires changing only this file - no endpoint code needs to change.
 """
 
+from typing import Annotated
+
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
@@ -78,3 +80,30 @@ async def _entra_auth(
         )
     # Placeholder - will be replaced with real validation
     raise NotImplementedError("Entra ID token validation not yet implemented")
+
+
+def require_document_admin(
+    settings: AppSettings = Depends(get_settings),
+) -> AuthenticatedUser:
+    """Allow document deletion only for the local development admin."""
+    if settings.environment not in ("local", "development"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Document deletion is disabled until Entra ID authentication is implemented.",
+        )
+
+    user = AuthenticatedUser(
+        user_id="local-dev-user",
+        email="dev@radia.local",
+        roles=["admin"],
+        display_name="Local Dev User",
+    )
+    if not user.has_role("admin"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Administrator role required to delete indexed documents.",
+        )
+    return user
+
+
+DocumentAdminDep = Annotated[AuthenticatedUser, Depends(require_document_admin)]

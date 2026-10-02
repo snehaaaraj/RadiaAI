@@ -120,10 +120,18 @@ export function useSetReviewQueue() {
       inFlightRef.current.add(item.key);
       patch(item.key, { state: 'reviewing' });
       try {
-        const result = await reviewRequirement(item.payload);
-        patch(item.key, { state: 'done', result });
-      } catch (err) {
-        patch(item.key, { state: 'error', error: toItemError(err) });
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const result = await reviewRequirement(item.payload);
+            if (result.completion.status === 'failed' && attempt === 0) continue;
+            patch(item.key, { state: 'done', result });
+            return;
+          } catch (err) {
+            if (attempt === 1) {
+              patch(item.key, { state: 'error', error: toItemError(err) });
+            }
+          }
+        }
       } finally {
         inFlightRef.current.delete(item.key);
       }

@@ -58,6 +58,9 @@ def _default_settings() -> AppSettings:
         retrieval_top_k=5,
         chunk_size=512,
         chunk_overlap=64,
+        ingestion_queue_name="radia-ingestion",
+        ingestion_max_attempts=5,
+        ingestion_max_upload_bytes=4 * 1024 * 1024,
         azure_openai=AzureOpenAISettings.model_construct(
             endpoint="https://example.openai.azure.com",
             api_key="",

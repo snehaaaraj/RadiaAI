@@ -147,8 +147,25 @@ export interface DocumentSummary {
   ingested_at: string | null;
 }
 
+export interface DocumentChunk {
+  chunk_id: string;
+  content: string;
+  chunk_index: number;
+  page_number: number | null;
+  section: string;
+}
+
+export interface DocumentDetail extends DocumentSummary {
+  chunks: DocumentChunk[];
+}
+
+export interface DocumentDeleteResponse {
+  document_id: string;
+  message: string;
+}
+
 export interface IngestRequest {
-  source: string;
+  source: 'blob' | 'sharepoint';
   document_ids?: string[];
 }
 
@@ -167,6 +184,21 @@ export interface IngestionStatusResponse {
   skipped: number;
   failed: number;
   message: string;
+}
+
+export interface IngestionJobResponse {
+  job_id: string;
+  source: string;
+  trigger: 'manual' | 'webhook';
+  status: 'queued' | 'processing' | 'retrying' | 'completed' | 'failed';
+  created_at: string;
+  updated_at: string;
+  attempt: number;
+  processed: number;
+  skipped: number;
+  failed: number;
+  message: string;
+  failure_details: Array<Record<string, string>>;
 }
 
 // ---------------------------------------------------------------------------
@@ -384,6 +416,7 @@ export interface JamaRequirement {
   global_id: string | null;
   name: string;
   description: string;
+  rationale: string;
   status: string | null;
   item_type_id: number | null;
   project_id: number | null;
@@ -392,4 +425,3 @@ export interface JamaRequirement {
   web_url: string | null;
   fields: Record<string, unknown>;
 }
-

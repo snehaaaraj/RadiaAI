@@ -39,6 +39,7 @@ class JamaRequirement(BaseModel):
     global_id: str | None = None
     name: str = ""
     description: str = Field(default="", description="Requirement body text (HTML stripped)")
+    rationale: str = Field(default="", description="Requirement rationale (HTML stripped)")
     status: str | None = None
     item_type_id: int | None = None
     project_id: int | None = None
