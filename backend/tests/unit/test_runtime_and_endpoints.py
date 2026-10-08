@@ -131,7 +131,9 @@ def test_resolve_settings_allows_fallback_in_explicit_test_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ENVIRONMENT", "test")
-    monkeypatch.setattr("app.main.get_settings", lambda: AppSettings(azure_openai={}))
+    monkeypatch.setattr(
+        "app.main.get_settings", lambda: AppSettings(azure_openai={"endpoint": None})
+    )
 
     settings = _resolve_settings()
 
@@ -142,7 +144,9 @@ def test_resolve_settings_allows_fallback_in_explicit_test_environment(
 @pytest.mark.unit
 def test_resolve_settings_fails_fast_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setattr("app.main.get_settings", lambda: AppSettings(azure_openai={}))
+    monkeypatch.setattr(
+        "app.main.get_settings", lambda: AppSettings(azure_openai={"endpoint": None})
+    )
 
     with pytest.raises(StartupConfigurationError, match="invalid for production") as exc_info:
         _resolve_settings()

@@ -89,7 +89,11 @@ class JamaAccountService:
 
     def status(self, user: AuthenticatedUser) -> JamaAccountStatus:
         base_url = self._settings.jama.base_url or None
-        link = self._repository.get_link(user.subject_key) if self.linking_enabled else None
+        link = (
+            self._repository.get_link(user.subject_key)
+            if self._repository is not None and self._settings.jama.has_base_url
+            else None
+        )
         if link is not None:
             return JamaAccountStatus(
                 linking_enabled=True,

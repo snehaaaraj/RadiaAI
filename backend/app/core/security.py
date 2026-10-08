@@ -258,17 +258,14 @@ class EntraTokenValidator:
             raise jwt.InvalidTokenError("Token has no key id")
 
         signing_key = self._keys.get(kid)
-        claims = cast(
-            dict[str, Any],
-            jwt.decode(
-                token,
-                key=signing_key.key,
-                algorithms=_ALLOWED_ALGORITHMS,
-                audience=self.settings.accepted_audiences,
-                issuer=self.settings.accepted_issuers,
-                leeway=self.settings.clock_skew_seconds,
-                options={"require": ["exp", "iat", "iss", "aud", "tid", "oid"]},
-            ),
+        claims = jwt.decode(
+            token,
+            key=signing_key.key,
+            algorithms=_ALLOWED_ALGORITHMS,
+            audience=self.settings.accepted_audiences,
+            issuer=self.settings.accepted_issuers,
+            leeway=self.settings.clock_skew_seconds,
+            options={"require": ["exp", "iat", "iss", "aud", "tid", "oid"]},
         )
 
         if str(claims["tid"]).casefold() != self.settings.tenant_id.strip().casefold():
