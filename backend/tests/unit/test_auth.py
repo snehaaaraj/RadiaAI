@@ -16,7 +16,7 @@ import jwt
 import pytest
 from cryptography.hazmat.primitives.asymmetric import rsa
 
-from app.core.config import EntraIDSettings
+from app.core.config import AppSettings, EntraIDSettings
 from app.core.security import (
     AuthenticatedUser,
     AuthProviderUnavailableError,
@@ -442,13 +442,20 @@ def test_auth_not_configured_fails_closed_in_deployed_environments(
 
 @pytest.mark.unit
 def test_missing_environment_defaults_to_production_and_fails_closed(
-    monkeypatch: pytest.MonkeyPatch,
+    monkeypatch: pytest.MonkeyPatch, test_settings: AppSettings
 ) -> None:
-    from app.core.config import AppSettings
     from app.main import StartupConfigurationError, _validate_auth_configuration
 
     monkeypatch.delenv("ENVIRONMENT", raising=False)
-    settings = AppSettings.model_construct()
+    settings = AppSettings.model_construct(
+        azure_openai=test_settings.azure_openai,
+        azure_search=test_settings.azure_search,
+        azure_blob=test_settings.azure_blob,
+        entra=test_settings.entra,
+        sharepoint=test_settings.sharepoint,
+        jama=test_settings.jama,
+        skillz=test_settings.skillz,
+    )
 
     assert settings.environment == "production"
     assert settings.allows_local_auth_bypass is False
