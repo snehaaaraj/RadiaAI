@@ -448,6 +448,9 @@ The project supports:
 ## 12. Security and operational notes
 
 - Secrets are loaded from `.env`
+- Every non-public endpoint requires a validated Microsoft Entra ID token and a Radia
+  app role ([authentication.md](./authentication.md))
+- Jama is accessed as each signed-in user's own linked Jama account
 - API responses use a consistent error envelope
 - Request IDs are propagated across logs and responses
 - Input validation is handled with Pydantic
@@ -466,7 +469,8 @@ The project supports:
 | Document listing and document management | Planned | `GET /api/v1/documents` currently returns an empty placeholder response; document detail and deletion are not implemented. |
 | Document-oriented workflows | In progress | Ingestion, search, and chat are available; document inventory and management workflows remain incomplete. |
 | Dependency health probes | Implemented | `GET /health/live` is a lightweight process check; `GET /health/ready` (and the legacy `GET /health` alias) performs bounded, cached, real connectivity probes against Azure OpenAI, Azure AI Search, and Blob Storage (required) plus SharePoint and Jama (optional-but-configured), returning HTTP 503 only when a required dependency is down. |
-| Microsoft Entra ID authentication and authorization | Planned | Local development uses a synthetic user. Production JWT/JWKS validation, issuer and audience checks, and role extraction are not implemented. |
+| Microsoft Entra ID authentication and authorization | Implemented | SPA sign-in with MSAL; API validates Entra access tokens (RS256/JWKS, issuer, audience, expiry, tenant, scope) and enforces `Radia.User` / `Radia.DocumentAdmin` / `Radia.Admin` app roles on every non-public endpoint. Local/test environments may use a synthetic user; deployed environments fail closed. See [authentication.md](./authentication.md). |
+| Per-user Jama access | Implemented | Each user links their own Jama API credentials (encrypted at rest); all Jama calls run as that user so Jama enforces their project permissions. Review history is private per user. |
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
 
 ## 14. Summary

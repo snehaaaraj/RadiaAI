@@ -456,6 +456,9 @@ export interface ReviewHistoryEntry {
   workflow: ReviewWorkflow;
   subject_id: string | null;
   created_at: string;
+  /** Entra identity of the user who ran the review (null for pre-authentication entries). */
+  owner_id?: string | null;
+  owner_name?: string | null;
   overall: ReviewStatus;
   completion: ReviewCompletion;
   category_results: CategoryResult[];
@@ -517,4 +520,36 @@ export interface JamaRequirement {
   modified_date: string | null;
   web_url: string | null;
   fields: Record<string, unknown>;
+}
+
+/** The signed-in user's Jama link (personal Jama API credentials are never returned). */
+export interface JamaAccountStatus {
+  linking_enabled: boolean;
+  linked: boolean;
+  using_shared_account: boolean;
+  jama_base_url: string | null;
+  jama_user_id: number | null;
+  jama_username: string | null;
+  jama_email: string | null;
+  jama_display_name: string | null;
+  linked_at: string | null;
+}
+
+export interface JamaAccountLinkRequest {
+  client_id: string;
+  client_secret: string;
+}
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+export interface CurrentUser {
+  user_id: string;
+  email: string;
+  display_name: string;
+  auth_method: 'entra' | 'local';
+  roles: string[];
+  can_manage_documents: boolean;
+  is_admin: boolean;
 }

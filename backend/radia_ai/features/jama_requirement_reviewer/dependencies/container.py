@@ -20,6 +20,7 @@ from fastapi import Depends, FastAPI, Request
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
+from app.core.security import RadiaUserDep
 from app.documents.repository import DocumentCatalogRepository
 from app.ingestion.job_store import IngestionJobStore
 from app.ingestion.service import IngestionService
@@ -27,9 +28,15 @@ from app.ingestion.sharepoint_webhook import SharePointWebhookService
 from app.ingestion.status_store import IngestionStatusStore
 from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
-from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import JamaClient
+from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
+    JamaClient,
+    JamaTokenCache,
+)
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointStandardsClient,
+)
+from radia_ai.features.jama_requirement_reviewer.repositories.jama_credential_repository import (
+    JamaCredentialRepository,
 )
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
     ReviewHistoryRepository,
@@ -38,6 +45,9 @@ from radia_ai.features.jama_requirement_reviewer.reviewers.consolidated import (
     build_category_reviewers,
 )
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
+from radia_ai.features.jama_requirement_reviewer.services.jama_account_service import (
+    JamaAccountService,
+)
 from radia_ai.features.jama_requirement_reviewer.services.jama_service import JamaService
 from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import (
     RequirementDeltaReviewService,
@@ -140,11 +150,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # SharePoint + Standards
     sharepoint_client = SharePointStandardsClient(settings.sharepoint)
 
-    # Jama Connect integration (read-only requirement access)
-    jama_client = JamaClient(settings.jama)
+    # Jama Connect integration. Production requests act as each user's linked Jama
+    # account; the shared service-account client below is used only in local/test.
+    jama_token_cache = JamaTokenCache()
+    app.state.jama_token_cache = jama_token_cache
+    jama_client = JamaClient(settings.jama, token_cache=jama_token_cache)
     app.state.jama_client = jama_client
     app.state.jama_service = JamaService(jama_client)
-    logger.info("jama_service_ready", configured=jama_client.is_configured)
+    logger.info(
+        "jama_service_ready",
+        shared_account_configured=jama_client.is_configured,
+        user_linking_enabled=settings.jama.is_linking_configured,
+    )
 
     # Ingestion service
     ingestion_service = IngestionService(
@@ -432,16 +449,67 @@ def get_standards_service(request: Request) -> StandardsService:
 StandardsServiceDep = Annotated[StandardsService, Depends(get_standards_service)]
 
 
-def get_jama_service(request: Request) -> JamaService:
-    """Resolve the Jama service from application state, building it lazily if needed."""
+def _get_shared_jama_service(request: Request) -> JamaService:
+    """Resolve the shared service-account Jama service (local development only)."""
     service = getattr(request.app.state, "jama_service", None)
     if service is None:
         settings = _resolve_settings(request.app)
-        client = JamaClient(settings.jama)
+        client = JamaClient(settings.jama, token_cache=get_jama_token_cache(request))
         service = JamaService(client)
         request.app.state.jama_client = client
         request.app.state.jama_service = service
-    return service
+    return cast(JamaService, service)
+
+
+def get_jama_token_cache(request: Request) -> JamaTokenCache:
+    """Process-wide cache of Jama bearer tokens so each request need not re-authenticate."""
+    cache = getattr(request.app.state, "jama_token_cache", None)
+    if cache is None:
+        cache = JamaTokenCache()
+        request.app.state.jama_token_cache = cache
+    return cast(JamaTokenCache, cache)
+
+
+def get_jama_credential_repository(request: Request) -> JamaCredentialRepository | None:
+    """Resolve the encrypted per-user Jama credential store, or None when not configured."""
+    repository = getattr(request.app.state, "jama_credential_repository", None)
+    if repository is not None:
+        return cast(JamaCredentialRepository, repository)
+    settings = _resolve_settings(request.app)
+    if not settings.jama.is_linking_configured:
+        return None
+    blob_client = BlobStorageClient(
+        settings.azure_blob.model_copy(
+            update={"container_name": settings.jama.credential_container_name}
+        )
+    )
+    try:
+        blob_client.ensure_container()
+    except Exception:
+        logger.exception("jama_credential_container_init_failed")
+    repository = JamaCredentialRepository(blob_client, settings.jama.credential_encryption_key)
+    request.app.state.jama_credential_repository = repository
+    return repository
+
+
+def get_jama_account_service(request: Request) -> JamaAccountService:
+    """Resolve the service that links users to their own Jama accounts."""
+    settings = _resolve_settings(request.app)
+    shared = _get_shared_jama_service(request) if settings.allows_shared_jama_account else None
+    return JamaAccountService(
+        settings=settings,
+        repository=get_jama_credential_repository(request),
+        token_cache=get_jama_token_cache(request),
+        shared_service=shared,
+    )
+
+
+JamaAccountServiceDep = Annotated[JamaAccountService, Depends(get_jama_account_service)]
+
+
+def get_jama_service(account_service: JamaAccountServiceDep, user: RadiaUserDep) -> JamaService:
+    """Resolve a Jama service that acts as the signed-in user's linked Jama account."""
+    return account_service.service_for(user)
 
 
 JamaServiceDep = Annotated[JamaService, Depends(get_jama_service)]

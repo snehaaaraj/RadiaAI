@@ -3,6 +3,7 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import PaletteIcon from '@mui/icons-material/Palette';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import LinkIcon from '@mui/icons-material/Link';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -22,6 +23,7 @@ import { type ThemePreference, type WorkspaceStartPage } from '@/context/AppCont
 import { useAppContext } from '@/context/useAppContext';
 import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 import { SETTINGS_SECTION_IDS } from '@/utils/settingsSections';
+import { JamaAccountCard } from '@/radia_ai/features/jamaRequirementReviewer/components/JamaAccountCard';
 import { getSettingsSectionCardSx, settingsStyles } from './Settings.styles';
 
 const THEMES: Array<{
@@ -102,12 +104,31 @@ export default function Settings() {
             Settings
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Universal Radia AI settings for theme, startup behavior, and notifications.
+            Universal Radia AI settings for your Jama account, theme, startup behavior, and
+            notifications.
           </Typography>
         </Box>
       </motion.div>
 
       <Stack spacing={2}>
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.02 }}
+        >
+          <Card id={SETTINGS_SECTION_IDS.JAMA_ACCOUNT} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
+            <CardContent>
+              <Box sx={settingsStyles.sectionHeader}>
+                <LinkIcon color="primary" />
+                <Typography variant="h6" fontWeight={700}>
+                  Jama account
+                </Typography>
+              </Box>
+              <JamaAccountCard />
+            </CardContent>
+          </Card>
+        </motion.div>
+
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}

@@ -1,6 +1,7 @@
 import apiClient from './client';
 import type { APIResponse, ChatData, ChatRequest } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
+import { authHeaders } from '@/auth/msal';
 
 export async function sendChatMessage(request: ChatRequest): Promise<ChatData> {
   const { data } = await apiClient.post<APIResponse<ChatData>>('/chat', request);
@@ -41,6 +42,7 @@ export async function streamChatMessage(
       headers: {
         'Content-Type': 'application/json',
         'X-Request-ID': crypto.randomUUID(),
+        ...(await authHeaders()),
       },
       body: JSON.stringify(request),
       signal,

@@ -6,13 +6,14 @@
  *   - Base URL configuration
  *   - Default headers
  *   - Request ID injection
- *   - TODO: Auth token injection (Entra ID)
+ *   - Microsoft Entra ID bearer token injection
  *   - Error response normalisation
  */
 
 import axios, { AxiosError, type AxiosResponse } from 'axios';
 import type { ErrorResponse } from '@/types/api';
 import { API_BASE } from '@/utils/constants';
+import { getAccessToken } from '@/auth/msal';
 
 /** Generate a UUID v4 for request tracing */
 function generateRequestId(): string {
@@ -31,13 +32,14 @@ const apiClient = axios.create({
 // Request interceptor - inject tracing header and auth token
 // ---------------------------------------------------------------------------
 
-apiClient.interceptors.request.use((config) => {
+apiClient.interceptors.request.use(async (config) => {
   // Attach a unique ID to every outbound request for distributed tracing
   config.headers['X-Request-ID'] = generateRequestId();
 
-  // TODO: Inject Entra ID bearer token here, e.g.:
-  // const token = await getAccessToken();
-  // config.headers['Authorization'] = `Bearer ${token}`;
+  const token = await getAccessToken();
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
 
   return config;
 });

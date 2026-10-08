@@ -1,12 +1,22 @@
 """
 Ingestion endpoint - trigger document ingestion into Azure AI Search.
 
-POST /api/v1/ingest         - trigger blob or sharepoint ingestion
-POST /api/v1/ingest/upload  - upload a single document for ingestion
-GET  /api/v1/ingest/status  - fetch the outcome of the most recent ingestion run
-                              (manual or webhook-triggered), so the UI can show it.
-POST /api/v1/ingest/webhook - Microsoft Graph change-notification receiver; auto-triggers
-                              SharePoint ingestion when the standards folder changes.
+Endpoints are split across three routers so each gets the right protection when
+mounted in ``app.api.v1.router``:
+
+``router`` - ingestion management, requires ``Radia.DocumentAdmin``:
+    POST /api/v1/ingest                   - trigger blob or sharepoint ingestion
+    POST /api/v1/ingest/upload            - upload a single document for ingestion
+    GET  /api/v1/ingest/jobs/{job_id}     - per-job progress
+    POST /api/v1/ingest/webhook/subscribe - (re)create the Graph subscription
+
+``status_router`` - any signed-in Radia user:
+    GET  /api/v1/ingest/status - outcome of the most recent ingestion run
+
+``webhook_router`` - called by Microsoft Graph, which cannot send an Entra user
+token. Each notification is authenticated by the subscription's ``clientState``
+secret and checked against the persisted subscription instead:
+    POST /api/v1/ingest/webhook
 """
 
 from uuid import UUID
@@ -32,6 +42,8 @@ from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
 )
 
 router = APIRouter()
+status_router = APIRouter()
+webhook_router = APIRouter()
 logger = get_logger(__name__)
 
 
@@ -136,7 +148,7 @@ async def get_ingestion_job(
     )
 
 
-@router.get(
+@status_router.get(
     "/status",
     response_model=APIResponse[IngestionStatusResponse],
     summary="Get the outcome of the most recent ingestion run",
@@ -159,7 +171,7 @@ async def get_ingestion_status(
     return APIResponse(data=response, request_id=request.state.request_id)
 
 
-@router.post(
+@webhook_router.post(
     "/webhook",
     response_model=None,
     include_in_schema=False,

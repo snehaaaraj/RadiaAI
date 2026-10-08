@@ -1,6 +1,8 @@
 """Schemas for Jama integration endpoints."""
 
 from radia_ai.features.jama_requirement_reviewer.models.jama_models import (
+    JamaAccountLinkRequest,
+    JamaAccountStatus,
     JamaProject,
     JamaProjectList,
     JamaRequirement,
@@ -9,6 +11,8 @@ from radia_ai.features.jama_requirement_reviewer.models.jama_models import (
 )
 
 __all__ = [
+    "JamaAccountLinkRequest",
+    "JamaAccountStatus",
     "JamaProject",
     "JamaProjectList",
     "JamaRequirement",

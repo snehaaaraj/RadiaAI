@@ -34,6 +34,8 @@ class ReviewHistoryService:
         self,
         subject_id: str | None,
         response: RequirementReviewResponse,
+        owner_id: str | None = None,
+        owner_name: str | None = None,
     ) -> str:
         review_id = self._new_review_id()
         entry = create_requirement_history_entry(
@@ -41,18 +43,24 @@ class ReviewHistoryService:
             created_at=self._utc_now(),
             subject_id=subject_id,
             response=response,
-        )
+        ).model_copy(update={"owner_id": owner_id, "owner_name": owner_name})
         self._repository.add_entry(entry)
         return review_id
 
-    def record_delta_review(self, subject_id: str | None, response: DeltaReviewResponse) -> str:
+    def record_delta_review(
+        self,
+        subject_id: str | None,
+        response: DeltaReviewResponse,
+        owner_id: str | None = None,
+        owner_name: str | None = None,
+    ) -> str:
         review_id = self._new_review_id()
         entry = create_delta_history_entry(
             review_id=review_id,
             created_at=self._utc_now(),
             subject_id=subject_id,
             response=response,
-        )
+        ).model_copy(update={"owner_id": owner_id, "owner_name": owner_name})
         self._repository.add_entry(entry)
         return review_id
 
@@ -60,23 +68,30 @@ class ReviewHistoryService:
         self,
         workflow: ReviewWorkflow | None = None,
         limit: int = 100,
+        owner_id: str | None = None,
     ) -> ReviewHistoryListResponse:
-        entries = self._repository.list_entries(workflow=workflow, limit=limit)
+        """List history; pass ``owner_id`` to restrict to one user (None = all users)."""
+        entries = self._repository.list_entries(workflow=workflow, limit=limit, owner_id=owner_id)
         return ReviewHistoryListResponse(total=len(entries), entries=entries)
 
     def apply_disposition(
         self,
         review_id: str,
         payload: ApplyFindingDispositionRequest,
+        reviewer_id: str | None = None,
+        owner_id: str | None = None,
     ) -> ReviewHistoryEntry:
+        """Apply a disposition as ``reviewer_id``; ``owner_id`` limits it to that user's review."""
         disposition = FindingDisposition(
             finding_index=payload.finding_index,
             disposition=payload.disposition,
             reviewer_comment=payload.reviewer_comment,
-            reviewer_id=payload.reviewer_id,
+            reviewer_id=reviewer_id,
             updated_at=self._utc_now(),
         )
-        return self._repository.apply_disposition(review_id=review_id, disposition=disposition)
+        return self._repository.apply_disposition(
+            review_id=review_id, disposition=disposition, owner_id=owner_id
+        )
 
     def _new_review_id(self) -> str:
         return f"rev-{uuid4()}"

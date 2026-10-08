@@ -20,6 +20,7 @@ import { motion } from 'framer-motion';
 import { useAppContext } from '@/context/useAppContext';
 import { useHealth } from '@/hooks/useHealth';
 import { useIngestDocuments } from '@/hooks/useIngestDocuments';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useIngestionStatus } from '@/hooks/useIngestionStatus';
 import { useIngestionJobStatus } from '@/hooks/useIngestionJobStatus';
 import { formatRelativeTime } from '@/utils/formatRelativeTime';
@@ -60,6 +61,8 @@ export default function Home() {
     .join('; ');
   const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
+  const { data: currentUser } = useCurrentUser();
+  const canManageDocuments = currentUser?.can_manage_documents ?? false;
 
   const handleIngest = () => {
     ingestDocuments({ source: 'sharepoint' });
@@ -113,15 +116,17 @@ export default function Home() {
               variant="outlined"
             />
           )}
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={isIngesting ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />}
-            onClick={handleIngest}
-            disabled={isIngesting}
-          >
-            {isIngesting ? 'Ingesting...' : 'Ingest Documents'}
-          </Button>
+          {canManageDocuments && (
+            <Button
+              variant="contained"
+              size="small"
+              startIcon={isIngesting ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />}
+              onClick={handleIngest}
+              disabled={isIngesting}
+            >
+              {isIngesting ? 'Ingesting...' : 'Ingest Documents'}
+            </Button>
+          )}
         </Box>
       </motion.div>
 

@@ -93,7 +93,9 @@ class ReviewHistoryRepository:
         self,
         workflow: ReviewWorkflow | None = None,
         limit: int = 100,
+        owner_id: str | None = None,
     ) -> list[ReviewHistoryEntry]:
+        """List newest entries first; ``owner_id`` restricts to one user's reviews."""
         # Auto-cleanup on every list call (lightweight, runs async in background on Vercel)
         try:
             deleted = self.cleanup_old_entries()
@@ -118,14 +120,21 @@ class ReviewHistoryRepository:
                 continue
             if workflow is not None and entry.workflow != workflow:
                 continue
+            if owner_id is not None and entry.owner_id != owner_id:
+                continue
             entries.append(entry)
         return entries
 
     def apply_disposition(
-        self, review_id: str, disposition: FindingDisposition
+        self,
+        review_id: str,
+        disposition: FindingDisposition,
+        owner_id: str | None = None,
     ) -> ReviewHistoryEntry:
+        """Record a disposition; ``owner_id`` restricts the update to that user's review."""
         entry = self._get(review_id)
-        if entry is None:
+        # Another user's review is reported as missing so review ids cannot be probed.
+        if entry is None or (owner_id is not None and entry.owner_id != owner_id):
             raise ValidationError(
                 "Review ID not found in history.",
                 detail={"review_id": review_id},

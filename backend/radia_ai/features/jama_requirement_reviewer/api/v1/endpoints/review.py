@@ -1,9 +1,10 @@
 """Requirements review endpoints."""
 
 from anyio import to_thread
-from fastapi import APIRouter, Request, status
+from fastapi import APIRouter, Query, Request, status
 
 from app.core.logging import get_logger
+from app.core.security import RadiaUserDep
 from app.schemas.common import APIResponse
 from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
     RequirementDeltaReviewServiceDep,
@@ -68,6 +69,7 @@ async def get_review_version(
 async def review_requirement(
     body: RequirementReviewInput,
     request: Request,
+    user: RadiaUserDep,
     service: RequirementReviewServiceDep,
     history_service: ReviewHistoryServiceDep,
 ) -> APIResponse[RequirementReviewResponse]:
@@ -75,7 +77,10 @@ async def review_requirement(
     response = await to_thread.run_sync(service.review_requirement, body)
     review_id = await to_thread.run_sync(
         lambda: history_service.record_requirement_review(
-            subject_id=body.requirement_id, response=response
+            subject_id=body.requirement_id,
+            response=response,
+            owner_id=user.subject_key,
+            owner_name=user.display_name or user.email,
         )
     )
     response = response.model_copy(update={"review_id": review_id})
@@ -95,6 +100,7 @@ async def review_requirement(
 async def review_delta(
     body: DeltaReviewInput,
     request: Request,
+    user: RadiaUserDep,
     service: RequirementDeltaReviewServiceDep,
     history_service: ReviewHistoryServiceDep,
 ) -> APIResponse[DeltaReviewResponse]:
@@ -107,7 +113,10 @@ async def review_delta(
     response = await to_thread.run_sync(service.review_delta, body)
     review_id = await to_thread.run_sync(
         lambda: history_service.record_delta_review(
-            subject_id=body.specification_id, response=response
+            subject_id=body.specification_id,
+            response=response,
+            owner_id=user.subject_key,
+            owner_name=user.display_name or user.email,
         )
     )
     response = response.model_copy(update={"review_id": review_id})
@@ -118,15 +127,24 @@ async def review_delta(
     "/history",
     response_model=APIResponse[ReviewHistoryListResponse],
     summary="List review history entries",
+    description=(
+        "Returns the caller's own reviews. Administrators (Radia.Admin) see every user's "
+        "reviews, or only their own with mine_only=true."
+    ),
     status_code=status.HTTP_200_OK,
 )
 async def get_review_history(
     request: Request,
+    user: RadiaUserDep,
     service: ReviewHistoryServiceDep,
     workflow: ReviewWorkflow | None = None,
-    limit: int = 100,
+    limit: int = Query(default=100, ge=1, le=500),
+    mine_only: bool = False,
 ) -> APIResponse[ReviewHistoryListResponse]:
-    history = await to_thread.run_sync(lambda: service.list_history(workflow=workflow, limit=limit))
+    owner_id = None if user.is_admin and not mine_only else user.subject_key
+    history = await to_thread.run_sync(
+        lambda: service.list_history(workflow=workflow, limit=limit, owner_id=owner_id)
+    )
     return APIResponse(data=history, request_id=request.state.request_id)
 
 
@@ -134,15 +152,22 @@ async def get_review_history(
     "/history/{review_id}/disposition",
     response_model=APIResponse[ReviewHistoryEntry],
     summary="Apply reviewer disposition for a finding",
+    description="Only the review's owner (or an administrator) can record dispositions.",
     status_code=status.HTTP_200_OK,
 )
 async def apply_finding_disposition(
     review_id: str,
     body: ApplyFindingDispositionRequest,
     request: Request,
+    user: RadiaUserDep,
     service: ReviewHistoryServiceDep,
 ) -> APIResponse[ReviewHistoryEntry]:
     updated_entry = await to_thread.run_sync(
-        lambda: service.apply_disposition(review_id=review_id, payload=body)
+        lambda: service.apply_disposition(
+            review_id=review_id,
+            payload=body,
+            reviewer_id=user.email or user.user_id,
+            owner_id=None if user.is_admin else user.subject_key,
+        )
     )
     return APIResponse(data=updated_entry, request_id=request.state.request_id)

@@ -84,7 +84,7 @@ RadiaAi-2.0/
 │   │   │   ├── config.py             # Pydantic settings (all Azure config)
 │   │   │   ├── logging.py            # structlog configuration
 │   │   │   ├── exceptions.py         # domain exception hierarchy
-│   │   │   └── security.py           # Entra ID auth middleware
+│   │   │   └── security.py           # Entra ID token validation, roles, get_current_user
 │   │   ├── ingestion/
 │   │   │   ├── service.py            # end-to-end ingest pipeline
 │   │   │   ├── chunker.py            # token-based text chunking with overlap
@@ -364,8 +364,11 @@ This repository is configured to deploy the frontend from the repo root using [v
 1. Import this repo into Vercel (or run `vercel` from the repo root)
 2. Add `VITE_API_BASE_URL` in Vercel Project Settings → Environment Variables
    - Value format: `https://<your-azure-backend>.azurewebsites.net/api/v1`
+   - Also add `VITE_ENTRA_CLIENT_ID`, `VITE_ENTRA_TENANT_ID`, and `VITE_ENTRA_API_SCOPE`
+     for Microsoft sign-in (see [docs/authentication.md](./docs/authentication.md))
 3. Redeploy after env var updates
-4. Ensure the backend `ALLOWED_ORIGINS` includes your Vercel domain(s)
+4. Ensure the backend `ALLOWED_ORIGINS` includes your Vercel domain(s), and add the
+   Vercel URL as a redirect URI on the SPA app registration
 
 Quick validation after deploy:
 - `GET <azure-backend>/api/v1/health/live` returns 200 (process is running)
@@ -377,25 +380,32 @@ Quick validation after deploy:
 
 ## API Endpoints (v1)
 
+Every endpoint requires a Microsoft Entra ID bearer token with the `Radia.User`
+app role unless noted. See [docs/authentication.md](./docs/authentication.md).
+
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/health/live` | Liveness check - process is running, no external calls |
-| GET | `/api/v1/health/ready` | Readiness check - cached, bounded-timeout dependency reachability (Azure OpenAI, Azure AI Search, Blob Storage, SharePoint, Jama); returns 503 if a required dependency is down |
-| GET | `/api/v1/health` | Legacy alias for `/api/v1/health/ready` |
+| GET | `/api/v1/health/live` | **Public.** Liveness check - process is running, no external calls |
+| GET | `/api/v1/health/ready` | **Public.** Readiness check - cached, bounded-timeout dependency reachability (Azure OpenAI, Azure AI Search, Blob Storage, SharePoint, Jama); returns 503 if a required dependency is down |
+| GET | `/api/v1/health` | **Public.** Legacy alias for `/api/v1/health/ready` |
+| GET | `/api/v1/auth/me` | Signed-in user, effective roles, and permissions |
 | GET | `/api/v1/review/version` | Reviewer bundle version + determinism metadata |
 | GET | `/api/v1/standards` | Standards/reference libraries (SharePoint or fallback) |
 | POST | `/api/v1/review/requirement` | AI-powered individual requirement review |
 | POST | `/api/v1/review/delta` | Score changed requirements against their baseline (no rewrites proposed) |
-| GET | `/api/v1/review/history` | List stored review runs and findings |
-| POST | `/api/v1/review/history/{id}/disposition` | Apply finding disposition (Accepted/Rejected/Deferred) |
+| GET | `/api/v1/review/history` | The caller's review runs (`Radia.Admin` sees everyone's) |
+| POST | `/api/v1/review/history/{id}/disposition` | Apply finding disposition (Accepted/Rejected/Deferred) on your own review |
+| GET / PUT / DELETE | `/api/v1/jama/account` | Status / link / unlink the caller's own Jama account |
+| GET | `/api/v1/jama/projects`, `/jama/requirements`, `/jama/requirements/{id}` | Jama access as the caller's linked Jama account |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
-| POST | `/api/v1/ingest` | Trigger document ingestion (blob or SharePoint) |
-| POST | `/api/v1/ingest/upload` | Upload and ingest a single document file |
+| POST | `/api/v1/ingest` | **`Radia.DocumentAdmin`.** Trigger document ingestion (blob or SharePoint) |
+| POST | `/api/v1/ingest/upload` | **`Radia.DocumentAdmin`.** Upload and ingest a single document file |
 | GET | `/api/v1/ingest/status` | Outcome of the most recent ingestion run (manual or webhook) |
-| GET | `/api/v1/ingest/jobs/{job_id}` | Durable status and failure details for one ingestion job |
-| POST | `/api/v1/ingest/webhook` | Microsoft Graph change-notification receiver (auto-ingestion) |
-| POST | `/api/v1/ingest/webhook/subscribe` | Manually (re)create the SharePoint webhook subscription |
+| GET | `/api/v1/ingest/jobs/{job_id}` | **`Radia.DocumentAdmin`.** Durable status and failure details for one ingestion job |
+| POST | `/api/v1/ingest/webhook` | **Public; validated by Graph `clientState`.** Microsoft Graph change-notification receiver (auto-ingestion) |
+| POST | `/api/v1/ingest/webhook/subscribe` | **`Radia.DocumentAdmin`.** Manually (re)create the SharePoint webhook subscription |
 | GET | `/api/v1/documents` | List indexed documents |
+| DELETE | `/api/v1/documents/{id}` | **`Radia.DocumentAdmin`.** Delete an indexed document (source file untouched) |
 | POST | `/api/v1/chat` | RAG question answering |
 
 Interactive docs available at `/api/docs` (non-production environments).
@@ -420,14 +430,22 @@ the full reference with descriptions.
 | `INGESTION_MAX_ATTEMPTS` / `INGESTION_MAX_UPLOAD_BYTES` | Fixed five queue deliveries / upload cap (default 4 MiB) |
 | `SHAREPOINT_*` | SharePoint Graph API credentials for standards library |
 | `SHAREPOINT_WEBHOOK_ENABLED` / `SHAREPOINT_WEBHOOK_PUBLIC_BASE_URL` | Optional auto-ingestion webhook (see Ingestion Pipeline) |
-| `ENTRA_*` | Microsoft Entra ID settings (leave empty for local dev) |
+| `ENTRA_*` | Microsoft Entra ID API app registration (required in staging/production; see [docs/authentication.md](./docs/authentication.md)) |
+| `VITE_ENTRA_*` | Frontend Microsoft sign-in (SPA app registration, tenant, API scope) |
+| `JAMA_BASE_URL` / `JAMA_CREDENTIAL_ENCRYPTION_KEY` | Jama instance and the key that encrypts each user's linked Jama credentials |
+| `ALLOWED_ORIGINS` / `ALLOWED_ORIGIN_REGEX` | CORS origins; clear the regex when hosting internally |
 
 ---
 
 ## Security Notes
 
 - Secrets are loaded from `.env` (never committed to git)
-- Authentication supports Microsoft Entra ID configuration with local development fallback
+- Microsoft Entra ID SSO with full access-token validation (signature, issuer, audience,
+  expiry, tenant, scope) and app-role authorization on every endpoint. Deployed
+  environments fail closed without Entra configuration.
+- Jama is accessed as each user's own linked Jama account, so Jama enforces their
+  project permissions. Linked credentials are encrypted at rest in a dedicated container.
+- Review history is private to the user who ran it (`Radia.Admin` sees all)
 - All API responses use a standardized error envelope (no stack traces exposed)
 - Input validation via Pydantic v2 on all endpoints
 

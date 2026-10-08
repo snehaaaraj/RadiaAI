@@ -278,7 +278,11 @@ def _test_settings() -> AppSettings:
             "password": "",
             "client_id": "",
             "client_secret": "",
+            "credential_encryption_key": "",
         },
+        # Explicit so a developer's .env can never switch tests to real Entra auth.
+        entra={"tenant_id": "", "client_id": "", "audience": ""},
+        local_dev_user_roles=["Radia.Admin"],
     )
 
 
@@ -325,6 +329,133 @@ def review_engine(test_app) -> ReviewEngineHarness:
 def client(test_app) -> TestClient:
     """Synchronous test client for simple endpoint tests."""
     return TestClient(test_app)
+
+
+# ---------------------------------------------------------------------------
+# Microsoft Entra ID test identity provider
+# ---------------------------------------------------------------------------
+
+TEST_TENANT_ID = "11111111-1111-1111-1111-111111111111"
+TEST_API_CLIENT_ID = "22222222-2222-2222-2222-222222222222"
+TEST_SIGNING_KID = "test-signing-key"
+
+
+class EntraTokenFactory:
+    """Mints RS256 access tokens shaped like real Entra ID v1/v2 API tokens."""
+
+    def __init__(self) -> None:
+        from cryptography.hazmat.primitives.asymmetric import rsa
+
+        self.private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        self.kid = TEST_SIGNING_KID
+        self.jwks_fetch_count = 0
+
+    def jwks(self) -> dict[str, Any]:
+        import json
+
+        import jwt
+
+        self.jwks_fetch_count += 1
+        jwk = json.loads(jwt.algorithms.RSAAlgorithm.to_jwk(self.private_key.public_key()))
+        jwk.update({"kid": self.kid, "use": "sig", "alg": "RS256"})
+        return {"keys": [jwk]}
+
+    def token(
+        self,
+        *,
+        oid: str = "user-alice",
+        email: str = "alice@radia.example",
+        name: str = "Alice Engineer",
+        roles: list[str] | None = None,
+        scp: str | None = "access_as_user",
+        version: str = "2.0",
+        expires_in: int = 3600,
+        signing_key: Any = None,
+        kid: str | None = None,
+        **overrides: Any,
+    ) -> str:
+        import time
+
+        import jwt
+
+        now = int(time.time())
+        if version == "1.0":
+            aud, iss = f"api://{TEST_API_CLIENT_ID}", f"https://sts.windows.net/{TEST_TENANT_ID}/"
+        else:
+            aud, iss = (
+                TEST_API_CLIENT_ID,
+                f"https://login.microsoftonline.com/{TEST_TENANT_ID}/v2.0",
+            )
+        claims: dict[str, Any] = {
+            "aud": aud,
+            "iss": iss,
+            "iat": now,
+            "nbf": now,
+            "exp": now + expires_in,
+            "tid": TEST_TENANT_ID,
+            "oid": oid,
+            "sub": f"sub-{oid}",
+            "name": name,
+            "preferred_username": email,
+            "ver": version,
+            "roles": ["Radia.User"] if roles is None else roles,
+        }
+        if scp is not None:
+            claims["scp"] = scp
+        claims.update(overrides)
+        claims = {key: value for key, value in claims.items() if value is not None}
+        return jwt.encode(
+            claims,
+            signing_key or self.private_key,
+            algorithm="RS256",
+            headers={"kid": kid or self.kid},
+        )
+
+    def headers(self, **kwargs: Any) -> dict[str, str]:
+        return {"Authorization": "Bearer " + self.token(**kwargs)}
+
+
+@pytest.fixture(scope="session")
+def entra_tokens() -> EntraTokenFactory:
+    return EntraTokenFactory()
+
+
+@pytest.fixture
+def secured_app(test_app, entra_tokens: EntraTokenFactory):
+    """
+    Switch the shared test app to real Entra ID token validation for one test.
+
+    Signing keys come from ``entra_tokens`` instead of login.microsoftonline.com;
+    everything else (signature, issuer, audience, expiry, tenant, scope, roles)
+    is the production code path.
+    """
+    from app.core.config import EntraIDSettings
+    from app.core.security import EntraTokenValidator
+
+    base_settings = _test_settings()
+    secured_settings = base_settings.model_copy(
+        update={
+            "environment": "test",
+            "entra": EntraIDSettings(tenant_id=TEST_TENANT_ID, client_id=TEST_API_CLIENT_ID),
+        }
+    )
+    previous_override = test_app.dependency_overrides.get(get_settings)
+    previous_settings = getattr(test_app.state, "settings", None)
+    test_app.dependency_overrides[get_settings] = lambda: secured_settings
+    test_app.state.settings = secured_settings
+    test_app.state.entra_token_validator = EntraTokenValidator(
+        secured_settings.entra, jwks_fetcher=entra_tokens.jwks
+    )
+    yield test_app
+    if previous_override is not None:
+        test_app.dependency_overrides[get_settings] = previous_override
+    test_app.state.settings = previous_settings
+    delattr(test_app.state, "entra_token_validator")
+
+
+@pytest.fixture
+def secured_client(secured_app) -> TestClient:
+    return TestClient(secured_app)
 
 
 @pytest.fixture

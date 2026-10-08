@@ -24,7 +24,8 @@ python-docx==1.1.2      # DOCX text extraction
 defusedxml==0.7.1       # Safe validation of untrusted XML
 
 # Utilities
-python-jose[cryptography]==3.3.0   # JWT for Entra ID tokens
+PyJWT[crypto]==2.13.0              # Entra ID access-token validation
+cryptography==50.0.1               # Fernet encryption of linked Jama credentials
 tenacity==9.0.0                    # retries with backoff
 structlog==24.4.0                  # structured logging
 

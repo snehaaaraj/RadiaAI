@@ -22,6 +22,12 @@ _ENV_FILE = (
 type DeploymentEnvironment = Literal["local", "development", "test", "staging", "production"]
 type RequiredSetting = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 
+# Environments where unauthenticated local development and the shared Jama service
+# account are permitted. Every deployed environment must use Entra ID.
+LOCAL_AUTH_BYPASS_ENVIRONMENTS: frozenset[str] = frozenset({"local", "test"})
+# Environments that refuse to start without Entra ID configured.
+ENTRA_REQUIRED_ENVIRONMENTS: frozenset[str] = frozenset({"staging", "production"})
+
 
 def _reject_placeholder(value: str) -> str:
     normalized = value.casefold()
@@ -289,6 +295,39 @@ class JamaSettings(BaseSettings):
     verify_ssl: bool = Field(
         default=True, description="Verify TLS certificates (disable only for self-hosted test)"
     )
+    credential_encryption_key: str = Field(
+        default="",
+        description=(
+            "Fernet key(s) used to encrypt each user's linked Jama API credentials at rest. "
+            "Comma-separate several keys to rotate: the first encrypts, all decrypt. "
+            'Generate with: python -c "from cryptography.fernet import Fernet; '
+            'print(Fernet.generate_key().decode())"'
+        ),
+    )
+    credential_container_name: str = Field(
+        default="radia-user-secrets",
+        description=(
+            "Dedicated blob container for encrypted per-user Jama credentials, kept apart "
+            "from the document container so ingestion can never read it."
+        ),
+    )
+    require_email_match: bool = Field(
+        default=True,
+        description=(
+            "Only allow linking a Jama account whose email/username matches the signed-in "
+            "Microsoft account, so users cannot link someone else's Jama credentials."
+        ),
+    )
+
+    @property
+    def has_base_url(self) -> bool:
+        """True when a Jama instance URL is configured (needed for per-user linking)."""
+        return bool(self.base_url)
+
+    @property
+    def is_linking_configured(self) -> bool:
+        """True when users can link their own Jama accounts."""
+        return self.has_base_url and bool(self.credential_encryption_key.strip())
 
     @property
     def rest_base(self) -> str:
@@ -302,7 +341,7 @@ class JamaSettings(BaseSettings):
 
     @property
     def is_configured(self) -> bool:
-        """True only when a base URL and a complete credential set are present."""
+        """True only when a base URL and a complete shared service-account credential set are present."""
         if not self.base_url:
             return False
         if self.auth_type == "oauth":
@@ -311,19 +350,70 @@ class JamaSettings(BaseSettings):
 
 
 class EntraIDSettings(BaseSettings):
-    """Microsoft Entra ID (Azure AD) configuration for authentication."""
+    """
+    Microsoft Entra ID (Azure AD) configuration for validating API access tokens.
+
+    ``client_id`` is the *API* app registration that exposes the delegated scope
+    the SPA requests (e.g. ``api://<client_id>/access_as_user``) and defines the
+    Radia app roles.
+    """
 
     model_config = SettingsConfigDict(env_prefix="ENTRA_", env_file=_ENV_FILE, extra="ignore")
 
     tenant_id: str = Field(default="", description="Azure AD tenant ID")
-    client_id: str = Field(default="", description="Application (client) ID")
-    client_secret: str = Field(default="", description="Client secret")
-    audience: str = Field(default="", description="Token audience (api://client_id)")
+    client_id: str = Field(default="", description="API app registration (client) ID")
+    client_secret: str = Field(default="", description="Client secret (not used for validation)")
+    audience: str = Field(
+        default="",
+        description="Token audience; defaults to api://<client_id>. The bare client_id is also accepted.",
+    )
+    authority_host: str = Field(
+        default="https://login.microsoftonline.com",
+        description="Entra authority host (change only for sovereign clouds)",
+    )
+    required_scope: str = Field(
+        default="access_as_user",
+        description="Delegated scope that user tokens must carry in the 'scp' claim",
+    )
+    require_app_role: bool = Field(
+        default=True,
+        description="Reject signed-in users that have no Radia app role assigned",
+    )
+    allow_app_tokens: bool = Field(
+        default=False,
+        description="Accept app-only (client-credentials) tokens that carry Radia app roles",
+    )
+    clock_skew_seconds: int = Field(
+        default=120, ge=0, le=600, description="Leeway for exp/nbf/iat validation"
+    )
+    jwks_cache_ttl_seconds: int = Field(
+        default=3600, ge=60, description="How long fetched signing keys are reused"
+    )
+    http_timeout_seconds: float = Field(
+        default=10.0, gt=0, description="Timeout for fetching Entra signing keys"
+    )
 
     @property
     def is_configured(self) -> bool:
-        """Returns True only when all Entra fields are populated."""
-        return bool(self.tenant_id and self.client_id and self.audience)
+        """True when tokens can be validated (tenant and API client id are set)."""
+        return bool(self.tenant_id.strip() and self.client_id.strip())
+
+    @property
+    def accepted_audiences(self) -> list[str]:
+        """Audiences accepted for v1 (api://...) and v2 (client id GUID) access tokens."""
+        candidates = [self.audience, f"api://{self.client_id}", self.client_id]
+        return list(dict.fromkeys(value.strip() for value in candidates if value.strip()))
+
+    @property
+    def accepted_issuers(self) -> list[str]:
+        """Issuers for v2 and v1 access tokens of the configured tenant."""
+        authority = self.authority_host.rstrip("/")
+        return [f"{authority}/{self.tenant_id}/v2.0", f"https://sts.windows.net/{self.tenant_id}/"]
+
+    @property
+    def jwks_url(self) -> str:
+        """Tenant signing-key endpoint (serves the keys for both v1 and v2 tokens)."""
+        return f"{self.authority_host.rstrip('/')}/{self.tenant_id}/discovery/v2.0/keys"
 
 
 class _ExplicitEnvironmentSettings(BaseSettings):
@@ -362,7 +452,11 @@ class AppSettings(BaseSettings):
     app_name: str = Field(default="Radia AI", description="Human-readable application name")
     app_version: str = Field(default="0.1.0")
     environment: DeploymentEnvironment = Field(
-        default="local", description="Deployment environment"
+        default="production",
+        description=(
+            "Deployment environment. Defaults to production so a deployment that forgets to "
+            "set ENVIRONMENT fails closed instead of enabling the local auth bypass."
+        ),
     )
     debug: bool = Field(default=False, description="Enable debug mode (never True in production)")
     log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = Field(default="INFO")
@@ -388,6 +482,46 @@ class AppSettings(BaseSettings):
         default=["http://localhost:5173", "http://localhost:3000"],
         description="CORS allowed origins",
     )
+    allowed_origin_regex: str | None = Field(
+        default=r"https://.*\.vercel\.app",
+        description=(
+            "Optional CORS origin regex (Vercel preview deployments). Set to an empty value "
+            "when hosting internally so only ALLOWED_ORIGINS are trusted."
+        ),
+    )
+
+    # --- Auth ---
+    local_dev_user_roles: list[str] = Field(
+        default=["Radia.Admin"],
+        description=(
+            "App roles granted to the synthetic user that is used only when ENVIRONMENT is "
+            "local/test and Entra ID is not configured."
+        ),
+    )
+
+    @field_validator("allowed_origin_regex", mode="before")
+    @classmethod
+    def blank_origin_regex_is_none(cls, value: str | None) -> str | None:
+        """Treat an empty ALLOWED_ORIGIN_REGEX as 'no regex'."""
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("local_dev_user_roles", mode="before")
+    @classmethod
+    def parse_local_dev_user_roles(cls, value: str | list[str]) -> list[str]:
+        """Accept a list, a JSON list string, or a comma-separated string."""
+        if isinstance(value, list):
+            return value
+        import json
+
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, list):
+            return [str(role) for role in parsed]
+        return [role.strip() for role in value.split(",") if role.strip()]
 
     @field_validator("allowed_origins", mode="before")
     @classmethod
@@ -430,6 +564,20 @@ class AppSettings(BaseSettings):
         if data.get("environment") == "production" and value:
             raise ValueError("debug=True is not allowed in the production environment")
         return value
+
+    @property
+    def allows_local_auth_bypass(self) -> bool:
+        """Synthetic local user is allowed only for local/test runs without Entra configured."""
+        return self.environment in LOCAL_AUTH_BYPASS_ENVIRONMENTS and not self.entra.is_configured
+
+    @property
+    def allows_shared_jama_account(self) -> bool:
+        """The shared Jama service account is only for unauthenticated local/test runs."""
+        return (
+            self.environment in LOCAL_AUTH_BYPASS_ENVIRONMENTS
+            and not self.entra.is_configured
+            and self.jama.is_configured
+        )
 
 
 @lru_cache(maxsize=1)

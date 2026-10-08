@@ -505,6 +505,15 @@ class BlobStorageClient:
         """Verify that the configured blob container is reachable."""
         self._container_client.get_container_properties()
 
+    def ensure_container(self) -> None:
+        """Create the configured container (private access) if it does not exist yet."""
+        from azure.core.exceptions import ResourceExistsError
+
+        try:
+            self._container_client.create_container()
+        except ResourceExistsError:
+            return
+
     def download_blob(self, blob_name: str) -> bytes:
         """Download blob content as bytes."""
         blob_client = self._container_client.get_blob_client(blob_name)

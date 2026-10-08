@@ -54,6 +54,7 @@ class ApplyFindingDispositionRequest(BaseModel):
     finding_index: int = Field(ge=0)
     disposition: FindingDispositionStatus
     reviewer_comment: str = ""
+    # Ignored by the API: the reviewer is always the authenticated caller.
     reviewer_id: str | None = None
 
 
@@ -64,6 +65,10 @@ class ReviewHistoryEntry(BaseModel):
     workflow: ReviewWorkflow
     subject_id: str | None = None
     created_at: str
+    # Tenant-qualified Entra object id of the user who ran the review. Entries
+    # without an owner predate authentication and are visible to admins only.
+    owner_id: str | None = None
+    owner_name: str | None = None
     overall: ReviewStatus
     completion: ReviewCompletion = Field(default_factory=ReviewCompletion.complete)
     category_results: list[CategoryResult] = Field(default_factory=list)
