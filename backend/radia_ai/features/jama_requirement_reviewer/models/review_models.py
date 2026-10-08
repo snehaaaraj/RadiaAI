@@ -47,6 +47,27 @@ class PassFail(StrEnum):
     FAIL = "Fail"
 
 
+class SourceType(StrEnum):
+    """Kind of source that backs a recommendation or a rule."""
+
+    SKILLZ_RULE = "skillz_rule"
+    STANDARD = "standard"
+
+
+SOURCE_AUTHORITY_LEVEL: dict[SourceType, int] = {
+    SourceType.SKILLZ_RULE: 1,
+    SourceType.STANDARD: 2,
+}
+"""
+The application-defined authority hierarchy (1 = highest).
+
+Skillz requirements-writing rules outrank findings grounded in indexed standards
+documents. Sources on the same level never override one another. This mapping -
+not the LLM - decides which source wins a conflict; synthesis output that claims
+otherwise is rejected by the validator.
+"""
+
+
 class FindingSeverity(StrEnum):
     """Severity levels used by reviewer findings."""
 
@@ -188,6 +209,21 @@ class DeterminismContext(BaseModel):
 class ReviewFinding(BaseModel):
     """Single explainable review finding."""
 
+    finding_id: str | None = Field(
+        default=None,
+        description=(
+            "Stable identifier of the finding within its review (F1, F2, ...), used by the "
+            "final recommendation to trace each contribution back to this finding."
+        ),
+    )
+    source_type: SourceType = Field(
+        default=SourceType.STANDARD,
+        description="Kind of source the finding is grounded in.",
+    )
+    authority_level: int = Field(
+        default=SOURCE_AUTHORITY_LEVEL[SourceType.STANDARD],
+        description="Application-defined authority level of the source (1 = highest).",
+    )
     category: str = Field(
         description="Finding sub-category (e.g. Banned Words, EARS Syntax, Operating Conditions)."
     )
@@ -319,6 +355,139 @@ class CategoryResult(BaseModel):
     )
 
 
+class ContributionStatus(StrEnum):
+    """How a single finding was treated when the final recommendation was synthesized."""
+
+    APPLIED = "applied"
+    MERGED_DUPLICATE = "merged_duplicate"
+    OVERRIDDEN = "overridden"
+    CONFLICT_UNRESOLVED = "conflict_unresolved"
+    REJECTED_UNSUPPORTED = "rejected_unsupported"
+    OUT_OF_SCOPE = "out_of_scope"
+    NOT_ADDRESSED = "not_addressed"
+
+
+class ConflictResolution(StrEnum):
+    """Outcome of a detected conflict between findings."""
+
+    RESOLVED_BY_SKILLZ = "resolved_by_skillz"
+    UNRESOLVED = "unresolved"
+
+
+class SkillzStatus(StrEnum):
+    """Whether Skillz rules governed the final recommendation."""
+
+    APPLIED = "applied"
+    NOT_APPLICABLE = "not_applicable"
+    UNAVAILABLE = "unavailable"
+
+
+class RecommendationStatus(StrEnum):
+    """Readiness of the final recommendation to replace the original Description."""
+
+    READY = "ready"
+    NEEDS_REVIEW = "needs_review"
+    NO_CHANGE = "no_change"
+    FAILED = "failed"
+
+
+class SkillzRuleReference(BaseModel):
+    """A Skillz rule cited by the final recommendation, with its full text for audit."""
+
+    rule_id: str = Field(description="Skillz rule identifier, e.g. C18 or Q3.")
+    title: str
+    document: str = Field(description="Skillz package document the rule comes from.")
+    text: str = Field(description="Full rule text as published in the Skillz package.")
+    source_url: str | None = Field(default=None, description="SharePoint URL of the package.")
+    source_type: SourceType = SourceType.SKILLZ_RULE
+    authority_level: int = SOURCE_AUTHORITY_LEVEL[SourceType.SKILLZ_RULE]
+
+
+class FindingContribution(BaseModel):
+    """Traceable account of how one finding affected the final recommendation."""
+
+    finding_id: str
+    status: ContributionStatus
+    contribution: str = Field(
+        default="", description="Short description of the effect on the final text."
+    )
+    reason: str = Field(default="", description="Why the finding was treated this way.")
+    overridden_by_rule_ids: list[str] = Field(
+        default_factory=list, description="Skillz rules that override this finding."
+    )
+    duplicate_of: str | None = Field(
+        default=None, description="Finding whose applied change this finding duplicates."
+    )
+    conflict_id: str | None = Field(
+        default=None, description="Conflict this finding participates in, when any."
+    )
+
+
+class SkillzChange(BaseModel):
+    """A change required by a Skillz rule that no finding proposed."""
+
+    rule_id: str
+    change: str
+    reason: str = ""
+
+
+class RecommendationConflict(BaseModel):
+    """A conflict detected between findings and how (or whether) it was resolved."""
+
+    conflict_id: str
+    finding_ids: list[str] = Field(default_factory=list)
+    description: str = ""
+    resolution: ConflictResolution = ConflictResolution.UNRESOLVED
+    governing_rule_ids: list[str] = Field(default_factory=list)
+
+
+class RecommendationOpenItem(BaseModel):
+    """Information the synthesis needed but could not safely supply."""
+
+    rule_id: str | None = None
+    description: str
+
+
+class SkillzCheckIssue(BaseModel):
+    """A deterministic Skillz rule violation detected in requirement text."""
+
+    rule_id: str
+    term: str
+    message: str
+
+
+class FinalRecommendation(BaseModel):
+    """
+    The single synthesized replacement for the requirement Description.
+
+    The individual findings remain the evidence: every finding is accounted for
+    in ``contributions`` with its treatment, and every Skillz rule cited by the
+    synthesis is carried in ``skillz_rules``.
+    """
+
+    status: RecommendationStatus
+    original_description: str
+    recommended_description: str | None = None
+    summary: str = ""
+    skillz_status: SkillzStatus
+    skillz_status_message: str = ""
+    skillz_package: str | None = None
+    skillz_revision: str | None = None
+    skillz_content_hash: str | None = None
+    skillz_source_url: str | None = None
+    contributions: list[FindingContribution] = Field(default_factory=list)
+    skillz_changes: list[SkillzChange] = Field(default_factory=list)
+    conflicts: list[RecommendationConflict] = Field(default_factory=list)
+    open_items: list[RecommendationOpenItem] = Field(default_factory=list)
+    skillz_rules: list[SkillzRuleReference] = Field(default_factory=list)
+    skillz_check_issues: list[SkillzCheckIssue] = Field(
+        default_factory=list,
+        description="Skillz violations still present in the recommended text.",
+    )
+    failure_message: str = ""
+    prompt_version: str = ""
+
+
 class RequirementReviewResponse(BaseModel):
     """Aggregated response for single-requirement review."""
 
@@ -328,6 +497,16 @@ class RequirementReviewResponse(BaseModel):
     category_results: list[CategoryResult] = Field(default_factory=list)
     findings: list[ReviewFinding] = Field(default_factory=list)
     determinism: DeterminismContext
+    requirement_text: str | None = Field(
+        default=None, description="The normalized requirement text that was reviewed."
+    )
+    final_recommendation: FinalRecommendation | None = Field(
+        default=None,
+        description=(
+            "One synthesized replacement Description with full provenance. Null when the "
+            "review itself did not complete."
+        ),
+    )
 
 
 class DeltaChangeSummary(BaseModel):

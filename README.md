@@ -113,7 +113,7 @@ RadiaAi-2.0/
 │   │   ├── radia_ai/features/
 │   │   │   ├── jamaRequirementReviewer/
 │   │   │   │   ├── api/              # review API calls
-│   │   │   │   ├── components/       # ReviewChangeSet, CategoryScoreGrid, etc.
+│   │   │   │   ├── components/       # FinalRecommendationPanel, ReviewChangeSet, CategoryScoreGrid, etc.
 │   │   │   │   ├── hooks/            # useRequirementReview, useReviewHistory
 │   │   │   │   └── pages/            # RequirementReview, DeltaReview, Standards
 │   │   │   ├── jamaRoundtrip/
@@ -153,7 +153,12 @@ The review system uses **LLM-based architecture** with GPT-5 + RAG:
 
 **Key behaviors:**
 - LLM analysis grounded in indexed standards documents
-- All findings include a `suggested_rewrite` (full improved requirement text)
+- All findings include a `suggested_rewrite` (full improved requirement text) that
+  fixes only that finding; these are kept as supporting evidence
+- A second synthesis step merges them into **one** `final_recommendation` - a
+  replacement Description with per-finding provenance, conflict handling, and
+  Skillz rules applied as the highest authority for aircraft-level requirements
+  (see [docs/architecture.md](docs/architecture.md) §5.1-5.2)
 - References point to actual SharePoint document URLs, not hardcoded names
 - File-hash caching: unchanged documents are not re-embedded on restart
 - Every response carries a **completion record** - a review that could not run
@@ -271,11 +276,18 @@ button, so there's always a single place to check ingestion health.
 ### AI-assisted modification workflow
 
 - [x] AI-generated suggested changes from findings
-- [x] Detailed change-set display:
+- [x] One final recommended Description synthesized from every valid suggestion,
+      ready to replace the original Jama Description
+  - [x] Skillz rules (SharePoint) as the highest authority for aircraft-level
+        requirements, enforced in code
+  - [x] Duplicates merged, Skillz-overridden suggestions and unresolved conflicts
+        kept visible with their reasons
+  - [x] Original vs recommended diff, follow-ups, and cited Skillz rule text
+- [x] Supporting evidence for every individual suggestion:
   - [x] What should change (recommendation)
   - [x] Source-of-truth standard reference with direct SharePoint link
   - [x] Supporting evidence/context for each finding
-  - [x] Full suggested rewrite (changeset)
+  - [x] The individual suggested rewrite
 
 ### Delta (verification) review workflow
 

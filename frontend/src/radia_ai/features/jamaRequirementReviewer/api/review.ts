@@ -12,12 +12,16 @@ import type {
   StandardsResponse,
 } from '@/types/api';
 
+/** A review now also synthesizes the final recommendation, so it can take longer than the default. */
+const REQUIREMENT_REVIEW_TIMEOUT_MS = 300_000;
+
 export async function reviewRequirement(
   payload: RequirementReviewInput
 ): Promise<RequirementReviewResponse> {
   const { data } = await apiClient.post<APIResponse<RequirementReviewResponse>>(
     '/review/requirement',
-    payload
+    payload,
+    { timeout: REQUIREMENT_REVIEW_TIMEOUT_MS }
   );
   return data.data;
 }

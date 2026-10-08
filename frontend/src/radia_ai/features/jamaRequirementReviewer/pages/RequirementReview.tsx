@@ -12,6 +12,7 @@ import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
 import { FileUploadZone } from '@/radia_ai/features/jamaRequirementReviewer/components/FileUploadZone';
+import { FinalRecommendationPanel } from '@/radia_ai/features/jamaRequirementReviewer/components/FinalRecommendationPanel';
 import { JamaRequirementPicker } from '@/radia_ai/features/jamaRequirementReviewer/components/JamaRequirementPicker';
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
 import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
@@ -406,15 +407,28 @@ export default function RequirementReview() {
               </Box>
               <CategoryScoreGrid categories={activeResult.category_results} />
               <Divider />
-              <ReviewChangeSet
-                findings={activeResult.findings}
-                reviewId={activeResult.review_id}
-                onApplyDisposition={(reviewId, payload) => {
-                  sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
-                  applyDisposition({ reviewId, payload });
-                }}
-                isApplyingDisposition={isApplyingDisposition}
-              />
+              {activeResult.final_recommendation ? (
+                <FinalRecommendationPanel
+                  recommendation={activeResult.final_recommendation}
+                  findings={activeResult.findings}
+                  reviewId={activeResult.review_id}
+                  onApplyDisposition={(reviewId, payload) => {
+                    sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
+                    applyDisposition({ reviewId, payload });
+                  }}
+                  isApplyingDisposition={isApplyingDisposition}
+                />
+              ) : (
+                <ReviewChangeSet
+                  findings={activeResult.findings}
+                  reviewId={activeResult.review_id}
+                  onApplyDisposition={(reviewId, payload) => {
+                    sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
+                    applyDisposition({ reviewId, payload });
+                  }}
+                  isApplyingDisposition={isApplyingDisposition}
+                />
+              )}
             </Stack>
           </Paper>
         </Stack>

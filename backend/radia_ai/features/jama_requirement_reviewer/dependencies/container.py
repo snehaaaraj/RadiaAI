@@ -52,7 +52,11 @@ from radia_ai.features.jama_requirement_reviewer.services.review_version_service
     ReviewVersionService,
 )
 from radia_ai.features.jama_requirement_reviewer.services.standards_service import StandardsService
+from radia_ai.features.jama_requirement_reviewer.skillz.service import SkillzService
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
+from radia_ai.features.jama_requirement_reviewer.synthesis.recommendation_synthesizer import (
+    RecommendationSynthesizer,
+)
 
 logger = get_logger(__name__)
 
@@ -179,6 +183,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     app.state.sharepoint_client = sharepoint_client
 
+    # Skillz rules + final recommendation synthesis
+    app.state.skillz_service = _build_skillz_service(settings, sharepoint_client)
+    app.state.recommendation_synthesizer = RecommendationSynthesizer(
+        openai_client, app.state.skillz_service
+    )
+
     # Note: Auto-sync removed for Vercel serverless compatibility.
     # Use manual ingestion via POST /api/v1/ingest endpoint or UI button instead.
     logger.info("ingestion_service_ready", message="Manual ingestion available via /api/v1/ingest")
@@ -188,6 +198,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         settings,
         app.state.standards_service,
         llm_enhancer,
+        app.state.recommendation_synthesizer,
     )
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
@@ -214,6 +225,7 @@ def _build_review_orchestrator(
     settings: AppSettings,
     standards_service: StandardsService | None = None,
     llm_enhancer: LLMReviewEnhancer | None = None,
+    synthesizer: RecommendationSynthesizer | None = None,
 ) -> ReviewOrchestrator:
     """Construct the LLM-based review orchestrator with registered reviewers."""
     return ReviewOrchestrator(
@@ -222,7 +234,54 @@ def _build_review_orchestrator(
         standards_service=standards_service,
         llm_enhancer=llm_enhancer,
         reviewer_bundle_version="2.0.0",
+        synthesizer=synthesizer,
     )
+
+
+def _build_skillz_service(
+    settings: AppSettings, sharepoint_client: SharePointStandardsClient
+) -> SkillzService:
+    """Skillz rules are read with the SharePoint credentials when they are configured."""
+    source = sharepoint_client if settings.sharepoint.is_configured else None
+    return SkillzService(settings.skillz, source)
+
+
+def get_skillz_service(request: Request) -> SkillzService:
+    """Resolve the Skillz service, building it for cold serverless invocations."""
+    service = getattr(request.app.state, "skillz_service", None)
+    if service is None:
+        settings = _resolve_settings(request.app)
+        sharepoint_client = getattr(
+            request.app.state, "sharepoint_client", None
+        ) or SharePointStandardsClient(settings.sharepoint)
+        service = _build_skillz_service(settings, sharepoint_client)
+        request.app.state.skillz_service = service
+    return cast(SkillzService, service)
+
+
+def get_recommendation_synthesizer(request: Request) -> RecommendationSynthesizer | None:
+    """
+    Resolve the final-recommendation synthesizer.
+
+    Returns None only when the Azure OpenAI client cannot be constructed; the
+    review then still returns its scores and findings without a recommendation.
+    """
+    synthesizer = getattr(request.app.state, "recommendation_synthesizer", None)
+    if synthesizer is not None:
+        return cast(RecommendationSynthesizer, synthesizer)
+
+    settings = _resolve_settings(request.app)
+    try:
+        openai_client = getattr(request.app.state, "openai_client", None) or OpenAIClient(
+            settings.azure_openai
+        )
+    except Exception:
+        logger.exception("recommendation_synthesizer_bootstrap_failed")
+        return None
+    request.app.state.openai_client = openai_client
+    synthesizer = RecommendationSynthesizer(openai_client, get_skillz_service(request))
+    request.app.state.recommendation_synthesizer = synthesizer
+    return synthesizer
 
 
 def get_review_version_service(request: Request) -> ReviewVersionService:
@@ -290,6 +349,7 @@ def get_review_orchestrator(request: Request) -> ReviewOrchestrator:
             settings,
             standards_service,
             get_llm_enhancer(request),
+            get_recommendation_synthesizer(request),
         )
         request.app.state.review_orchestrator = orchestrator
     return orchestrator

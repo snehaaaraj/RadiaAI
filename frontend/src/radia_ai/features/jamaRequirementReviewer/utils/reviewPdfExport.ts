@@ -7,8 +7,14 @@
  */
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
-import type { CategoryResult, ReviewFinding, RequirementReviewResponse } from '@/types/api';
+import type {
+  CategoryResult,
+  FinalRecommendation,
+  ReviewFinding,
+  RequirementReviewResponse,
+} from '@/types/api';
 import { getReviewQualityScore, getCategoryScore } from '@/utils/reviewQuality';
+import { CONTRIBUTION_STATUS_LABEL, findingSourceLabel } from './recommendationEvidence';
 
 export interface ReviewPdfMetadataItem {
   label: string;
@@ -157,6 +163,110 @@ function addFindingsSection(doc: jsPDF, cursorY: number, findings: ReviewFinding
   return (doc as any).lastAutoTable.finalY + 16;
 }
 
+function ensureSpace(doc: jsPDF, cursorY: number, needed = 60): number {
+  if (cursorY > doc.internal.pageSize.getHeight() - PAGE_MARGIN - needed) {
+    doc.addPage();
+    return PAGE_MARGIN;
+  }
+  return cursorY;
+}
+
+function lastTableY(doc: jsPDF): number {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (doc as any).lastAutoTable.finalY;
+}
+
+const RECOMMENDATION_STATUS_LABEL: Record<FinalRecommendation['status'], string> = {
+  ready: 'Ready to replace',
+  needs_review: 'Needs review',
+  no_change: 'No change needed',
+  failed: 'Not generated',
+};
+
+function addRecommendationSection(
+  doc: jsPDF,
+  cursorY: number,
+  recommendation: FinalRecommendation,
+  findings: ReviewFinding[]
+): number {
+  cursorY = ensureSpace(doc, cursorY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(12);
+  doc.text('Final recommended requirement', PAGE_MARGIN, cursorY);
+  cursorY += 8;
+
+  const rows: [string, string][] = [
+    ['Status', RECOMMENDATION_STATUS_LABEL[recommendation.status]],
+    ['Skillz', recommendation.skillz_status_message || recommendation.skillz_status],
+    ['Original Description', recommendation.original_description],
+    [
+      'Recommended Description',
+      recommendation.recommended_description ?? recommendation.failure_message ?? 'Not generated',
+    ],
+  ];
+  if (recommendation.summary) rows.push(['Summary', recommendation.summary]);
+  autoTable(doc, {
+    startY: cursorY,
+    theme: 'grid',
+    styles: { fontSize: 9, cellPadding: 4, overflow: 'linebreak', valign: 'top' },
+    columnStyles: { 0: { fontStyle: 'bold', cellWidth: 130 } },
+    body: rows,
+    margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+  });
+  cursorY = lastTableY(doc) + 12;
+
+  if (recommendation.contributions.length > 0) {
+    const findingById = new Map(findings.map((f, i) => [f.finding_id ?? `F${i + 1}`, f]));
+    autoTable(doc, {
+      startY: cursorY,
+      head: [['Suggestion', 'Treatment', 'Effect on final text', 'Reason', 'Source']],
+      body: recommendation.contributions.map((c) => {
+        const finding = findingById.get(c.finding_id);
+        const overriddenBy = c.overridden_by_rule_ids.length
+          ? ` (Skillz ${c.overridden_by_rule_ids.join(', ')})`
+          : '';
+        return [
+          c.finding_id,
+          `${CONTRIBUTION_STATUS_LABEL[c.status]}${overriddenBy}`,
+          c.contribution,
+          c.reason,
+          findingSourceLabel(finding ?? null),
+        ];
+      }),
+      styles: { fontSize: 8, cellPadding: 4, overflow: 'linebreak', valign: 'top' },
+      headStyles: { fillColor: [27, 79, 216] },
+      columnStyles: { 0: { cellWidth: 50 }, 1: { cellWidth: 90 } },
+      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+    });
+    cursorY = lastTableY(doc) + 12;
+  }
+
+  const notes: [string, string][] = [
+    ...recommendation.skillz_changes.map((c): [string, string] => [`Skillz ${c.rule_id}`, c.change]),
+    ...recommendation.conflicts.map((c): [string, string] => [
+      `Conflict ${c.conflict_id} (${c.resolution === 'unresolved' ? 'unresolved' : 'resolved by Skillz'})`,
+      `${c.description} [${c.finding_ids.join(', ')}]`,
+    ]),
+    ...recommendation.open_items.map((o): [string, string] => [
+      o.rule_id ? `Follow-up (Skillz ${o.rule_id})` : 'Follow-up',
+      o.description,
+    ]),
+    ...recommendation.skillz_check_issues.map((i): [string, string] => [`Skillz check ${i.rule_id}`, i.message]),
+  ];
+  if (notes.length > 0) {
+    autoTable(doc, {
+      startY: cursorY,
+      theme: 'plain',
+      styles: { fontSize: 8, cellPadding: 3, overflow: 'linebreak', valign: 'top' },
+      columnStyles: { 0: { fontStyle: 'bold', cellWidth: 150 } },
+      body: notes,
+      margin: { left: PAGE_MARGIN, right: PAGE_MARGIN },
+    });
+    cursorY = lastTableY(doc) + 16;
+  }
+  return cursorY;
+}
+
 /** Renders one requirement's review result onto the given document, returning the new cursor Y. */
 function renderSection(doc: jsPDF, section: ReviewPdfSection, cursorY: number, isFirst: boolean): number {
   if (!isFirst) {
@@ -179,6 +289,14 @@ function renderSection(doc: jsPDF, section: ReviewPdfSection, cursorY: number, i
   ];
   cursorY = addMetadataTable(doc, cursorY, rows);
   cursorY = addCategoryTable(doc, cursorY, section.result.category_results);
+  if (section.result.final_recommendation) {
+    cursorY = addRecommendationSection(
+      doc,
+      cursorY,
+      section.result.final_recommendation,
+      section.result.findings
+    );
+  }
   cursorY = addFindingsSection(doc, cursorY, section.result.findings);
 
   return cursorY;

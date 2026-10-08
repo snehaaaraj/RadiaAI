@@ -11,6 +11,7 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     CategoryResult,
     DeltaReviewResponse,
     DeterminismContext,
+    FinalRecommendation,
     RequirementReviewResponse,
     ReviewCompletion,
     ReviewFinding,
@@ -71,6 +72,8 @@ class ReviewHistoryEntry(BaseModel):
     dispositions: list[FindingDisposition] = Field(default_factory=list)
     # For delta reviews: map flattened finding index -> requirement_id
     finding_to_requirement_map: dict[int, str] = Field(default_factory=dict)
+    requirement_text: str | None = None
+    final_recommendation: FinalRecommendation | None = None
 
 
 class ReviewHistoryListResponse(BaseModel):
@@ -97,6 +100,8 @@ def create_requirement_history_entry(
         category_results=response.category_results,
         findings=response.findings,
         determinism=response.determinism,
+        requirement_text=response.requirement_text,
+        final_recommendation=response.final_recommendation,
     )
 
 

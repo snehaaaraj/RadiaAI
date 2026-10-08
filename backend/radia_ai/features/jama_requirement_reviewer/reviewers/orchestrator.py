@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Protocol
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     REVIEW_CATEGORIES,
@@ -34,10 +34,31 @@ from radia_ai.features.jama_requirement_reviewer.utils.review_scoring import (
 if TYPE_CHECKING:
     from app.core.config import AppSettings
     from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
+    from radia_ai.features.jama_requirement_reviewer.models.review_models import (
+        FinalRecommendation,
+    )
     from radia_ai.features.jama_requirement_reviewer.reviewers.base import RequirementReviewer
     from radia_ai.features.jama_requirement_reviewer.services.standards_service import (
         StandardsService,
     )
+
+
+class RecommendationSynthesizerLike(Protocol):
+    """The synthesis step that turns findings into one final recommendation."""
+
+    @property
+    def prompt_version(self) -> str: ...
+
+    def synthesize(
+        self,
+        *,
+        requirement_text: str,
+        requirement_level: str | None,
+        findings: list[ReviewFinding],
+    ) -> FinalRecommendation: ...
+
+
+_SYNTHESIS_PROMPT_KEY = "recommendation_synthesis"
 
 
 class ReviewOrchestrator:
@@ -50,20 +71,26 @@ class ReviewOrchestrator:
         standards_service: StandardsService | None = None,
         llm_enhancer: LLMReviewEnhancer | None = None,
         reviewer_bundle_version: str = "2.0.0",
+        synthesizer: RecommendationSynthesizerLike | None = None,
     ) -> None:
         self._settings = settings
         self._reviewers = reviewers
         self._standards_service = standards_service
         self._llm_enhancer = llm_enhancer
         self._reviewer_bundle_version = reviewer_bundle_version
+        self._synthesizer = synthesizer
 
     def review_requirement(self, payload: RequirementReviewInput) -> RequirementReviewResponse:
         """
-        Run the consolidated LLM review, proposing a rewrite for each finding.
+        Run the consolidated LLM review, then synthesize one final recommendation.
 
         When the review engine cannot evaluate the requirement, the response
         carries ``overall = NOT_EVALUATED`` and a failed completion record. An
-        unevaluated requirement is never reported as acceptable.
+        unevaluated requirement is never reported as acceptable, and no final
+        recommendation is produced for it.
+
+        The scores describe the original requirement. The final recommendation is
+        a separate synthesis layer over the findings and never changes them.
         """
         normalized_payload = normalize_requirement_review_input(payload)
 
@@ -74,7 +101,17 @@ class ReviewOrchestrator:
         else:
             llm_result = self._llm_enhancer.consolidated_review(normalized_payload)
 
-        return self._to_response(llm_result)
+        response = self._to_response(llm_result).model_copy(
+            update={"requirement_text": normalized_payload.text}
+        )
+        if response.completion.is_complete and self._synthesizer is not None:
+            recommendation = self._synthesizer.synthesize(
+                requirement_text=normalized_payload.text,
+                requirement_level=normalized_payload.requirement_level,
+                findings=response.findings,
+            )
+            response = response.model_copy(update={"final_recommendation": recommendation})
+        return response
 
     def score_revision(self, revision: RequirementRevision) -> RequirementReviewResponse:
         """
@@ -110,7 +147,10 @@ class ReviewOrchestrator:
                 determinism=determinism,
             )
 
-        enriched = self._enrich_findings(llm_result.findings)
+        enriched = [
+            finding.model_copy(update={"finding_id": f"F{index}"})
+            for index, finding in enumerate(self._enrich_findings(llm_result.findings), start=1)
+        ]
         category_results = self._build_category_results(enriched)
         overall_score = average_score([result.score for result in category_results])
         return RequirementReviewResponse(
@@ -153,6 +193,8 @@ class ReviewOrchestrator:
     def build_version_response(self) -> ReviewVersionResponse:
         """Return reviewer/prompt/standards version metadata."""
         prompt_versions = {reviewer.name: reviewer.prompt_version for reviewer in self._reviewers}
+        if self._synthesizer is not None:
+            prompt_versions[_SYNTHESIS_PROMPT_KEY] = self._synthesizer.prompt_version
         standards_versions = {
             reviewer.name: reviewer.standards_version for reviewer in self._reviewers
         }

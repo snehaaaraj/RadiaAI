@@ -9,6 +9,7 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import { FindingCard } from '@/radia_ai/features/jamaRequirementReviewer/components/FindingCard';
+import { FinalRecommendationPanel } from '@/radia_ai/features/jamaRequirementReviewer/components/FinalRecommendationPanel';
 import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewQualityBand } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewQualityBand';
 import { ReviewStatusChip } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewStatusChip';
@@ -153,25 +154,35 @@ export default function ReviewHistory() {
                     </Box>
                   </>
                 )}
-                <Stack spacing={1}>
-                  {entry.findings.map((finding, index) => {
-                    const disposition = entry.dispositions.find((item) => item.finding_index === index);
-                    // Filter findings based on disposition filter
-                    if (dispositionFilter !== 'all' && disposition?.disposition !== dispositionFilter) {
-                      return null;
-                    }
-                    return (
-                      <FindingCard
-                        key={`${entry.review_id}-${index}`}
-                        finding={finding}
-                        index={index}
-                        reviewId={entry.review_id}
-                        disposition={disposition}
-                        readOnly
-                      />
-                    );
-                  })}
-                </Stack>
+                {entry.final_recommendation && dispositionFilter === 'all' ? (
+                  <FinalRecommendationPanel
+                    recommendation={entry.final_recommendation}
+                    findings={entry.findings}
+                    reviewId={entry.review_id}
+                    dispositions={entry.dispositions}
+                    readOnly
+                  />
+                ) : (
+                  <Stack spacing={1}>
+                    {entry.findings.map((finding, index) => {
+                      const disposition = entry.dispositions.find((item) => item.finding_index === index);
+                      // Filter findings based on disposition filter
+                      if (dispositionFilter !== 'all' && disposition?.disposition !== dispositionFilter) {
+                        return null;
+                      }
+                      return (
+                        <FindingCard
+                          key={`${entry.review_id}-${index}`}
+                          finding={finding}
+                          index={index}
+                          reviewId={entry.review_id}
+                          disposition={disposition}
+                          readOnly
+                        />
+                      );
+                    })}
+                  </Stack>
+                )}
               </Stack>
             </Paper>
           ))

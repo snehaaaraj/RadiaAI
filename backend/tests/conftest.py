@@ -39,6 +39,9 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
     ReviewHistoryRepository,
 )
+from radia_ai.features.jama_requirement_reviewer.synthesis.recommendation_synthesizer import (
+    RecommendationSynthesizer,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -47,6 +50,7 @@ if TYPE_CHECKING:
 # so the DI container rebuilds them against the new enhancer.
 _CACHED_REVIEW_STATE = (
     "llm_enhancer",
+    "recommendation_synthesizer",
     "review_orchestrator",
     "review_version_service",
     "requirement_review_service",
@@ -152,11 +156,55 @@ class StubLLMReviewEnhancer:
         )
 
 
+class StubSynthesisLLM:
+    """
+    Deterministic stand-in for the synthesis chat completion.
+
+    Applies the first finding's suggested rewrite and marks every finding as
+    applied, so the real synthesizer's validation runs without Azure.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[list[dict[str, str]]] = []
+
+    def chat_completion(
+        self,
+        messages: list[dict[str, str]],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        model: str | None = None,
+    ) -> str:
+        import json
+
+        self.calls.append(messages)
+        payload = json.loads(messages[1]["content"])
+        findings = payload["findings"]
+        text = next(
+            (f["suggested_rewrite"] for f in findings if f.get("suggested_rewrite")),
+            payload["original_description"],
+        )
+        return json.dumps(
+            {
+                "recommended_description": text,
+                "summary": "Applied the review findings.",
+                "contributions": [
+                    {"finding_id": f["finding_id"], "status": "applied", "contribution": "Applied"}
+                    for f in findings
+                ],
+                "skillz_changes": [],
+                "conflicts": [],
+                "open_items": [],
+            }
+        )
+
+
 class ReviewEngineHarness:
     """Installs review-engine stand-ins onto the test app and resets them after."""
 
     def __init__(self, app) -> None:
         self._app = app
+        self.synthesis_llm = StubSynthesisLLM()
 
     def install(
         self,
@@ -166,6 +214,10 @@ class ReviewEngineHarness:
         """Install an enhancer returning *result* and drop cached review services."""
         self.reset()
         self._app.state.llm_enhancer = StubLLMReviewEnhancer(result)
+        self.synthesis_llm = StubSynthesisLLM()
+        self._app.state.recommendation_synthesizer = RecommendationSynthesizer(
+            self.synthesis_llm, skillz_service=None
+        )
 
     def install_default(self) -> None:
         """Install an engine that completes and returns exactly one finding."""

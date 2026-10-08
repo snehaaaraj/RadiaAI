@@ -65,6 +65,10 @@ def _jama_settings_factory() -> "JamaSettings":
     return cast(JamaSettings, cast(Any, JamaSettings)())
 
 
+def _skillz_settings_factory() -> "SkillzSettings":
+    return cast(SkillzSettings, cast(Any, SkillzSettings)())
+
+
 class AzureOpenAISettings(BaseSettings):
     """Azure OpenAI service configuration."""
 
@@ -201,6 +205,53 @@ class SharePointSettings(BaseSettings):
     def is_webhook_configured(self) -> bool:
         """True only when SharePoint is configured and the webhook has been enabled with a base URL."""
         return self.is_configured and self.webhook_enabled and bool(self.webhook_public_base_url)
+
+
+class SkillzSettings(BaseSettings):
+    """
+    Skillz requirements-writing rules package (authoritative writing rules).
+
+    The package is a zip in the SharePoint drive configured by ``SharePointSettings``
+    and is read with the same credentials. Its rules govern the final
+    recommendation synthesis only for the requirement levels listed in
+    ``applicable_levels``.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="SKILLZ_", env_file=_ENV_FILE, extra="ignore")
+
+    enabled: bool = Field(default=True, description="Apply Skillz rules during synthesis")
+    zip_path: str = Field(
+        default=(
+            "0. Reference Material/AI Reference Material/Skillz/"
+            "acr-generator_Rev5.5_Issue1.0.zip"
+        ),
+        description="Path of the Skillz package zip within the SharePoint drive",
+    )
+    applicable_levels: list[str] = Field(
+        default=["aircraft"],
+        description="Requirement levels (case-insensitive) governed by this Skillz package",
+    )
+    cache_ttl_seconds: int = Field(
+        default=3600,
+        ge=0,
+        description="How long a downloaded Skillz package is reused before re-fetching",
+    )
+
+    @field_validator("applicable_levels", mode="before")
+    @classmethod
+    def parse_applicable_levels(cls, value: str | list[str]) -> list[str]:
+        """Accept a list, a JSON list string, or a comma-separated string."""
+        if isinstance(value, list):
+            return value
+        import json
+
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, list):
+            return [str(level) for level in parsed]
+        return [level.strip() for level in value.split(",") if level.strip()]
 
 
 class JamaSettings(BaseSettings):
@@ -368,6 +419,7 @@ class AppSettings(BaseSettings):
     entra: EntraIDSettings = Field(default_factory=_entra_id_settings_factory)
     sharepoint: SharePointSettings = Field(default_factory=_sharepoint_settings_factory)
     jama: JamaSettings = Field(default_factory=_jama_settings_factory)
+    skillz: SkillzSettings = Field(default_factory=_skillz_settings_factory)
 
     @field_validator("debug")
     @classmethod
