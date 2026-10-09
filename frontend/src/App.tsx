@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { CssBaseline, ThemeProvider } from '@mui/material';
@@ -41,10 +41,10 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <AppProvider>
         <ThemeShell>
-          <AuthGate>
-            <BrowserRouter>
-              <Routes>
-                <Route path={ROUTES.LANDING} element={<Landing />} />
+          <BrowserRouter>
+            <Routes>
+              <Route path={ROUTES.LANDING} element={<Landing />} />
+              <Route element={<AuthGate><Outlet /></AuthGate>}>
                 <Route path={ROUTES.RADIA_AI_RESOURCES} element={<RadiaResources />} />
                 <Route path={ROUTES.JAMA_ROUNDTRIP} element={<JamaRoundtripHome />} />
                 <Route element={<AppLayout />}>
@@ -59,10 +59,10 @@ export default function App() {
                   <Route path={ROUTES.DOCUMENTS} element={<Documents />} />
                   <Route path={ROUTES.SETTINGS} element={<Settings />} />
                 </Route>
-                <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
-              </Routes>
-            </BrowserRouter>
-          </AuthGate>
+              </Route>
+              <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
+            </Routes>
+          </BrowserRouter>
         </ThemeShell>
       </AppProvider>
       {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}

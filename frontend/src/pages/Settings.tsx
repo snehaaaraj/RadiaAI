@@ -4,6 +4,9 @@ import PaletteIcon from '@mui/icons-material/Palette';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import LinkIcon from '@mui/icons-material/Link';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -25,6 +28,9 @@ import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 import { SETTINGS_SECTION_IDS } from '@/utils/settingsSections';
 import { JamaAccountCard } from '@/radia_ai/features/jamaRequirementReviewer/components/JamaAccountCard';
 import { getSettingsSectionCardSx, settingsStyles } from './Settings.styles';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useIngestDocuments } from '@/hooks/useIngestDocuments';
+import { useIngestionJobStatus } from '@/hooks/useIngestionJobStatus';
 
 const THEMES: Array<{
   key: ThemePreference;
@@ -75,6 +81,19 @@ export default function Settings() {
   } = useAppContext();
 
   const reduceMotion = motionPreference === 'reduced';
+  const { data: currentUser } = useCurrentUser();
+  const canManageDocuments = currentUser?.can_manage_documents ?? false;
+  const {
+    mutate: ingestDocuments,
+    isPending: isIngesting,
+    isSuccess,
+    isError,
+    data: ingestResult,
+  } = useIngestDocuments();
+  const { data: ingestionJob } = useIngestionJobStatus(ingestResult?.job_id ?? null);
+  const ingestionFailureMessage = ingestionJob?.failure_details
+    .map((failure) => [failure.filename, failure.error].filter(Boolean).join(': '))
+    .join('; ');
 
   // On mount, scroll to the section indicated by the URL hash.
   // Wait for the page entrance animation to finish before scrolling
@@ -111,6 +130,62 @@ export default function Settings() {
       </motion.div>
 
       <Stack spacing={2}>
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.01 }}
+        >
+          <Card id={SETTINGS_SECTION_IDS.DOCUMENT_INGESTION} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
+            <CardContent>
+              <Box sx={settingsStyles.sectionHeader}>
+                <CloudUploadIcon color="primary" />
+                <Typography variant="h6" fontWeight={700}>
+                  Document ingestion
+                </Typography>
+              </Box>
+              <Stack spacing={2} alignItems="flex-start">
+                <Typography variant="body2" color="text.secondary">
+                  Sync documents from SharePoint into the reviewer knowledge base. Only users with
+                  document management access can start an ingestion.
+                </Typography>
+                {canManageDocuments && (
+                  <Button
+                    variant="contained"
+                    startIcon={
+                      isIngesting ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />
+                    }
+                    onClick={() => ingestDocuments({ source: 'sharepoint' })}
+                    disabled={isIngesting}
+                  >
+                    {isIngesting ? 'Ingesting...' : 'Ingest Documents'}
+                  </Button>
+                )}
+                {isSuccess && (
+                  <Alert
+                    severity={
+                      ingestionJob?.status === 'failed'
+                        ? 'error'
+                        : ingestionJob?.status === 'completed'
+                          ? 'success'
+                          : 'info'
+                    }
+                    sx={{ width: '100%' }}
+                  >
+                    {ingestionJob?.status === 'failed'
+                      ? `${ingestionJob.message} ${ingestionFailureMessage ?? ''}`
+                      : ingestionJob?.message ?? ingestResult?.message ?? 'Ingestion job queued.'}
+                  </Alert>
+                )}
+                {isError && (
+                  <Alert severity="error" sx={{ width: '100%' }}>
+                    Failed to trigger ingestion. Please check backend logs.
+                  </Alert>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+        </motion.div>
+
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}

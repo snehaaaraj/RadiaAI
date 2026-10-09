@@ -18,6 +18,9 @@ import { useAppContext } from '@/context/useAppContext';
 import { NavigationGuardProvider } from '@/context/NavigationGuardContext';
 import windrunnerLanding from '@/assets/windrunner-landing.png';
 import { APP_NAME, HEADER_HEIGHT, ROUTES } from '@/utils/constants';
+import { msalInstance, signIn } from '@/auth/msal';
+import { useIsAuthenticated } from '@azure/msal-react';
+import LoginIcon from '@mui/icons-material/Login';
 
 const highlights = [
   {
@@ -127,9 +130,17 @@ export default function Landing() {
                       Intelligent requirements quality review, built for modern engineering teams.
                     </Typography>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                      <Button variant="contained" size="large" onClick={() => navigate(ROUTES.RADIA_AI_RESOURCES)}>
-                        Enter workspace
-                      </Button>
+                      {msalInstance ? (
+                        <LandingAuthAction />
+                      ) : (
+                        <Button
+                          variant="contained"
+                          size="large"
+                          onClick={() => navigate(ROUTES.RADIA_AI_RESOURCES)}
+                        >
+                          Enter workspace
+                        </Button>
+                      )}
                       <Button variant="outlined" size="large" onClick={() => navigate(ROUTES.SETTINGS)}>
                         Personalize experience
                       </Button>
@@ -176,5 +187,33 @@ export default function Landing() {
         </Container>
       </Box>
     </NavigationGuardProvider>
+  );
+}
+
+function LandingAuthAction() {
+  const isAuthenticated = useIsAuthenticated();
+  const navigate = useNavigate();
+
+  if (isAuthenticated) {
+    return (
+      <Button
+        variant="contained"
+        size="large"
+        onClick={() => navigate(ROUTES.RADIA_AI_RESOURCES)}
+      >
+        Enter workspace
+      </Button>
+    );
+  }
+
+  return (
+    <Button
+      variant="contained"
+      size="large"
+      startIcon={<LoginIcon />}
+      onClick={() => void signIn()}
+    >
+      Sign in with Microsoft
+    </Button>
   );
 }

@@ -19,6 +19,7 @@ import TuneIcon from '@mui/icons-material/Tune';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
 import RestartAltIcon from '@mui/icons-material/RestartAlt';
 import LinkIcon from '@mui/icons-material/Link';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useNavigationGuardContext } from '@/context/useNavigationGuardContext';
@@ -62,6 +63,7 @@ export function Sidebar() {
 
   const settingsSectionIcons: Record<string, JSX.Element> = {
     'jama-account': <LinkIcon />,
+    'document-ingestion': <CloudUploadIcon />,
     'theme-mode': <PaletteIcon />,
     'startup-behavior': <TuneIcon />,
     'review-notifications': <NotificationsActiveIcon />,
