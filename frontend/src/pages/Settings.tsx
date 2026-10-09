@@ -133,7 +133,25 @@ export default function Settings() {
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.01 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.02 }}
+        >
+          <Card id={SETTINGS_SECTION_IDS.JAMA_ACCOUNT} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
+            <CardContent>
+              <Box sx={settingsStyles.sectionHeader}>
+                <LinkIcon color="primary" />
+                <Typography variant="h6" fontWeight={700}>
+                  Jama account
+                </Typography>
+              </Box>
+              <JamaAccountCard />
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.05 }}
         >
           <Card id={SETTINGS_SECTION_IDS.DOCUMENT_INGESTION} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
             <CardContent>
@@ -145,20 +163,22 @@ export default function Settings() {
               </Box>
               <Stack spacing={2} alignItems="flex-start">
                 <Typography variant="body2" color="text.secondary">
-                  Sync documents from SharePoint into the reviewer knowledge base. Only users with
-                  document management access can start an ingestion.
+                  Sync documents from SharePoint into the reviewer knowledge base.
                 </Typography>
-                {canManageDocuments && (
-                  <Button
-                    variant="contained"
-                    startIcon={
-                      isIngesting ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />
-                    }
-                    onClick={() => ingestDocuments({ source: 'sharepoint' })}
-                    disabled={isIngesting}
-                  >
-                    {isIngesting ? 'Ingesting...' : 'Ingest Documents'}
-                  </Button>
+                <Button
+                  variant="contained"
+                  startIcon={
+                    isIngesting ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />
+                  }
+                  onClick={() => ingestDocuments({ source: 'sharepoint' })}
+                  disabled={isIngesting || !canManageDocuments}
+                >
+                  {isIngesting ? 'Ingesting...' : 'Ingest Documents'}
+                </Button>
+                {!canManageDocuments && (
+                  <Typography variant="body2" color="text.secondary">
+                    Document management access is required to start an ingestion.
+                  </Typography>
                 )}
                 {isSuccess && (
                   <Alert
@@ -189,25 +209,7 @@ export default function Settings() {
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.02 }}
-        >
-          <Card id={SETTINGS_SECTION_IDS.JAMA_ACCOUNT} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
-            <CardContent>
-              <Box sx={settingsStyles.sectionHeader}>
-                <LinkIcon color="primary" />
-                <Typography variant="h6" fontWeight={700}>
-                  Jama account
-                </Typography>
-              </Box>
-              <JamaAccountCard />
-            </CardContent>
-          </Card>
-        </motion.div>
-
-        <motion.div
-          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
-          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
-          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.05 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.1 }}
         >
           <Card id={SETTINGS_SECTION_IDS.THEME_MODE} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
             <CardContent>

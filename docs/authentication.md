@@ -148,6 +148,14 @@ Frontend (build-time, `VITE_*`):
 When the `VITE_ENTRA_*` variables are absent, the SPA skips sign-in. The
 backend accepts that only with `ENVIRONMENT=local` or `test`.
 
+For a local UI preview that skips Microsoft sign-in even when frontend Entra
+settings are present, run the frontend with `npm run dev:local` from
+`frontend/`. This `local-preview` mode is enabled only by Vite's development server on
+`localhost`, `127.0.0.1`, or `::1`; production builds and other hosts continue
+to require the configured sign-in. API requests still follow the backend's
+authentication configuration, so unauthenticated API access requires its
+existing local/test auth bypass to be enabled.
+
 ## Behaviour by environment
 
 | `ENVIRONMENT` | Entra not configured | Shared Jama service account |

@@ -13,8 +13,25 @@ export const authSettings = {
   redirectUri: import.meta.env.VITE_ENTRA_REDIRECT_URI?.trim() || window.location.origin,
 };
 
+export function isLocalViewingEnvironment(mode: string, isDev: boolean, hostname: string): boolean {
+  return (
+    isDev &&
+    mode === 'local-preview' &&
+    ['localhost', '127.0.0.1', '::1'].includes(hostname)
+  );
+}
+
+export const isLocalViewing = isLocalViewingEnvironment(
+  import.meta.env.MODE,
+  import.meta.env.DEV,
+  window.location.hostname
+);
+
 export const isAuthEnabled = Boolean(
-  authSettings.clientId && authSettings.tenantId && authSettings.apiScope
+  !isLocalViewing &&
+    authSettings.clientId &&
+    authSettings.tenantId &&
+    authSettings.apiScope
 );
 
 /** Scopes requested for the Radia API access token. */
