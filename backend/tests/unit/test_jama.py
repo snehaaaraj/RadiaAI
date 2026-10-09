@@ -11,6 +11,7 @@ from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
     JamaClient,
     _strip_html,
 )
+from radia_ai.features.jama_requirement_reviewer.dependencies.container import get_jama_service
 from radia_ai.features.jama_requirement_reviewer.services.jama_service import JamaService
 
 
@@ -81,10 +82,10 @@ def jama_client(test_app) -> Iterator[None]:
             }
         },
     }
-    test_app.state.jama_service = JamaService(_StubJamaClient(responses))
+    stub_service = JamaService(_StubJamaClient(responses))
+    test_app.dependency_overrides[get_jama_service] = lambda: stub_service
     yield
-    if hasattr(test_app.state, "jama_service"):
-        delattr(test_app.state, "jama_service")
+    test_app.dependency_overrides.pop(get_jama_service, None)
 
 
 @pytest.mark.unit

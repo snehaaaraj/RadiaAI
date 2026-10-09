@@ -1,17 +1,24 @@
 """Jama Connect integration endpoints.
 
-Read-only access to Jama projects and requirements so a user can pick a
-requirement by ID and pull its content into a review. Jama credentials are
-resolved server-side; the browser only talks to these endpoints.
+Every Jama call runs as the signed-in user's *own* linked Jama account, so Jama
+enforces that user's project permissions. Users link their account once via
+``PUT /jama/account`` with personal API credentials from their Jama profile.
+Credentials are verified, encrypted, and never returned to the browser.
 """
 
 from anyio import to_thread
 from fastapi import APIRouter, Query, Request, status
 
 from app.core.logging import get_logger
+from app.core.security import RadiaUserDep
 from app.schemas.common import APIResponse
-from radia_ai.features.jama_requirement_reviewer.dependencies.container import JamaServiceDep
+from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
+    JamaAccountServiceDep,
+    JamaServiceDep,
+)
 from radia_ai.features.jama_requirement_reviewer.schemas.jama import (
+    JamaAccountLinkRequest,
+    JamaAccountStatus,
     JamaProjectList,
     JamaRequirement,
     JamaRequirementSearchResult,
@@ -22,10 +29,61 @@ logger = get_logger(__name__)
 
 
 @router.get(
+    "/account",
+    response_model=APIResponse[JamaAccountStatus],
+    summary="Get the signed-in user's Jama link status",
+    status_code=status.HTTP_200_OK,
+)
+async def get_jama_account(
+    request: Request,
+    user: RadiaUserDep,
+    account_service: JamaAccountServiceDep,
+) -> APIResponse[JamaAccountStatus]:
+    result = await to_thread.run_sync(lambda: account_service.status(user))
+    return APIResponse(data=result, request_id=request.state.request_id)
+
+
+@router.put(
+    "/account",
+    response_model=APIResponse[JamaAccountStatus],
+    summary="Link the signed-in user's Jama account",
+    description=(
+        "Verifies personal Jama API credentials (Jama profile -> Set API Credentials) "
+        "against Jama, checks they belong to the signed-in Microsoft user, and stores them "
+        "encrypted. Replaces any previously linked credentials."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def link_jama_account(
+    body: JamaAccountLinkRequest,
+    request: Request,
+    user: RadiaUserDep,
+    account_service: JamaAccountServiceDep,
+) -> APIResponse[JamaAccountStatus]:
+    result = await to_thread.run_sync(lambda: account_service.link(user, body))
+    return APIResponse(data=result, request_id=request.state.request_id)
+
+
+@router.delete(
+    "/account",
+    response_model=APIResponse[JamaAccountStatus],
+    summary="Unlink the signed-in user's Jama account",
+    status_code=status.HTTP_200_OK,
+)
+async def unlink_jama_account(
+    request: Request,
+    user: RadiaUserDep,
+    account_service: JamaAccountServiceDep,
+) -> APIResponse[JamaAccountStatus]:
+    result = await to_thread.run_sync(lambda: account_service.unlink(user))
+    return APIResponse(data=result, request_id=request.state.request_id)
+
+
+@router.get(
     "/projects",
     response_model=APIResponse[JamaProjectList],
     summary="List Jama projects",
-    description="Returns projects visible to the configured Jama service account.",
+    description="Returns projects visible to the signed-in user's linked Jama account.",
     status_code=status.HTTP_200_OK,
 )
 async def list_jama_projects(

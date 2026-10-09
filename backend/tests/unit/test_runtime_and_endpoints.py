@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, cast
 
 import pytest
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from starlette.requests import Request
 
 from app.core.config import (
@@ -16,7 +16,8 @@ from app.core.config import (
     AzureSearchSettings,
     get_settings,
 )
-from app.core.security import _entra_auth, _stub_auth
+from app.core.exceptions import AuthenticationNotConfiguredError
+from app.core.security import Role, get_current_user
 from app.dependencies.container import get_ingestion_job_store, get_search_service
 from app.main import StartupConfigurationError, _resolve_settings
 
@@ -130,7 +131,9 @@ def test_resolve_settings_allows_fallback_in_explicit_test_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv("ENVIRONMENT", "test")
-    monkeypatch.setattr("app.main.get_settings", lambda: AppSettings(azure_openai={}))
+    monkeypatch.setattr(
+        "app.main.get_settings", lambda: AppSettings(azure_openai={"endpoint": None})
+    )
 
     settings = _resolve_settings()
 
@@ -141,7 +144,9 @@ def test_resolve_settings_allows_fallback_in_explicit_test_environment(
 @pytest.mark.unit
 def test_resolve_settings_fails_fast_in_production(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("ENVIRONMENT", "production")
-    monkeypatch.setattr("app.main.get_settings", lambda: AppSettings(azure_openai={}))
+    monkeypatch.setattr(
+        "app.main.get_settings", lambda: AppSettings(azure_openai={"endpoint": None})
+    )
 
     with pytest.raises(StartupConfigurationError, match="invalid for production") as exc_info:
         _resolve_settings()
@@ -150,22 +155,21 @@ def test_resolve_settings_fails_fast_in_production(monkeypatch: pytest.MonkeyPat
 
 
 @pytest.mark.unit
-@pytest.mark.asyncio
-async def test_stub_auth_returns_synthetic_user() -> None:
-    user = await _stub_auth(_make_request(), credentials=None)
+def test_local_auth_bypass_returns_synthetic_user(test_settings: AppSettings) -> None:
+    user = get_current_user(_make_request(), credentials=None, settings=test_settings)
 
     assert user.user_id == "local-dev-user"
     assert user.email == "dev@radia.local"
-    assert user.has_role("admin") is True
+    assert user.auth_method == "local"
+    assert user.has_role(Role.ADMIN) is True
 
 
 @pytest.mark.unit
-@pytest.mark.asyncio
-async def test_entra_auth_requires_credentials() -> None:
-    with pytest.raises(HTTPException) as exc_info:
-        await _entra_auth(_make_request(), credentials=None)
+def test_unconfigured_auth_fails_closed_outside_local(test_settings: AppSettings) -> None:
+    settings = test_settings.model_copy(update={"environment": "development"})
 
-    assert exc_info.value.status_code == 401
+    with pytest.raises(AuthenticationNotConfiguredError):
+        get_current_user(_make_request(), credentials=None, settings=settings)
 
 
 @dataclass

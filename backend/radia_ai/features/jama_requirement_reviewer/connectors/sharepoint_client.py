@@ -210,6 +210,39 @@ class SharePointStandardsClient:
         """Verify Graph authentication and access to the configured standards folder."""
         self.resolve_folder_context()
 
+    def download_drive_file(
+        self, path: str, *, max_bytes: int = 10 * 1024 * 1024
+    ) -> tuple[bytes, str | None]:
+        """
+        Download one file from the configured drive by its path within the drive.
+
+        Returns the file bytes and its SharePoint web URL. Raises when SharePoint is
+        not configured, the file is missing, or it is larger than *max_bytes*.
+        """
+        if not self._settings.is_configured:
+            raise RuntimeError("SharePoint is not configured.")
+
+        encoded_path = "/".join(quote(segment) for segment in path.strip("/").split("/"))
+        with httpx.Client() as client:
+            if self._site_id is None:
+                self._site_id = self._resolve_site_id(client)
+            if self._drive_id is None:
+                self._drive_id = self._resolve_drive_id(client, self._site_id)
+
+            item_url = f"{_GRAPH_BASE}/drives/{self._drive_id}/root:/{encoded_path}"
+            meta = client.get(item_url, headers=self._headers(), timeout=15)
+            meta.raise_for_status()
+            item = cast(GraphDriveItem, meta.json())
+            if "folder" in item:
+                raise ValueError(f"SharePoint path is a folder, not a file: {path}")
+            if item.get("size", 0) > max_bytes:
+                raise ValueError(f"SharePoint file exceeds {max_bytes} bytes: {path}")
+
+            response = _download_file(client, f"{item_url}:/content", self._headers())
+            if len(response.content) > max_bytes:
+                raise ValueError(f"SharePoint file exceeds {max_bytes} bytes: {path}")
+            return response.content, item.get("webUrl") or None
+
     def _list_folder_children(self, client: httpx.Client, drive_id: str) -> list[GraphDriveItem]:
         """Return the Graph API items from the configured standards folder."""
         folder = self._settings.standards_folder

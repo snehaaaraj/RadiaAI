@@ -75,7 +75,7 @@ The frontend is a single-page application built with React and TypeScript.
 - Animated page transitions and cards
 - Review state preserved across navigation
 - Clear review actions to reset stored review state
-- Result presentation focused on score, category breakdown, findings, evidence, and rewrite guidance
+- Result presentation focused on score, category breakdown, one final recommended requirement, and expandable supporting evidence
 
 ## 4. Backend architecture
 
@@ -97,7 +97,9 @@ The backend is a layered FastAPI application.
 - **services**: business logic and workflow orchestration
 - **reviewers**: LLM review orchestration and reviewer version metadata
 - **rag**: retrieval and the consolidated LLM review call
-- **prompts**: the consolidated review system prompt
+- **prompts**: the consolidated review, delta review and recommendation synthesis prompts
+- **skillz**: Skillz package loading, rule parsing and deterministic Skillz checks
+- **synthesis**: final recommendation synthesis and its code-enforced validation
 - **models / schemas**: validated API contracts
 - **standards**: standards registry and catalog lookup
 - **diff**: revision comparison logic
@@ -120,19 +122,92 @@ Single review is an **authoring** pass: it flags violations and proposes replace
 4. One consolidated GPT-5 call produces findings across all four scored categories.
 5. Findings are enriched with standards references and SharePoint URLs.
 6. Category scores are derived from the findings and averaged into an overall
-   score and status.
-7. The response includes:
+   score and status. Scores always describe the **original** requirement.
+7. Findings are numbered `F1`, `F2`, ... and passed to the final recommendation
+   synthesis (see §5.1).
+8. The response includes:
    - overall status
    - completion record (see §6)
    - category results
-   - findings, each carrying a `suggested_rewrite` (the changeset)
+   - findings, each carrying its individual `suggested_rewrite`, source document,
+     page/section and excerpt (the evidence)
+   - `final_recommendation` - one replacement Description with full provenance
+   - the normalized `requirement_text` that was reviewed
    - version metadata
    - review ID
+
+### 5.1 Final recommendation synthesis
+
+Each finding's `suggested_rewrite` fixes only that finding, so several competing
+rewrites are produced for one requirement. A second GPT-5 call
+(`RecommendationSynthesizer`, prompt `RECOMMENDATION_SYNTHESIS_SYSTEM`) merges them
+into **one** Description that can replace the original Jama Description. The
+individual findings are kept unchanged as the supporting evidence.
+
+```
+Jama requirement → normalize → standards retrieval → consolidated review (findings F1..Fn)
+  → scoring (original requirement)
+  → Skillz rules (aircraft level) → synthesis + conflict resolution → validation
+  → final_recommendation (+ provenance) → UI
+```
+
+**Description only.** The Description is extracted from the normalized text; plain
+pasted text is treated entirely as the Description. Title and rationale are passed
+as context only.
+
+**Source authority is defined by the application, not the LLM.**
+`SOURCE_AUTHORITY_LEVEL` assigns Skillz requirements-writing rules level 1 and
+standards findings level 2. The prompt states the hierarchy, and the validator
+enforces it on every response:
+
+| Rule | Enforcement |
+|------|-------------|
+| Every finding is accounted for exactly once | missing findings become `not_addressed` |
+| Only a loaded Skillz rule can override a finding | an override without one becomes `conflict_unresolved` |
+| Only a loaded Skillz rule can resolve a conflict | otherwise the conflict stays `unresolved` |
+| Cited rule IDs must exist | invented IDs are removed |
+| Final text passes the deterministic Skillz checks | remaining issues are reported |
+
+Any violation triggers one repair round; whatever remains is shown to the user.
+Each finding ends up `applied`, `merged_duplicate`, `overridden`,
+`conflict_unresolved`, `rejected_unsupported`, `out_of_scope` or `not_addressed`.
+Conflicts that no Skillz rule decides are never merged: the original wording is
+kept for that aspect, the non-conflicting changes are still applied, and the
+conflicting suggestions are shown side by side.
+
+Status: `ready`, `needs_review` (unresolved conflicts, unaddressed findings, or
+remaining Skillz check issues), `no_change`, or `failed`. Open items (for example a
+verification method still to record) are follow-ups and do not block `ready`.
+The recommendation itself is not scored.
+
+### 5.2 Skillz rules
+
+Skillz is the authoritative requirements-writing rule package
+(`acr-generator`, WindRunner aircraft-level requirements). It is modelled as a rules
+layer, not as another search document: it is not indexed in Azure AI Search.
+
+- `SkillzService` downloads the package zip from SharePoint (`SKILLZ_ZIP_PATH`,
+  same Graph credentials as the standards library), caches it for
+  `SKILLZ_CACHE_TTL_SECONDS`, and serves the last good copy if a refresh fails.
+- The zip is read in memory as data only. Rules are split by ID from
+  `references/core-rules.md` (`C1`...), `references/quality-gates.md` (`Q1`...) and
+  `references/obligation-form-precedents.md` (`OFP`). The controlled-vocabulary
+  lists are read from `scripts/check_acr.py` with `ast.literal_eval`; no package
+  file is ever executed.
+- Only the rules that govern a single Description (`APPLICABLE_RULE_IDS`) are sent
+  to the model. Rules that need ACF/ACFD exports, workbooks or other fields are not.
+- Skillz applies only to the levels in `SKILLZ_APPLICABLE_LEVELS` (default
+  `aircraft`). Other levels get a standards-only recommendation labelled
+  "Skillz not applicable"; if the package cannot be loaded the recommendation is
+  labelled "Skillz not applied".
+- Every recommendation records the Skillz package, revision, content hash and
+  SharePoint URL, plus the full text of every rule it cites.
 
 ### Set review
 
 A parsed PDF yields many requirements. Each one runs through the single-requirement
-authoring pass independently, and the results are presented per requirement.
+authoring pass independently (including the final recommendation synthesis), and
+the results are presented per requirement.
 
 ### Delta review
 
@@ -373,6 +448,9 @@ The project supports:
 ## 12. Security and operational notes
 
 - Secrets are loaded from `.env`
+- Every non-public endpoint requires a validated Microsoft Entra ID token and a Radia
+  app role ([authentication.md](./authentication.md))
+- Jama is accessed as each signed-in user's own linked Jama account
 - API responses use a consistent error envelope
 - Request IDs are propagated across logs and responses
 - Input validation is handled with Pydantic
@@ -391,7 +469,8 @@ The project supports:
 | Document listing and document management | Planned | `GET /api/v1/documents` currently returns an empty placeholder response; document detail and deletion are not implemented. |
 | Document-oriented workflows | In progress | Ingestion, search, and chat are available; document inventory and management workflows remain incomplete. |
 | Dependency health probes | Implemented | `GET /health/live` is a lightweight process check; `GET /health/ready` (and the legacy `GET /health` alias) performs bounded, cached, real connectivity probes against Azure OpenAI, Azure AI Search, and Blob Storage (required) plus SharePoint and Jama (optional-but-configured), returning HTTP 503 only when a required dependency is down. |
-| Microsoft Entra ID authentication and authorization | Planned | Local development uses a synthetic user. Production JWT/JWKS validation, issuer and audience checks, and role extraction are not implemented. |
+| Microsoft Entra ID authentication and authorization | Implemented | SPA sign-in with MSAL; API validates Entra access tokens (RS256/JWKS, issuer, audience, expiry, tenant, scope) and enforces `Radia.User` / `Radia.DocumentAdmin` / `Radia.Admin` app roles on every non-public endpoint. Local/test environments may use a synthetic user; deployed environments fail closed. See [authentication.md](./authentication.md). |
+| Per-user Jama access | Implemented | Each user links their own Jama API credentials (encrypted at rest); all Jama calls run as that user so Jama enforces their project permissions. Review history is private per user. |
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
 
 ## 14. Summary

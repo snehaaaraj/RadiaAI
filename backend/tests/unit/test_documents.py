@@ -152,7 +152,7 @@ def test_delete_document_removes_indexed_copy_only(client: TestClient) -> None:
 
 
 @pytest.mark.unit
-def test_delete_document_is_disabled_outside_local_and_development(
+def test_delete_document_fails_closed_when_auth_is_not_configured_outside_local(
     client: TestClient, test_settings: AppSettings, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     catalog, search = _install_stubs(client)
@@ -169,5 +169,6 @@ def test_delete_document_is_disabled_outside_local_and_development(
         _remove_stubs(client)
 
     assert response.status_code == 503
+    assert response.json()["error"]["code"] == "AUTH_NOT_CONFIGURED"
     assert search.deleted == []
     assert catalog.deleted == []

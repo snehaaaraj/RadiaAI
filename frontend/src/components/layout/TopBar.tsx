@@ -14,6 +14,7 @@ import type { MouseEvent } from 'react';
 import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { RadiaMark } from './RadiaMark';
+import { UserMenu } from './UserMenu';
 import { useNavigationGuardContext } from '@/context/useNavigationGuardContext';
 import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 
@@ -360,6 +361,22 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
             Settings
           </Button>
         )}
+        <UserMenu
+          onNavigate={guardedNavigate}
+          buttonSx={{
+            textTransform: 'none',
+            minWidth: 'auto',
+            fontWeight: 600,
+            color: headerForegroundColor,
+            px: 1,
+            borderRadius: 1,
+            transition: 'transform 160ms ease, background-color 160ms ease',
+            '&:hover': {
+              backgroundColor: hoverHighlight,
+              transform: 'scale(1.04)',
+            },
+          }}
+        />
         <Button
           color="inherit"
           onClick={openSupport}

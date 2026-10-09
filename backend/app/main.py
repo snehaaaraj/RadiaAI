@@ -22,6 +22,7 @@ from pydantic import ValidationError
 
 from app.api.v1.router import router as v1_router
 from app.core.config import (
+    ENTRA_REQUIRED_ENVIRONMENTS,
     AppSettings,
     AzureBlobSettings,
     AzureOpenAISettings,
@@ -137,6 +138,29 @@ def _resolve_settings() -> AppSettings:
         ) from exc
 
 
+def _validate_auth_configuration(settings: AppSettings) -> None:
+    """Refuse to start a deployed environment that would run without authentication."""
+    if settings.environment in ENTRA_REQUIRED_ENVIRONMENTS and not settings.entra.is_configured:
+        raise StartupConfigurationError(
+            f"Microsoft Entra ID authentication is required in {settings.environment}: "
+            "set ENTRA_TENANT_ID and ENTRA_CLIENT_ID."
+        )
+    if not settings.entra.is_configured:
+        if settings.allows_local_auth_bypass:
+            logger.warning(
+                "auth_local_bypass_active",
+                environment=settings.environment,
+                roles=settings.local_dev_user_roles,
+            )
+        else:
+            logger.error("auth_not_configured_requests_will_be_rejected")
+    if settings.jama.has_base_url and not settings.jama.is_linking_configured:
+        logger.warning(
+            "jama_account_linking_disabled",
+            reason="JAMA_CREDENTIAL_ENCRYPTION_KEY is not set",
+        )
+
+
 def create_app() -> FastAPI:
     """
     Application factory - returns a fully configured FastAPI instance.
@@ -146,6 +170,7 @@ def create_app() -> FastAPI:
     """
     settings = _resolve_settings()
     configure_logging(settings)
+    _validate_auth_configuration(settings)
 
     app = FastAPI(
         title=settings.app_name,
@@ -175,12 +200,13 @@ def create_app() -> FastAPI:
 def _register_middleware(app: FastAPI, settings: AppSettings) -> None:
     """Attach all middleware to the application in correct order (outermost first)."""
 
-    # CORS - must be outermost so preflight OPTIONS requests are handled correctly
-    # Support both explicit origins and Vercel preview deployments
+    # CORS - must be outermost so preflight OPTIONS requests are handled correctly.
+    # The optional origin regex supports Vercel preview deployments; disable it for
+    # internal hosting so only the explicit origins are trusted.
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.allowed_origins,
-        allow_origin_regex=r"https://.*\.vercel\.app",
+        allow_origin_regex=settings.allowed_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -247,8 +273,14 @@ def _register_exception_handlers(app: FastAPI) -> None:
             message=exc.message,
             detail=exc.detail,
         )
+        headers = (
+            {"WWW-Authenticate": 'Bearer error="invalid_token"'}
+            if exc.http_status == status.HTTP_401_UNAUTHORIZED
+            else None
+        )
         return JSONResponse(
             status_code=exc.http_status,
+            headers=headers,
             content=ErrorResponse(
                 error=ErrorDetail(
                     code=exc.error_code,

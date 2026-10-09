@@ -72,7 +72,7 @@ class _SlowReviewService:
 class _StubHistoryService:
     """Avoids real Blob Storage; history persistence is not under test here."""
 
-    def record_requirement_review(self, subject_id, response):
+    def record_requirement_review(self, subject_id, response, **_owner):
         return f"review-{subject_id}"
 
 

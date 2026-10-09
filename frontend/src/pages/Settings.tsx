@@ -3,6 +3,10 @@ import LightModeIcon from '@mui/icons-material/LightMode';
 import PaletteIcon from '@mui/icons-material/Palette';
 import SettingsBrightnessIcon from '@mui/icons-material/SettingsBrightness';
 import NotificationsActiveIcon from '@mui/icons-material/NotificationsActive';
+import LinkIcon from '@mui/icons-material/Link';
+import CloudUploadIcon from '@mui/icons-material/CloudUpload';
+import Alert from '@mui/material/Alert';
+import CircularProgress from '@mui/material/CircularProgress';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import Card from '@mui/material/Card';
@@ -22,7 +26,11 @@ import { type ThemePreference, type WorkspaceStartPage } from '@/context/AppCont
 import { useAppContext } from '@/context/useAppContext';
 import { HEADER_HEIGHT, ROUTES } from '@/utils/constants';
 import { SETTINGS_SECTION_IDS } from '@/utils/settingsSections';
+import { JamaAccountCard } from '@/radia_ai/features/jamaRequirementReviewer/components/JamaAccountCard';
 import { getSettingsSectionCardSx, settingsStyles } from './Settings.styles';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useIngestDocuments } from '@/hooks/useIngestDocuments';
+import { useIngestionJobStatus } from '@/hooks/useIngestionJobStatus';
 
 const THEMES: Array<{
   key: ThemePreference;
@@ -73,6 +81,19 @@ export default function Settings() {
   } = useAppContext();
 
   const reduceMotion = motionPreference === 'reduced';
+  const { data: currentUser } = useCurrentUser();
+  const canManageDocuments = currentUser?.can_manage_documents ?? false;
+  const {
+    mutate: ingestDocuments,
+    isPending: isIngesting,
+    isSuccess,
+    isError,
+    data: ingestResult,
+  } = useIngestDocuments();
+  const { data: ingestionJob } = useIngestionJobStatus(ingestResult?.job_id ?? null);
+  const ingestionFailureMessage = ingestionJob?.failure_details
+    .map((failure) => [failure.filename, failure.error].filter(Boolean).join(': '))
+    .join('; ');
 
   // On mount, scroll to the section indicated by the URL hash.
   // Wait for the page entrance animation to finish before scrolling
@@ -102,7 +123,8 @@ export default function Settings() {
             Settings
           </Typography>
           <Typography variant="body1" color="text.secondary">
-            Universal Radia AI settings for theme, startup behavior, and notifications.
+            Universal Radia AI settings for your Jama account, theme, startup behavior, and
+            notifications.
           </Typography>
         </Box>
       </motion.div>
@@ -111,7 +133,83 @@ export default function Settings() {
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.02 }}
+        >
+          <Card id={SETTINGS_SECTION_IDS.JAMA_ACCOUNT} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
+            <CardContent>
+              <Box sx={settingsStyles.sectionHeader}>
+                <LinkIcon color="primary" />
+                <Typography variant="h6" fontWeight={700}>
+                  Jama account
+                </Typography>
+              </Box>
+              <JamaAccountCard />
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.05 }}
+        >
+          <Card id={SETTINGS_SECTION_IDS.DOCUMENT_INGESTION} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
+            <CardContent>
+              <Box sx={settingsStyles.sectionHeader}>
+                <CloudUploadIcon color="primary" />
+                <Typography variant="h6" fontWeight={700}>
+                  Document ingestion
+                </Typography>
+              </Box>
+              <Stack spacing={2} alignItems="flex-start">
+                <Typography variant="body2" color="text.secondary">
+                  Sync documents from SharePoint into the reviewer knowledge base.
+                </Typography>
+                <Button
+                  variant="contained"
+                  startIcon={
+                    isIngesting ? <CircularProgress size={16} color="inherit" /> : <CloudUploadIcon />
+                  }
+                  onClick={() => ingestDocuments({ source: 'sharepoint' })}
+                  disabled={isIngesting || !canManageDocuments}
+                >
+                  {isIngesting ? 'Ingesting...' : 'Ingest Documents'}
+                </Button>
+                {!canManageDocuments && (
+                  <Typography variant="body2" color="text.secondary">
+                    Document management access is required to start an ingestion.
+                  </Typography>
+                )}
+                {isSuccess && (
+                  <Alert
+                    severity={
+                      ingestionJob?.status === 'failed'
+                        ? 'error'
+                        : ingestionJob?.status === 'completed'
+                          ? 'success'
+                          : 'info'
+                    }
+                    sx={{ width: '100%' }}
+                  >
+                    {ingestionJob?.status === 'failed'
+                      ? `${ingestionJob.message} ${ingestionFailureMessage ?? ''}`
+                      : ingestionJob?.message ?? ingestResult?.message ?? 'Ingestion job queued.'}
+                  </Alert>
+                )}
+                {isError && (
+                  <Alert severity="error" sx={{ width: '100%' }}>
+                    Failed to trigger ingestion. Please check backend logs.
+                  </Alert>
+                )}
+              </Stack>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.1 }}
         >
           <Card id={SETTINGS_SECTION_IDS.THEME_MODE} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
             <CardContent>

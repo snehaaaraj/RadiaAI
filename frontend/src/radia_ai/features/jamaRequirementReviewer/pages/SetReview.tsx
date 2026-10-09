@@ -27,6 +27,7 @@ import PlayArrowIcon from '@mui/icons-material/PlayArrow';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
+import { FinalRecommendationPanel } from '@/radia_ai/features/jamaRequirementReviewer/components/FinalRecommendationPanel';
 import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import {
   SET_REVIEW_CONCURRENCY,
@@ -556,7 +557,15 @@ export default function SetReview() {
               </Box>
               <CategoryScoreGrid categories={activeResult.category_results} />
               <Divider />
-              <ReviewChangeSet findings={activeResult.findings} reviewId={activeResult.review_id} />
+              {activeResult.final_recommendation ? (
+                <FinalRecommendationPanel
+                  recommendation={activeResult.final_recommendation}
+                  findings={activeResult.findings}
+                  reviewId={activeResult.review_id}
+                />
+              ) : (
+                <ReviewChangeSet findings={activeResult.findings} reviewId={activeResult.review_id} />
+              )}
             </Stack>
           </Paper>
 

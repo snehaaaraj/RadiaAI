@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Alert from '@mui/material/Alert';
 import Autocomplete from '@mui/material/Autocomplete';
 import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
 import Link from '@mui/material/Link';
 import MenuItem from '@mui/material/MenuItem';
@@ -9,23 +10,20 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import {
+  JAMA_LINK_REQUIRED_CODES,
+  jamaErrorCode,
   useJamaProjects,
   useJamaRequirement,
   useJamaRequirementSearch,
 } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useJama';
-import type {
-  ErrorResponse,
-  JamaRequirement,
-  JamaRequirementSummary,
-} from '@/types/api';
+import type { JamaRequirement, JamaRequirementSummary } from '@/types/api';
+import { useNavigationGuardContext } from '@/context/useNavigationGuardContext';
+import { ROUTES } from '@/utils/constants';
+import { SETTINGS_SECTION_IDS } from '@/utils/settingsSections';
 
 interface JamaRequirementPickerProps {
   onRequirementSelected: (requirement: JamaRequirement) => void;
   disabled?: boolean;
-}
-
-function errorCode(error: unknown): string | undefined {
-  return (error as ErrorResponse | undefined)?.error?.code;
 }
 
 function summaryLabel(summary: JamaRequirementSummary): string {
@@ -41,6 +39,7 @@ export function JamaRequirementPicker({
   const [inputValue, setInputValue] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { guardedNavigate } = useNavigationGuardContext();
 
   const projectsQuery = useJamaProjects();
 
@@ -73,14 +72,40 @@ export function JamaRequirementPicker({
     [searchQuery.data]
   );
 
-  const notConfigured = errorCode(projectsQuery.error) === 'JAMA_NOT_CONFIGURED';
-  const searchError = searchQuery.isError && !notConfigured;
+  const projectsErrorCode = jamaErrorCode(projectsQuery.error);
+  const notConfigured = projectsErrorCode === 'JAMA_NOT_CONFIGURED';
+  const linkRequired = projectsErrorCode !== undefined && JAMA_LINK_REQUIRED_CODES.has(projectsErrorCode);
+  const searchError = searchQuery.isError && !notConfigured && !linkRequired;
 
   if (notConfigured) {
     return (
       <Alert severity="info" variant="outlined">
-        Jama is not connected. Ask an administrator to configure the Jama credentials on the
-        server (JAMA_BASE_URL and API credentials) to browse requirements here.
+        Jama is not connected. Ask an administrator to configure Jama on the server
+        (JAMA_BASE_URL and account linking) to browse requirements here.
+      </Alert>
+    );
+  }
+
+  if (linkRequired) {
+    return (
+      <Alert
+        severity="info"
+        variant="outlined"
+        action={
+          <Button
+            color="inherit"
+            size="small"
+            onClick={() =>
+              guardedNavigate(`${ROUTES.SETTINGS}#${SETTINGS_SECTION_IDS.JAMA_ACCOUNT}`)
+            }
+          >
+            Link Jama
+          </Button>
+        }
+      >
+        {projectsErrorCode === 'JAMA_CREDENTIALS_INVALID'
+          ? 'Jama rejected your linked credentials. Re-link your Jama account to browse requirements.'
+          : 'Link your Jama account to browse requirements. You will only see projects you can access in Jama.'}
       </Alert>
     );
   }
@@ -178,7 +203,9 @@ export function JamaRequirementPicker({
 
       {requirementQuery.isError && (
         <Alert severity="warning" variant="outlined">
-          Could not read the selected requirement from Jama.
+          {jamaErrorCode(requirementQuery.error) === 'JAMA_PERMISSION_DENIED'
+            ? 'Your Jama account does not have access to this requirement.'
+            : 'Could not read the selected requirement from Jama.'}
         </Alert>
       )}
 

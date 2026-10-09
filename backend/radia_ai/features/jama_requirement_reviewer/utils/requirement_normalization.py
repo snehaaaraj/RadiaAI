@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from dataclasses import dataclass
 
 from radia_ai.features.jama_requirement_reviewer.models.review_models import RequirementReviewInput
 
@@ -36,6 +37,44 @@ _CORE_FIELD_LABELS = {"title", "description", "rationale"}
 _TRAILING_METADATA_LABELS = tuple(
     label for label, field in _FIELD_LABELS if field not in _CORE_FIELD_LABELS
 )
+_CANONICAL_FIELD_PREFIXES = {
+    "Title: ": "title",
+    "Description: ": "description",
+    "Rationale: ": "rationale",
+}
+
+
+@dataclass(frozen=True)
+class RequirementFields:
+    """The Jama fields of a normalized requirement."""
+
+    title: str
+    description: str
+    rationale: str
+
+
+def split_requirement_fields(normalized_text: str) -> RequirementFields:
+    """
+    Split normalized review text into its Title, Description and Rationale.
+
+    Normalization renders fielded input as ``Title: ...``, ``Description: ...`` and
+    ``Rationale: ...`` blocks. Plain requirement text has no fields and is treated
+    entirely as the Description, which is the field a recommendation replaces.
+    """
+    fields: dict[str, str] = {}
+    for block in normalized_text.split("\n\n"):
+        for prefix, name in _CANONICAL_FIELD_PREFIXES.items():
+            if block.startswith(prefix):
+                fields[name] = block[len(prefix) :].strip()
+                break
+
+    if not fields:
+        return RequirementFields(title="", description=normalized_text.strip(), rationale="")
+    return RequirementFields(
+        title=fields.get("title", ""),
+        description=fields.get("description", ""),
+        rationale=fields.get("rationale", ""),
+    )
 
 
 def normalize_requirement_review_input(payload: RequirementReviewInput) -> RequirementReviewInput:

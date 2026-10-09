@@ -262,7 +262,14 @@ export interface CategoryResult {
   score?: number;
 }
 
+export type SourceType = 'skillz_rule' | 'standard';
+
 export interface ReviewFinding {
+  /** Stable ID within its review (F1, F2, ...). Absent on reviews stored before synthesis. */
+  finding_id?: string | null;
+  source_type?: SourceType;
+  /** Application-defined authority level of the source; 1 is the highest. */
+  authority_level?: number;
   category: string;
   reviewer: string;
   severity: FindingSeverity;
@@ -295,6 +302,86 @@ export interface DeltaReviewInput {
   updated_requirements: RequirementReviewInput[];
 }
 
+export type ContributionStatus =
+  | 'applied'
+  | 'merged_duplicate'
+  | 'overridden'
+  | 'conflict_unresolved'
+  | 'rejected_unsupported'
+  | 'out_of_scope'
+  | 'not_addressed';
+
+export type ConflictResolution = 'resolved_by_skillz' | 'unresolved';
+export type SkillzStatus = 'applied' | 'not_applicable' | 'unavailable';
+export type RecommendationStatus = 'ready' | 'needs_review' | 'no_change' | 'failed';
+
+export interface SkillzRuleReference {
+  rule_id: string;
+  title: string;
+  document: string;
+  text: string;
+  source_url: string | null;
+  source_type: SourceType;
+  authority_level: number;
+}
+
+export interface FindingContribution {
+  finding_id: string;
+  status: ContributionStatus;
+  contribution: string;
+  reason: string;
+  overridden_by_rule_ids: string[];
+  duplicate_of: string | null;
+  conflict_id: string | null;
+}
+
+export interface SkillzChange {
+  rule_id: string;
+  change: string;
+  reason: string;
+}
+
+export interface RecommendationConflict {
+  conflict_id: string;
+  finding_ids: string[];
+  description: string;
+  resolution: ConflictResolution;
+  governing_rule_ids: string[];
+}
+
+export interface RecommendationOpenItem {
+  rule_id: string | null;
+  description: string;
+}
+
+export interface SkillzCheckIssue {
+  rule_id: string;
+  term: string;
+  message: string;
+}
+
+/** One synthesized replacement Description with full provenance to the findings. */
+export interface FinalRecommendation {
+  status: RecommendationStatus;
+  original_description: string;
+  recommended_description: string | null;
+  summary: string;
+  skillz_status: SkillzStatus;
+  skillz_status_message: string;
+  skillz_package: string | null;
+  skillz_revision: string | null;
+  skillz_content_hash: string | null;
+  skillz_source_url: string | null;
+  contributions: FindingContribution[];
+  skillz_changes: SkillzChange[];
+  conflicts: RecommendationConflict[];
+  open_items: RecommendationOpenItem[];
+  skillz_rules: SkillzRuleReference[];
+  skillz_check_issues: SkillzCheckIssue[];
+  failure_message: string;
+  prompt_version: string;
+}
+
 export interface RequirementReviewResponse {
   review_id: string | null;
   overall: ReviewStatus;
@@ -302,6 +389,10 @@ export interface RequirementReviewResponse {
   category_results: CategoryResult[];
   findings: ReviewFinding[];
   determinism: DeterminismContext;
+  /** Normalized requirement text that was reviewed. */
+  requirement_text?: string | null;
+  /** Null when the review did not complete; absent on results stored before synthesis. */
+  final_recommendation?: FinalRecommendation | null;
 }
 
 export interface DeltaChangeSummary {
@@ -365,6 +456,9 @@ export interface ReviewHistoryEntry {
   workflow: ReviewWorkflow;
   subject_id: string | null;
   created_at: string;
+  /** Entra identity of the user who ran the review (null for pre-authentication entries). */
+  owner_id?: string | null;
+  owner_name?: string | null;
   overall: ReviewStatus;
   completion: ReviewCompletion;
   category_results: CategoryResult[];
@@ -372,6 +466,8 @@ export interface ReviewHistoryEntry {
   determinism: DeterminismContext;
   dispositions: FindingDisposition[];
   finding_to_requirement_map: Record<number, string>; // For delta: flattened index -> requirement_id
+  requirement_text?: string | null;
+  final_recommendation?: FinalRecommendation | null;
 }
 
 export interface ReviewHistoryListResponse {
@@ -424,4 +520,36 @@ export interface JamaRequirement {
   modified_date: string | null;
   web_url: string | null;
   fields: Record<string, unknown>;
+}
+
+/** The signed-in user's Jama link (personal Jama API credentials are never returned). */
+export interface JamaAccountStatus {
+  linking_enabled: boolean;
+  linked: boolean;
+  using_shared_account: boolean;
+  jama_base_url: string | null;
+  jama_user_id: number | null;
+  jama_username: string | null;
+  jama_email: string | null;
+  jama_display_name: string | null;
+  linked_at: string | null;
+}
+
+export interface JamaAccountLinkRequest {
+  client_id: string;
+  client_secret: string;
+}
+
+// ---------------------------------------------------------------------------
+// Authentication
+// ---------------------------------------------------------------------------
+
+export interface CurrentUser {
+  user_id: string;
+  email: string;
+  display_name: string;
+  auth_method: 'entra' | 'local';
+  roles: string[];
+  can_manage_documents: boolean;
+  is_admin: boolean;
 }

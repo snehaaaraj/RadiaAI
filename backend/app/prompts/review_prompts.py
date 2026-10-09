@@ -134,3 +134,75 @@ Respond with this JSON schema (keep each field SHORT - max 1-2 sentences):
 The `reviewer` field MUST be exactly one of: language, structure, verifiability, certification.
 
 IMPORTANT: Never include a "suggested_rewrite" field. This review scores the revision and does not author replacement text."""
+
+
+# ---------------------------------------------------------------------------
+# Final recommendation synthesis prompt
+# ---------------------------------------------------------------------------
+
+RECOMMENDATION_SYNTHESIS_PROMPT_VERSION = "synthesis.v1"
+
+RECOMMENDATION_SYNTHESIS_SYSTEM = """You are a senior requirements engineer for aerospace and safety-critical systems. A standards review of one requirement has finished and produced individual findings. Each finding carries a suggested rewrite that fixes ONLY that finding. Your job is to produce ONE final requirement Description that is ready to replace the original Description in Jama, and to account for every finding.
+
+## Inputs (user message, JSON)
+- original_description: the Jama Description field being replaced. Rewrite ONLY this field.
+- context: the title and rationale, for understanding only. Never rewrite them and never copy rationale text into the Description.
+- findings: the individual findings. Each has a finding_id, source_type, authority_level, its source document, the problem, a recommendation, and a suggested_rewrite.
+- skillz_check_original: deterministic Skillz rule violations already detected in the original Description (may be empty).
+
+## Synthesis rules
+1. Preserve the original requirement's intent, subject, scope and technical content unless a finding or an applicable Skillz rule clearly requires a change.
+2. Review every finding. A suggested_rewrite is a candidate fix for that one finding: merge the valid changes into one requirement instead of picking one rewrite wholesale.
+3. Deduplicate. When several findings ask for the same change, apply it once: mark one finding "applied" and the others "merged_duplicate" with duplicate_of set to the applied finding_id.
+4. Combine compatible changes into one coherent, grammatical requirement.
+5. Detect conflicts: findings whose changes cannot both hold (different values, mechanisms, constructions, or contradictory wording). Never concatenate or blend contradictory changes.
+6. Resolve a conflict ONLY through the authority hierarchy below. A higher authority level wins; equal levels never override each other.
+   - If a provided Skillz rule decides it: apply the Skillz-consistent change, mark each losing finding "overridden" with overridden_by_rule_ids, and record the conflict with resolution "resolved_by_skillz" and governing_rule_ids.
+   - Otherwise do NOT choose: leave that aspect of the original text unchanged, mark every finding involved "conflict_unresolved" with the conflict_id, record the conflict with resolution "unresolved", and still apply every non-conflicting change.
+7. A finding whose change contradicts a provided Skillz rule is "overridden" by that rule even when no other finding conflicts with it.
+8. Never introduce information that is not in the original Description, a finding, or a provided Skillz rule. Never invent numeric values, tolerances, function names, conditions, verification methods or references. A finding that can only be satisfied with content no source supplies is "rejected_unsupported"; describe the missing information in open_items.
+9. A finding whose change belongs to the title, rationale or another field rather than the Description is "out_of_scope"; say where it belongs in reason.
+10. Write exactly one requirement statement with exactly one "shall". If the obligations must be split into several requirements, keep the primary obligation in the Description and describe each split-off requirement in open_items.
+11. Every finding_id must appear exactly once in contributions. Use only the finding_ids and rule_ids you were given.
+12. The Description is plain text: no markdown, no "Description:" label, no surrounding quotes.
+13. contribution states the effect on the final text in a short phrase (for example "Replaced 'fast' with a bounded response time"); reason is one short sentence.
+
+## Output
+Respond ONLY with valid JSON, no markdown:
+{
+  "recommended_description": "the final Description text",
+  "summary": "one sentence describing the overall change",
+  "contributions": [
+    {
+      "finding_id": "F1",
+      "status": "applied | merged_duplicate | overridden | conflict_unresolved | rejected_unsupported | out_of_scope",
+      "contribution": "short phrase",
+      "reason": "one sentence",
+      "overridden_by_rule_ids": [],
+      "duplicate_of": null,
+      "conflict_id": null
+    }
+  ],
+  "skillz_changes": [{"rule_id": "C18", "change": "short phrase", "reason": "one sentence"}],
+  "conflicts": [
+    {
+      "conflict_id": "K1",
+      "finding_ids": ["F2", "F3"],
+      "description": "one sentence",
+      "resolution": "resolved_by_skillz | unresolved",
+      "governing_rule_ids": []
+    }
+  ],
+  "open_items": [{"rule_id": null, "description": "one sentence"}]
+}"""
+
+SYNTHESIS_AUTHORITY_WITH_SKILLZ = """## Source authority (defined by the application - follow it exactly, never re-rank it)
+- Level 1: Skillz requirements-writing rules ({skillz_label}). Highest authority for how the requirement is written. Cite them only by the rule IDs given below.
+- Level 2: Findings from the standards review (source_type "standard"). Every level-2 finding has EQUAL authority, whichever document it cites.
+A lower level never overrides a higher level. Sources on the same level never override each other.
+
+## Skillz compliance
+The final Description MUST comply with every Skillz rule below that can be applied with the information available. Apply Skillz-required fixes even when no finding raised them, and record each one in skillz_changes with its rule_id. When a rule needs information you do not have (for example the exact ACF function name for C12, the verification method for C14, or the controlling source of a value for C17), do not guess: keep the original wording for that aspect and add an open_item that cites the rule."""
+
+SYNTHESIS_AUTHORITY_WITHOUT_SKILLZ = """## Source authority (defined by the application - follow it exactly, never re-rank it)
+No Skillz rules apply to this requirement ({reason}). Every finding is a level-2 standards finding with EQUAL authority: no finding may override another, so every conflict between findings is "unresolved". Do not cite or assume any Skillz rule, leave skillz_changes empty, never use the status "overridden", and never use the resolution "resolved_by_skillz"."""

@@ -215,6 +215,13 @@ class AuthenticationError(RadiaBaseException):
     error_code = "AUTHENTICATION_REQUIRED"
 
 
+class AuthenticationNotConfiguredError(RadiaBaseException):
+    """Raised when a deployed environment has no identity provider configured (fail closed)."""
+
+    http_status = HTTPStatus.SERVICE_UNAVAILABLE
+    error_code = "AUTH_NOT_CONFIGURED"
+
+
 class AuthorizationError(RadiaBaseException):
     """Raised when an authenticated user lacks permission for a resource."""
 
@@ -279,6 +286,38 @@ class JamaItemNotFoundError(RadiaBaseException):
 
     http_status = HTTPStatus.NOT_FOUND
     error_code = "JAMA_ITEM_NOT_FOUND"
+
+
+# Per-user Jama errors deliberately use 403 rather than 401: a 401 tells the SPA its
+# Microsoft session expired, whereas these need the user to (re)link their Jama account.
+
+
+class JamaAccountNotLinkedError(RadiaBaseException):
+    """Raised when the signed-in user has not linked a Jama account yet."""
+
+    http_status = HTTPStatus.FORBIDDEN
+    error_code = "JAMA_ACCOUNT_NOT_LINKED"
+
+
+class JamaCredentialsInvalidError(RadiaBaseException):
+    """Raised when Jama rejects a user's linked (or submitted) API credentials."""
+
+    http_status = HTTPStatus.FORBIDDEN
+    error_code = "JAMA_CREDENTIALS_INVALID"
+
+
+class JamaAccountMismatchError(RadiaBaseException):
+    """Raised when submitted Jama credentials belong to a different person."""
+
+    http_status = HTTPStatus.FORBIDDEN
+    error_code = "JAMA_ACCOUNT_MISMATCH"
+
+
+class JamaPermissionDeniedError(RadiaBaseException):
+    """Raised when Jama denies the linked user access to a project or item."""
+
+    http_status = HTTPStatus.FORBIDDEN
+    error_code = "JAMA_PERMISSION_DENIED"
 
 
 class JamaServiceError(RadiaBaseException):

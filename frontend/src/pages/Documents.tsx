@@ -27,6 +27,7 @@ import Typography from '@mui/material/Typography';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import { useDeleteDocument, useDocument, useDocuments } from '@/hooks/useDocuments';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import type { DocumentStatus } from '@/types/api';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
@@ -59,6 +60,8 @@ export default function Documents() {
   const { data, isLoading, isError, error, isPlaceholderData } = useDocuments(listParams);
   const documentQuery = useDocument(selectedDocumentId);
   const deleteMutation = useDeleteDocument();
+  const { data: currentUser } = useCurrentUser();
+  const canManageDocuments = currentUser?.can_manage_documents ?? false;
 
   const handleDelete = () => {
     if (!selectedDocumentId) return;
@@ -275,14 +278,16 @@ export default function Documents() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button
-            color="error"
-            startIcon={<DeleteOutlineIcon />}
-            onClick={() => setConfirmDelete(true)}
-            disabled={!documentQuery.data || deleteMutation.isPending}
-          >
-            Delete indexed copy
-          </Button>
+          {canManageDocuments && (
+            <Button
+              color="error"
+              startIcon={<DeleteOutlineIcon />}
+              onClick={() => setConfirmDelete(true)}
+              disabled={!documentQuery.data || deleteMutation.isPending}
+            >
+              Delete indexed copy
+            </Button>
+          )}
           <Button onClick={() => setSelectedDocumentId(null)}>Close</Button>
         </DialogActions>
       </Dialog>

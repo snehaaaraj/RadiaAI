@@ -20,6 +20,7 @@ from fastapi import Depends, FastAPI, Request
 from app.core.azure_clients import BlobStorageClient, OpenAIClient, SearchService
 from app.core.config import AppSettings, get_settings
 from app.core.logging import get_logger
+from app.core.security import RadiaUserDep
 from app.documents.repository import DocumentCatalogRepository
 from app.ingestion.job_store import IngestionJobStore
 from app.ingestion.service import IngestionService
@@ -27,9 +28,15 @@ from app.ingestion.sharepoint_webhook import SharePointWebhookService
 from app.ingestion.status_store import IngestionStatusStore
 from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
-from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import JamaClient
+from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
+    JamaClient,
+    JamaTokenCache,
+)
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
     SharePointStandardsClient,
+)
+from radia_ai.features.jama_requirement_reviewer.repositories.jama_credential_repository import (
+    JamaCredentialRepository,
 )
 from radia_ai.features.jama_requirement_reviewer.repositories.review_history_repository import (
     ReviewHistoryRepository,
@@ -38,6 +45,9 @@ from radia_ai.features.jama_requirement_reviewer.reviewers.consolidated import (
     build_category_reviewers,
 )
 from radia_ai.features.jama_requirement_reviewer.reviewers.orchestrator import ReviewOrchestrator
+from radia_ai.features.jama_requirement_reviewer.services.jama_account_service import (
+    JamaAccountService,
+)
 from radia_ai.features.jama_requirement_reviewer.services.jama_service import JamaService
 from radia_ai.features.jama_requirement_reviewer.services.requirement_delta_review_service import (
     RequirementDeltaReviewService,
@@ -52,7 +62,11 @@ from radia_ai.features.jama_requirement_reviewer.services.review_version_service
     ReviewVersionService,
 )
 from radia_ai.features.jama_requirement_reviewer.services.standards_service import StandardsService
+from radia_ai.features.jama_requirement_reviewer.skillz.service import SkillzService
 from radia_ai.features.jama_requirement_reviewer.standards.registry import StandardsRegistry
+from radia_ai.features.jama_requirement_reviewer.synthesis.recommendation_synthesizer import (
+    RecommendationSynthesizer,
+)
 
 logger = get_logger(__name__)
 
@@ -136,11 +150,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # SharePoint + Standards
     sharepoint_client = SharePointStandardsClient(settings.sharepoint)
 
-    # Jama Connect integration (read-only requirement access)
-    jama_client = JamaClient(settings.jama)
+    # Jama Connect integration. Production requests act as each user's linked Jama
+    # account; the shared service-account client below is used only in local/test.
+    jama_token_cache = JamaTokenCache()
+    app.state.jama_token_cache = jama_token_cache
+    jama_client = JamaClient(settings.jama, token_cache=jama_token_cache)
     app.state.jama_client = jama_client
     app.state.jama_service = JamaService(jama_client)
-    logger.info("jama_service_ready", configured=jama_client.is_configured)
+    logger.info(
+        "jama_service_ready",
+        shared_account_configured=jama_client.is_configured,
+        user_linking_enabled=settings.jama.is_linking_configured,
+    )
 
     # Ingestion service
     ingestion_service = IngestionService(
@@ -179,6 +200,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
     app.state.sharepoint_client = sharepoint_client
 
+    # Skillz rules + final recommendation synthesis
+    app.state.skillz_service = _build_skillz_service(settings, sharepoint_client)
+    app.state.recommendation_synthesizer = RecommendationSynthesizer(
+        openai_client, app.state.skillz_service
+    )
+
     # Note: Auto-sync removed for Vercel serverless compatibility.
     # Use manual ingestion via POST /api/v1/ingest endpoint or UI button instead.
     logger.info("ingestion_service_ready", message="Manual ingestion available via /api/v1/ingest")
@@ -188,6 +215,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         settings,
         app.state.standards_service,
         llm_enhancer,
+        app.state.recommendation_synthesizer,
     )
     app.state.review_version_service = ReviewVersionService(app.state.review_orchestrator)
     app.state.requirement_review_service = RequirementReviewService(app.state.review_orchestrator)
@@ -214,6 +242,7 @@ def _build_review_orchestrator(
     settings: AppSettings,
     standards_service: StandardsService | None = None,
     llm_enhancer: LLMReviewEnhancer | None = None,
+    synthesizer: RecommendationSynthesizer | None = None,
 ) -> ReviewOrchestrator:
     """Construct the LLM-based review orchestrator with registered reviewers."""
     return ReviewOrchestrator(
@@ -222,7 +251,54 @@ def _build_review_orchestrator(
         standards_service=standards_service,
         llm_enhancer=llm_enhancer,
         reviewer_bundle_version="2.0.0",
+        synthesizer=synthesizer,
     )
+
+
+def _build_skillz_service(
+    settings: AppSettings, sharepoint_client: SharePointStandardsClient
+) -> SkillzService:
+    """Skillz rules are read with the SharePoint credentials when they are configured."""
+    source = sharepoint_client if settings.sharepoint.is_configured else None
+    return SkillzService(settings.skillz, source)
+
+
+def get_skillz_service(request: Request) -> SkillzService:
+    """Resolve the Skillz service, building it for cold serverless invocations."""
+    service = getattr(request.app.state, "skillz_service", None)
+    if service is None:
+        settings = _resolve_settings(request.app)
+        sharepoint_client = getattr(
+            request.app.state, "sharepoint_client", None
+        ) or SharePointStandardsClient(settings.sharepoint)
+        service = _build_skillz_service(settings, sharepoint_client)
+        request.app.state.skillz_service = service
+    return cast(SkillzService, service)
+
+
+def get_recommendation_synthesizer(request: Request) -> RecommendationSynthesizer | None:
+    """
+    Resolve the final-recommendation synthesizer.
+
+    Returns None only when the Azure OpenAI client cannot be constructed; the
+    review then still returns its scores and findings without a recommendation.
+    """
+    synthesizer = getattr(request.app.state, "recommendation_synthesizer", None)
+    if synthesizer is not None:
+        return cast(RecommendationSynthesizer, synthesizer)
+
+    settings = _resolve_settings(request.app)
+    try:
+        openai_client = getattr(request.app.state, "openai_client", None) or OpenAIClient(
+            settings.azure_openai
+        )
+    except Exception:
+        logger.exception("recommendation_synthesizer_bootstrap_failed")
+        return None
+    request.app.state.openai_client = openai_client
+    synthesizer = RecommendationSynthesizer(openai_client, get_skillz_service(request))
+    request.app.state.recommendation_synthesizer = synthesizer
+    return synthesizer
 
 
 def get_review_version_service(request: Request) -> ReviewVersionService:
@@ -290,6 +366,7 @@ def get_review_orchestrator(request: Request) -> ReviewOrchestrator:
             settings,
             standards_service,
             get_llm_enhancer(request),
+            get_recommendation_synthesizer(request),
         )
         request.app.state.review_orchestrator = orchestrator
     return orchestrator
@@ -372,16 +449,67 @@ def get_standards_service(request: Request) -> StandardsService:
 StandardsServiceDep = Annotated[StandardsService, Depends(get_standards_service)]
 
 
-def get_jama_service(request: Request) -> JamaService:
-    """Resolve the Jama service from application state, building it lazily if needed."""
+def _get_shared_jama_service(request: Request) -> JamaService:
+    """Resolve the shared service-account Jama service (local development only)."""
     service = getattr(request.app.state, "jama_service", None)
     if service is None:
         settings = _resolve_settings(request.app)
-        client = JamaClient(settings.jama)
+        client = JamaClient(settings.jama, token_cache=get_jama_token_cache(request))
         service = JamaService(client)
         request.app.state.jama_client = client
         request.app.state.jama_service = service
-    return service
+    return cast(JamaService, service)
+
+
+def get_jama_token_cache(request: Request) -> JamaTokenCache:
+    """Process-wide cache of Jama bearer tokens so each request need not re-authenticate."""
+    cache = getattr(request.app.state, "jama_token_cache", None)
+    if cache is None:
+        cache = JamaTokenCache()
+        request.app.state.jama_token_cache = cache
+    return cast(JamaTokenCache, cache)
+
+
+def get_jama_credential_repository(request: Request) -> JamaCredentialRepository | None:
+    """Resolve the encrypted per-user Jama credential store, or None when not configured."""
+    repository = getattr(request.app.state, "jama_credential_repository", None)
+    if repository is not None:
+        return cast(JamaCredentialRepository, repository)
+    settings = _resolve_settings(request.app)
+    if not settings.jama.is_linking_configured:
+        return None
+    blob_client = BlobStorageClient(
+        settings.azure_blob.model_copy(
+            update={"container_name": settings.jama.credential_container_name}
+        )
+    )
+    try:
+        blob_client.ensure_container()
+    except Exception:
+        logger.exception("jama_credential_container_init_failed")
+    repository = JamaCredentialRepository(blob_client, settings.jama.credential_encryption_key)
+    request.app.state.jama_credential_repository = repository
+    return repository
+
+
+def get_jama_account_service(request: Request) -> JamaAccountService:
+    """Resolve the service that links users to their own Jama accounts."""
+    settings = _resolve_settings(request.app)
+    shared = _get_shared_jama_service(request) if settings.allows_shared_jama_account else None
+    return JamaAccountService(
+        settings=settings,
+        repository=get_jama_credential_repository(request),
+        token_cache=get_jama_token_cache(request),
+        shared_service=shared,
+    )
+
+
+JamaAccountServiceDep = Annotated[JamaAccountService, Depends(get_jama_account_service)]
+
+
+def get_jama_service(account_service: JamaAccountServiceDep, user: RadiaUserDep) -> JamaService:
+    """Resolve a Jama service that acts as the signed-in user's linked Jama account."""
+    return account_service.service_for(user)
 
 
 JamaServiceDep = Annotated[JamaService, Depends(get_jama_service)]

@@ -6,6 +6,7 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
+    "dev:local": "vite --mode local-preview",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint src",
@@ -16,6 +17,8 @@
     "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.25.0",
+    "@azure/msal-react": "^5.7.2",
     "@emotion/react": "^11.13.5",
     "@emotion/styled": "^11.13.5",
     "@fontsource/roboto": "^5.1.0",

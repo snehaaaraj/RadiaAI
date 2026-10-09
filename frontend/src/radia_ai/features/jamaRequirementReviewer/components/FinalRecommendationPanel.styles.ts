@@ -1,0 +1,97 @@
+import type { SxProps, Theme } from '@mui/material/styles';
+
+export const finalRecommendationStyles = {
+  paper: {
+    p: 2,
+    borderRadius: 3,
+    border: '2px solid',
+    borderColor: 'primary.main',
+  } satisfies SxProps<Theme>,
+  headerRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 1,
+    flexWrap: 'wrap',
+  } satisfies SxProps<Theme>,
+  textBox: {
+    p: 1.5,
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: 'divider',
+    height: '100%',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  } satisfies SxProps<Theme>,
+  recommendedBox: {
+    p: 1.5,
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: 'primary.main',
+    bgcolor: 'action.hover',
+    height: '100%',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  } satisfies SxProps<Theme>,
+  textBoxHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 1,
+    mb: 0.5,
+  } satisfies SxProps<Theme>,
+  diffAdded: {
+    bgcolor: 'success.light',
+    color: 'success.contrastText',
+    borderRadius: 0.5,
+    px: 0.25,
+  } satisfies SxProps<Theme>,
+  diffRemoved: {
+    bgcolor: 'error.light',
+    color: 'error.contrastText',
+    textDecoration: 'line-through',
+    borderRadius: 0.5,
+    px: 0.25,
+  } satisfies SxProps<Theme>,
+  sectionBox: {
+    p: 1.25,
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: 'divider',
+  } satisfies SxProps<Theme>,
+  conflictBox: {
+    p: 1.25,
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: 'warning.main',
+  } satisfies SxProps<Theme>,
+  conflictSuggestion: {
+    p: 1,
+    borderRadius: 1,
+    borderLeft: '3px solid',
+    borderColor: 'warning.main',
+    bgcolor: 'action.hover',
+  } satisfies SxProps<Theme>,
+  accordion: {
+    boxShadow: 'none',
+    border: '1px solid',
+    borderColor: 'divider',
+    borderRadius: 2,
+    '&:before': { display: 'none' },
+    overflow: 'hidden',
+  } satisfies SxProps<Theme>,
+  evidenceRow: {
+    display: 'flex',
+    alignItems: 'flex-start',
+    gap: 1,
+    width: '100%',
+  } satisfies SxProps<Theme>,
+  ruleChip: {
+    cursor: 'pointer',
+  } satisfies SxProps<Theme>,
+  ruleText: {
+    whiteSpace: 'pre-wrap',
+    fontFamily: 'monospace',
+    fontSize: 13,
+  } satisfies SxProps<Theme>,
+};

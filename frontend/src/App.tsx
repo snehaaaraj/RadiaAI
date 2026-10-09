@@ -1,9 +1,10 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { CssBaseline, ThemeProvider } from '@mui/material';
 import { useMemo, type ReactNode } from 'react';
 import { AppLayout } from '@/components/layout/AppLayout';
+import { AuthGate } from '@/auth/AuthGate';
 import { AppProvider } from '@/context/AppContext';
 import { useAppContext } from '@/context/useAppContext';
 import Landing from '@/pages/Landing';
@@ -43,19 +44,21 @@ export default function App() {
           <BrowserRouter>
             <Routes>
               <Route path={ROUTES.LANDING} element={<Landing />} />
-              <Route path={ROUTES.RADIA_AI_RESOURCES} element={<RadiaResources />} />
-              <Route path={ROUTES.JAMA_ROUNDTRIP} element={<JamaRoundtripHome />} />
-              <Route element={<AppLayout />}>
-                <Route path={ROUTES.HOME} element={<Home />} />
-                <Route path={ROUTES.REVIEW_REQUIREMENT} element={<RequirementReview />} />
-                <Route path={ROUTES.REVIEW_SET} element={<SetReview />} />
-                <Route path={ROUTES.REVIEW_DELTA} element={<DeltaReview />} />
-                <Route path={ROUTES.REVIEW_HISTORY} element={<ReviewHistory />} />
-                <Route path={ROUTES.STANDARDS} element={<Standards />} />
-                <Route path={ROUTES.CHAT} element={<Chat />} />
-                <Route path={ROUTES.SEARCH} element={<Search />} />
-                <Route path={ROUTES.DOCUMENTS} element={<Documents />} />
-                <Route path={ROUTES.SETTINGS} element={<Settings />} />
+              <Route element={<AuthGate><Outlet /></AuthGate>}>
+                <Route path={ROUTES.RADIA_AI_RESOURCES} element={<RadiaResources />} />
+                <Route path={ROUTES.JAMA_ROUNDTRIP} element={<JamaRoundtripHome />} />
+                <Route element={<AppLayout />}>
+                  <Route path={ROUTES.HOME} element={<Home />} />
+                  <Route path={ROUTES.REVIEW_REQUIREMENT} element={<RequirementReview />} />
+                  <Route path={ROUTES.REVIEW_SET} element={<SetReview />} />
+                  <Route path={ROUTES.REVIEW_DELTA} element={<DeltaReview />} />
+                  <Route path={ROUTES.REVIEW_HISTORY} element={<ReviewHistory />} />
+                  <Route path={ROUTES.STANDARDS} element={<Standards />} />
+                  <Route path={ROUTES.CHAT} element={<Chat />} />
+                  <Route path={ROUTES.SEARCH} element={<Search />} />
+                  <Route path={ROUTES.DOCUMENTS} element={<Documents />} />
+                  <Route path={ROUTES.SETTINGS} element={<Settings />} />
+                </Route>
               </Route>
               <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
             </Routes>

@@ -1,10 +1,27 @@
 import apiClient from '@/api/client';
 import type {
   APIResponse,
+  JamaAccountLinkRequest,
+  JamaAccountStatus,
   JamaProjectList,
   JamaRequirement,
   JamaRequirementSearchResult,
 } from '@/types/api';
+
+export async function fetchJamaAccount(): Promise<JamaAccountStatus> {
+  const { data } = await apiClient.get<APIResponse<JamaAccountStatus>>('/jama/account');
+  return data.data;
+}
+
+export async function linkJamaAccount(body: JamaAccountLinkRequest): Promise<JamaAccountStatus> {
+  const { data } = await apiClient.put<APIResponse<JamaAccountStatus>>('/jama/account', body);
+  return data.data;
+}
+
+export async function unlinkJamaAccount(): Promise<JamaAccountStatus> {
+  const { data } = await apiClient.delete<APIResponse<JamaAccountStatus>>('/jama/account');
+  return data.data;
+}
 
 export async function fetchJamaProjects(): Promise<JamaProjectList> {
   const { data } = await apiClient.get<APIResponse<JamaProjectList>>('/jama/projects');

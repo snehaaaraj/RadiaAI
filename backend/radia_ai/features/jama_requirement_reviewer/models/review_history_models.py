@@ -11,6 +11,7 @@ from radia_ai.features.jama_requirement_reviewer.models.review_models import (
     CategoryResult,
     DeltaReviewResponse,
     DeterminismContext,
+    FinalRecommendation,
     RequirementReviewResponse,
     ReviewCompletion,
     ReviewFinding,
@@ -53,6 +54,7 @@ class ApplyFindingDispositionRequest(BaseModel):
     finding_index: int = Field(ge=0)
     disposition: FindingDispositionStatus
     reviewer_comment: str = ""
+    # Ignored by the API: the reviewer is always the authenticated caller.
     reviewer_id: str | None = None
 
 
@@ -63,6 +65,10 @@ class ReviewHistoryEntry(BaseModel):
     workflow: ReviewWorkflow
     subject_id: str | None = None
     created_at: str
+    # Tenant-qualified Entra object id of the user who ran the review. Entries
+    # without an owner predate authentication and are visible to admins only.
+    owner_id: str | None = None
+    owner_name: str | None = None
     overall: ReviewStatus
     completion: ReviewCompletion = Field(default_factory=ReviewCompletion.complete)
     category_results: list[CategoryResult] = Field(default_factory=list)
@@ -71,6 +77,8 @@ class ReviewHistoryEntry(BaseModel):
     dispositions: list[FindingDisposition] = Field(default_factory=list)
     # For delta reviews: map flattened finding index -> requirement_id
     finding_to_requirement_map: dict[int, str] = Field(default_factory=dict)
+    requirement_text: str | None = None
+    final_recommendation: FinalRecommendation | None = None
 
 
 class ReviewHistoryListResponse(BaseModel):
@@ -97,6 +105,8 @@ def create_requirement_history_entry(
         category_results=response.category_results,
         findings=response.findings,
         determinism=response.determinism,
+        requirement_text=response.requirement_text,
+        final_recommendation=response.final_recommendation,
     )
 
 

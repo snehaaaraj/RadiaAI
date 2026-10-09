@@ -6,7 +6,7 @@ mapped into these models by the service layer so the rest of the app never has
 to know Jama's field-id conventions.
 """
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, SecretStr
 
 
 class JamaProject(BaseModel):
@@ -64,3 +64,38 @@ class JamaRequirementSearchResult(BaseModel):
     total: int = 0
     start_at: int = 0
     max_results: int = 0
+
+
+class JamaUserProfile(BaseModel):
+    """The Jama user a set of API credentials authenticates as."""
+
+    id: int
+    username: str = ""
+    email: str = ""
+    display_name: str = ""
+    active: bool = True
+
+
+class JamaAccountLinkRequest(BaseModel):
+    """Personal Jama API credentials submitted by the signed-in user."""
+
+    client_id: str = Field(min_length=1, max_length=256, description="Jama API client ID")
+    client_secret: SecretStr = Field(
+        min_length=1, max_length=512, description="Jama API client secret"
+    )
+
+
+class JamaAccountStatus(BaseModel):
+    """Whether the signed-in user can reach Jama, and as which Jama account."""
+
+    linking_enabled: bool = Field(description="Server is configured for per-user Jama linking")
+    linked: bool = False
+    using_shared_account: bool = Field(
+        default=False, description="Local development only: requests use the shared account"
+    )
+    jama_base_url: str | None = None
+    jama_user_id: int | None = None
+    jama_username: str | None = None
+    jama_email: str | None = None
+    jama_display_name: str | None = None
+    linked_at: str | None = None

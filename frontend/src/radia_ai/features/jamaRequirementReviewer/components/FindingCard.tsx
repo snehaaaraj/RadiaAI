@@ -42,6 +42,11 @@ interface FindingCardProps {
   onApplyDisposition?: (reviewId: string, payload: ApplyFindingDispositionRequest) => void;
   isApplyingDisposition?: boolean;
   readOnly?: boolean;
+  /**
+   * Render as supporting evidence for a final recommendation: the per-finding
+   * rewrite is labelled as an individual suggestion rather than a changeset.
+   */
+  evidenceMode?: boolean;
 }
 
 export function FindingCard({
@@ -52,6 +57,7 @@ export function FindingCard({
   onApplyDisposition,
   isApplyingDisposition = false,
   readOnly = false,
+  evidenceMode = false,
 }: FindingCardProps) {
   const [selectedDisposition, setSelectedDisposition] = useState<FindingDispositionStatus | ''>(
     disposition?.disposition ?? ''
@@ -86,7 +92,7 @@ export function FindingCard({
             <Chip label={finding.category} size="small" color="primary" variant="outlined" />
             <Chip label={finding.severity} size="small" color={SEVERITY_COLOR[finding.severity]} />
             <Typography variant="subtitle2" fontWeight={800}>
-              Change {index + 1}
+              {evidenceMode ? `Suggestion ${finding.finding_id ?? index + 1}` : `Change ${index + 1}`}
             </Typography>
           </Stack>
           <Stack
@@ -175,7 +181,7 @@ export function FindingCard({
                   <Box>
                     <Box sx={findingCardStyles.changesetHeaderRow}>
                       <Typography variant="overline" color="primary" fontWeight={700}>
-                        Changeset
+                        {evidenceMode ? 'Original suggestion' : 'Changeset'}
                       </Typography>
                       <Tooltip title={copied ? 'Copied!' : 'Copy to clipboard'} placement="top">
                         <Button
@@ -196,7 +202,9 @@ export function FindingCard({
                       </Typography>
                     </Box>
                     <Typography variant="caption" color="text.secondary" sx={findingCardStyles.changesetCaption}>
-                      Applying this suggestion and re-running the review should result in this finding passing.
+                      {evidenceMode
+                        ? 'This individual suggestion fixes only this finding. The final recommendation combines every valid suggestion.'
+                        : 'Applying this suggestion and re-running the review should result in this finding passing.'}
                     </Typography>
                   </Box>
                 </>
