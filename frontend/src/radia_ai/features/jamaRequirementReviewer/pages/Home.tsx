@@ -47,7 +47,11 @@ const QUICK_ACTIONS = [
 export default function Home() {
   const navigate = useNavigate();
   const { data: health, isLoading } = useHealth();
-  const { data: ingestionStatus } = useIngestionStatus();
+  const {
+    data: ingestionStatus,
+    isLoading: isIngestionStatusLoading,
+    isError: isIngestionStatusError,
+  } = useIngestionStatus();
   const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
 
@@ -88,17 +92,37 @@ export default function Home() {
               variant="outlined"
             />
           )}
-          {ingestionStatus?.timestamp && (
-            <Chip
-              icon={ingestionStatus.outcome === 'error' ? <ErrorOutlineIcon /> : <SyncIcon />}
-              label={`Last ingested ${formatRelativeTime(ingestionStatus.timestamp)} - ${
-                ingestionStatus.trigger === 'webhook' ? 'auto (SharePoint change)' : 'manual'
-              } - ${ingestionStatus.outcome === 'error' ? 'failed' : `${ingestionStatus.processed} updated`}`}
-              color={ingestionStatus.outcome === 'error' ? 'error' : 'success'}
-              size="small"
-              variant="outlined"
-            />
-          )}
+          <Chip
+            icon={
+              ingestionStatus?.outcome === 'error' || isIngestionStatusError
+                ? <ErrorOutlineIcon />
+                : <SyncIcon />
+            }
+            label={
+              ingestionStatus?.timestamp
+                ? `Last ingested ${formatRelativeTime(ingestionStatus.timestamp)} - ${
+                    ingestionStatus.trigger === 'webhook' ? 'auto (SharePoint change)' : 'manual'
+                  } - ${
+                    ingestionStatus.outcome === 'error'
+                      ? 'failed'
+                      : `${ingestionStatus.processed} updated`
+                  }`
+                : isIngestionStatusLoading
+                  ? 'Last ingested: checking status...'
+                  : isIngestionStatusError
+                    ? 'Last ingested: status unavailable'
+                    : 'Last ingested: no runs recorded'
+            }
+            color={
+              ingestionStatus?.outcome === 'error' || isIngestionStatusError
+                ? 'error'
+                : ingestionStatus?.timestamp
+                  ? 'success'
+                  : 'default'
+            }
+            size="small"
+            variant="outlined"
+          />
         </Box>
       </motion.div>
 

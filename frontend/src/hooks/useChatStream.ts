@@ -103,6 +103,7 @@ export function useChatStream() {
       setStreamingText('');
 
       const finishWithError = (message: string) => {
+        if (controller.signal.aborted) return;
         stopReveal();
         pendingTextRef.current = '';
         pendingTerminalRef.current = null;
@@ -115,14 +116,17 @@ export function useChatStream() {
         request,
         {
           onDelta: (text) => {
+            if (controller.signal.aborted) return;
             pendingTextRef.current += text;
             ensureRevealing();
           },
           onDone: (data) => {
+            if (controller.signal.aborted) return;
             pendingTerminalRef.current = { kind: 'done', data };
             ensureRevealing();
           },
           onNoAnswer: (data) => {
+            if (controller.signal.aborted) return;
             pendingTerminalRef.current = { kind: 'no_answer', data };
             ensureRevealing();
           },

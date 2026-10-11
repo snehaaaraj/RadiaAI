@@ -14,8 +14,7 @@ Roles are Entra *app roles* defined on the API app registration and assigned to
 users or groups in Enterprise Applications:
 
   - ``Radia.User``           use the app: chat, search, standards, reviews, Jama
-  - ``Radia.DocumentAdmin``  plus ingestion management and indexed-document deletion
-  - ``Radia.Admin``          everything, including all users' review history
+  - ``Radia.Admin``          everything, including document management and all users' review history
 """
 
 from __future__ import annotations
@@ -59,13 +58,11 @@ class Role(StrEnum):
     """Radia app roles (the ``value`` of each app role on the API app registration)."""
 
     USER = "Radia.User"
-    DOCUMENT_ADMIN = "Radia.DocumentAdmin"
     ADMIN = "Radia.Admin"
 
 
 _ROLE_IMPLICATIONS: dict[str, frozenset[str]] = {
-    Role.ADMIN: frozenset({Role.ADMIN, Role.DOCUMENT_ADMIN, Role.USER}),
-    Role.DOCUMENT_ADMIN: frozenset({Role.DOCUMENT_ADMIN, Role.USER}),
+    Role.ADMIN: frozenset({Role.ADMIN, Role.USER}),
     Role.USER: frozenset({Role.USER}),
 }
 
@@ -358,10 +355,8 @@ def require_roles(*roles: Role) -> Callable[[AuthenticatedUser], AuthenticatedUs
 
 
 require_user = require_roles(Role.USER)
-require_document_admin = require_roles(Role.DOCUMENT_ADMIN)
 require_admin = require_roles(Role.ADMIN)
 
 CurrentUserDep = Annotated[AuthenticatedUser, Depends(get_current_user)]
 RadiaUserDep = Annotated[AuthenticatedUser, Depends(require_user)]
-DocumentAdminDep = Annotated[AuthenticatedUser, Depends(require_document_admin)]
 AdminDep = Annotated[AuthenticatedUser, Depends(require_admin)]

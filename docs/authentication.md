@@ -74,8 +74,32 @@ Users and groups*.
 | App role value        | Grants                                                                                   |
 |-----------------------|------------------------------------------------------------------------------------------|
 | `Radia.User`          | Chat, search, standards, documents (read), run reviews, own review history, own Jama link |
-| `Radia.DocumentAdmin` | `Radia.User` plus ingestion trigger/upload/job status, webhook re-subscribe, delete indexed documents |
-| `Radia.Admin`         | Everything, including every user's review history and dispositions                       |
+| `Radia.Admin`         | `Radia.User` plus ingestion trigger/upload/job status, webhook re-subscribe, delete indexed documents, every user's review history and dispositions |
+
+These are the only two allocation types. The profile menu shows one **Admin**
+or **User** tag, even though Admin also inherits User permissions.
+
+Assign `Radia.Admin` to anyone who needs document-management permissions;
+assign `Radia.User` for read-only document access and running reviews.
+
+### User-specific history
+
+- The API records the verified tenant and object ID as the owner of each
+  requirement or delta review. Users see only their own reviews; Admin sees
+  all users' reviews by default (or only their own with `mine_only=true`).
+  Admin also sees a **Run by** label on each review with the runner's saved
+  name; older entries without a name show **Unknown user**. This label is
+  not displayed to Users.
+- The full chat page and floating chat pop-up persist separate conversations
+  in browser localStorage, keyed by the API-verified tenant and object ID.
+  Admin has no special access to anyone else's chats. Conversations survive
+  navigation and reloads in that browser; they are not synchronized across
+  browsers or devices.
+- The previous unscoped pop-up history is not imported, because its owner
+  cannot be verified.
+- Switching accounts remounts the authenticated app with a fresh query cache,
+  clearing displayed state and cancelling mounted chat streams. Protected
+  content is shown only after the API verifies the current account.
 
 A signed-in user with no Radia role gets `403` (`ENTRA_REQUIRE_APP_ROLE=true`).
 For a second layer, also set **Assignment required = Yes** on the enterprise
@@ -90,7 +114,7 @@ application.
 | `GET /auth/me`                             | `Radia.User`                                  |
 | `/chat`, `/search`, `/standards`, `/documents` (GET), `/review/*`, `/ingest/status` | `Radia.User` |
 | `/jama/*` (including `/jama/account`)      | `Radia.User` + the user's own linked Jama account |
-| `POST /ingest`, `/ingest/upload`, `GET /ingest/jobs/{id}`, `POST /ingest/webhook/subscribe`, `DELETE /documents/{id}` | `Radia.DocumentAdmin` |
+| `POST /ingest`, `/ingest/upload`, `GET /ingest/jobs/{id}`, `POST /ingest/webhook/subscribe`, `DELETE /documents/{id}` | `Radia.Admin` |
 | `GET /review/history` (all users)          | `Radia.Admin`; others only see their own      |
 
 Protection is applied when routers are mounted in
@@ -105,7 +129,7 @@ Create **two app registrations** in the company tenant.
 
 1. *Expose an API*: set the Application ID URI to `api://<api-client-id>` and
    add the delegated scope **`access_as_user`** (admins and users can consent).
-2. *App roles*: create `Radia.User`, `Radia.DocumentAdmin`, and `Radia.Admin`
+2. *App roles*: create `Radia.User` and `Radia.Admin`
    (allowed member types: Users/Groups).
 3. *Manifest*: set `"requestedAccessTokenVersion": 2` (v1 tokens are accepted
    too).

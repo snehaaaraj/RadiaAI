@@ -9,6 +9,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import SendIcon from '@mui/icons-material/Send';
 import BoltIcon from '@mui/icons-material/Bolt';
 import { useChatStream } from '@/hooks/useChatStream';
+import { useChatHistory } from '@/hooks/useChatHistory';
 import type { ChatMessage } from '@/types/api';
 
 interface ConversationTurn {
@@ -18,7 +19,7 @@ interface ConversationTurn {
 
 export default function Chat() {
   const [input, setInput] = useState('');
-  const [history, setHistory] = useState<ConversationTurn[]>([]);
+  const { history, setHistory } = useChatHistory('page');
   const endRef = useRef<HTMLDivElement>(null);
   const { isStreaming, streamingText, sendMessage } = useChatStream();
 

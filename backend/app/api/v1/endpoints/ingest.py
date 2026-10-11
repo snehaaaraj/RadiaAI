@@ -4,7 +4,7 @@ Ingestion endpoint - trigger document ingestion into Azure AI Search.
 Endpoints are split across three routers so each gets the right protection when
 mounted in ``app.api.v1.router``:
 
-``router`` - ingestion management, requires ``Radia.DocumentAdmin``:
+``router`` - ingestion management, requires ``Radia.Admin``:
     POST /api/v1/ingest                   - trigger blob or sharepoint ingestion
     POST /api/v1/ingest/upload            - upload a single document for ingestion
     GET  /api/v1/ingest/jobs/{job_id}     - per-job progress

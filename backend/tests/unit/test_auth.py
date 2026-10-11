@@ -32,7 +32,6 @@ TENANT = "11111111-1111-1111-1111-111111111111"
 CLIENT = "22222222-2222-2222-2222-222222222222"
 
 USER = ["Radia.User"]
-DOC_ADMIN = ["Radia.DocumentAdmin"]
 ADMIN = ["Radia.Admin"]
 
 
@@ -221,8 +220,8 @@ def test_cached_keys_survive_refresh_failure(entra_tokens) -> None:
 
 @pytest.mark.unit
 def test_role_hierarchy() -> None:
-    assert expand_roles([Role.ADMIN]) == {Role.ADMIN, Role.DOCUMENT_ADMIN, Role.USER}
-    assert expand_roles([Role.DOCUMENT_ADMIN]) == {Role.DOCUMENT_ADMIN, Role.USER}
+    assert set(Role) == {Role.ADMIN, Role.USER}
+    assert expand_roles([Role.ADMIN]) == {Role.ADMIN, Role.USER}
     assert expand_roles([Role.USER]) == {Role.USER}
     assert expand_roles(["Something.Else"]) == {"Something.Else"}
 
@@ -272,7 +271,7 @@ PROTECTED_USER_ROUTES = [
     ("GET", "/api/v1/ingest/status"),
 ]
 
-DOCUMENT_ADMIN_ROUTES = [
+ADMIN_ROUTES = [
     ("POST", "/api/v1/ingest"),
     ("POST", "/api/v1/ingest/upload"),
     ("GET", f"/api/v1/ingest/jobs/{uuid4()}"),
@@ -282,7 +281,7 @@ DOCUMENT_ADMIN_ROUTES = [
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(("method", "path"), PROTECTED_USER_ROUTES + DOCUMENT_ADMIN_ROUTES)
+@pytest.mark.parametrize(("method", "path"), PROTECTED_USER_ROUTES + ADMIN_ROUTES)
 def test_protected_routes_require_a_token(
     secured_client: TestClient, method: str, path: str
 ) -> None:
@@ -331,19 +330,21 @@ def test_app_only_tokens_are_rejected_by_default(secured_client: TestClient, ent
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("roles", [USER, ADMIN])
 def test_me_returns_verified_identity_and_effective_roles(
-    secured_client: TestClient, entra_tokens
+    secured_client: TestClient, entra_tokens, roles: list[str]
 ) -> None:
-    response = secured_client.get("/api/v1/auth/me", headers=entra_tokens.headers(roles=DOC_ADMIN))
+    response = secured_client.get("/api/v1/auth/me", headers=entra_tokens.headers(roles=roles))
 
     assert response.status_code == 200
     data = response.json()["data"]
     assert data["user_id"] == "user-alice"
+    assert data["tenant_id"] == TENANT
     assert data["email"] == "alice@radia.example"
     assert data["auth_method"] == "entra"
-    assert data["roles"] == ["Radia.DocumentAdmin", "Radia.User"]
-    assert data["can_manage_documents"] is True
-    assert data["is_admin"] is False
+    assert data["roles"] == (["Radia.Admin", "Radia.User"] if roles == ADMIN else USER)
+    assert data["can_manage_documents"] is (roles == ADMIN)
+    assert data["is_admin"] is (roles == ADMIN)
 
 
 @pytest.mark.unit
@@ -354,21 +355,28 @@ def test_radia_user_can_use_the_app(secured_client: TestClient, entra_tokens) ->
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize(("method", "path"), DOCUMENT_ADMIN_ROUTES)
-def test_ingestion_management_requires_document_admin(
-    secured_client: TestClient, entra_tokens, method: str, path: str
+@pytest.mark.parametrize(("method", "path"), ADMIN_ROUTES)
+@pytest.mark.parametrize("roles", [USER, ["Radia.User", "Unrecognized.Role"]])
+def test_document_management_requires_admin(
+    secured_client: TestClient, entra_tokens, method: str, path: str, roles: list[str]
 ) -> None:
-    response = secured_client.request(method, path, headers=entra_tokens.headers(roles=USER))
+    response = secured_client.request(method, path, headers=entra_tokens.headers(roles=roles))
 
     assert response.status_code == 403
-    assert "Radia.DocumentAdmin" in response.json()["error"]["detail"]["required_roles"]
+    assert "Radia.Admin" in response.json()["error"]["detail"]["required_roles"]
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("roles", [DOC_ADMIN, ADMIN])
-def test_document_admins_pass_ingestion_authorization(
-    secured_client: TestClient, entra_tokens, roles: list[str]
-) -> None:
+def test_unrecognized_role_does_not_grant_access(secured_client: TestClient, entra_tokens) -> None:
+    response = secured_client.get(
+        "/api/v1/auth/me", headers=entra_tokens.headers(roles=["Unrecognized.Role"])
+    )
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+
+
+@pytest.mark.unit
+def test_admins_pass_ingestion_authorization(secured_client: TestClient, entra_tokens) -> None:
     from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
         get_ingestion_job_store,
     )
@@ -377,7 +385,7 @@ def test_document_admins_pass_ingestion_authorization(
     app.dependency_overrides[get_ingestion_job_store] = _RecordingJobStore
     try:
         response = secured_client.post(
-            "/api/v1/ingest", json={"source": "blob"}, headers=entra_tokens.headers(roles=roles)
+            "/api/v1/ingest", json={"source": "blob"}, headers=entra_tokens.headers(roles=ADMIN)
         )
     finally:
         app.dependency_overrides.pop(get_ingestion_job_store, None)
@@ -506,14 +514,54 @@ def test_review_history_is_private_to_its_owner(secured_client: TestClient, entr
 @pytest.mark.unit
 def test_admin_sees_every_users_review_history(secured_client: TestClient, entra_tokens) -> None:
     alice = entra_tokens.headers(oid="user-alice")
+    bob = entra_tokens.headers(oid="user-bob", email="bob@radia.example")
     admin = entra_tokens.headers(oid="user-admin", email="admin@radia.example", roles=ADMIN)
     alice_review = _run_review(secured_client, alice, "REQ-ALICE")
+    bob_review = _run_review(secured_client, bob, "REQ-BOB")
+    admin_review = _run_review(secured_client, admin, "REQ-ADMIN")
 
     everyone = secured_client.get("/api/v1/review/history", headers=admin).json()["data"]
     mine = secured_client.get("/api/v1/review/history?mine_only=true", headers=admin).json()["data"]
 
-    assert alice_review in [e["review_id"] for e in everyone["entries"]]
-    assert mine["entries"] == []
+    assert {e["review_id"] for e in everyone["entries"]} == {alice_review, bob_review, admin_review}
+    assert [e["review_id"] for e in mine["entries"]] == [admin_review]
+
+
+@pytest.mark.unit
+def test_user_cannot_request_all_users_history(secured_client: TestClient, entra_tokens) -> None:
+    alice = entra_tokens.headers(oid="user-alice")
+    bob = entra_tokens.headers(oid="user-bob", email="bob@radia.example")
+    alice_review = _run_review(secured_client, alice, "REQ-ALICE")
+    _run_review(secured_client, bob, "REQ-BOB")
+
+    response = secured_client.get("/api/v1/review/history?mine_only=false", headers=alice)
+
+    assert response.status_code == 200
+    assert [e["review_id"] for e in response.json()["data"]["entries"]] == [alice_review]
+
+
+@pytest.mark.unit
+def test_delta_history_is_private_to_its_owner(secured_client: TestClient, entra_tokens) -> None:
+    alice = entra_tokens.headers(oid="user-alice")
+    bob = entra_tokens.headers(oid="user-bob", email="bob@radia.example")
+    admin = entra_tokens.headers(oid="user-admin", roles=ADMIN)
+    response = secured_client.post(
+        "/api/v1/review/delta",
+        json={
+            "specification_id": "SPEC-ALICE",
+            "baseline_requirements": [],
+            "updated_requirements": [
+                {"requirement_id": "REQ-1", "text": "The system shall respond within 1 second."}
+            ],
+        },
+        headers=alice,
+    )
+    assert response.status_code == 200
+    review_id = response.json()["data"]["review_id"]
+    for headers, expected in [(alice, [review_id]), (bob, []), (admin, [review_id])]:
+        history = secured_client.get("/api/v1/review/history?workflow=delta", headers=headers)
+        assert history.status_code == 200
+        assert [e["review_id"] for e in history.json()["data"]["entries"]] == expected
 
 
 @pytest.mark.unit
