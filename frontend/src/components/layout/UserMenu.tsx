@@ -58,9 +58,7 @@ export function UserMenu({ buttonSx, onNavigate }: UserMenuProps) {
             </Typography>
           </Stack>
           <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
-            {user.roles.map((role) => (
-              <Chip key={role} label={role.replace('Radia.', '')} size="small" />
-            ))}
+            <Chip label={user.is_admin ? 'Admin' : 'User'} size="small" />
             {user.auth_method === 'local' && (
               <Chip label="Local dev" size="small" color="warning" variant="outlined" />
             )}

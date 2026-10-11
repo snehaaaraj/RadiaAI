@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 
 from app.core.exceptions import DocumentNotFoundError
 from app.core.logging import get_logger
-from app.core.security import require_document_admin
+from app.core.security import require_admin
 from app.schemas.common import APIResponse, PaginatedResponse
 from app.schemas.documents import (
     DocumentDeleteResponse,
@@ -95,7 +95,7 @@ async def get_document(
     response_model=DocumentDeleteResponse,
     summary="Delete an indexed document",
     status_code=status.HTTP_200_OK,
-    dependencies=[Depends(require_document_admin)],
+    dependencies=[Depends(require_admin)],
 )
 async def delete_document(
     document_id: str,

@@ -546,6 +546,7 @@ export interface JamaAccountLinkRequest {
 
 export interface CurrentUser {
   user_id: string;
+  tenant_id: string;
   email: string;
   display_name: string;
   auth_method: 'entra' | 'local';

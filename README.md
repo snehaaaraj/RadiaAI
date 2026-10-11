@@ -398,14 +398,14 @@ app role unless noted. See [docs/authentication.md](./docs/authentication.md).
 | GET / PUT / DELETE | `/api/v1/jama/account` | Status / link / unlink the caller's own Jama account |
 | GET | `/api/v1/jama/projects`, `/jama/requirements`, `/jama/requirements/{id}` | Jama access as the caller's linked Jama account |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
-| POST | `/api/v1/ingest` | **`Radia.DocumentAdmin`.** Trigger document ingestion (blob or SharePoint) |
-| POST | `/api/v1/ingest/upload` | **`Radia.DocumentAdmin`.** Upload and ingest a single document file |
+| POST | `/api/v1/ingest` | **`Radia.Admin`.** Trigger document ingestion (blob or SharePoint) |
+| POST | `/api/v1/ingest/upload` | **`Radia.Admin`.** Upload and ingest a single document file |
 | GET | `/api/v1/ingest/status` | Outcome of the most recent ingestion run (manual or webhook) |
-| GET | `/api/v1/ingest/jobs/{job_id}` | **`Radia.DocumentAdmin`.** Durable status and failure details for one ingestion job |
+| GET | `/api/v1/ingest/jobs/{job_id}` | **`Radia.Admin`.** Durable status and failure details for one ingestion job |
 | POST | `/api/v1/ingest/webhook` | **Public; validated by Graph `clientState`.** Microsoft Graph change-notification receiver (auto-ingestion) |
-| POST | `/api/v1/ingest/webhook/subscribe` | **`Radia.DocumentAdmin`.** Manually (re)create the SharePoint webhook subscription |
+| POST | `/api/v1/ingest/webhook/subscribe` | **`Radia.Admin`.** Manually (re)create the SharePoint webhook subscription |
 | GET | `/api/v1/documents` | List indexed documents |
-| DELETE | `/api/v1/documents/{id}` | **`Radia.DocumentAdmin`.** Delete an indexed document (source file untouched) |
+| DELETE | `/api/v1/documents/{id}` | **`Radia.Admin`.** Delete an indexed document (source file untouched) |
 | POST | `/api/v1/chat` | RAG question answering |
 
 Interactive docs available at `/api/docs` (non-production environments).

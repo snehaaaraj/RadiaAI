@@ -246,7 +246,7 @@ export function Sidebar() {
         })}
       >
         <Typography variant="caption" color="text.secondary" noWrap>
-          v0.1.0 - Phase 3
+          v0.1.0 - Phase 4
         </Typography>
       </Box>
     </Box>

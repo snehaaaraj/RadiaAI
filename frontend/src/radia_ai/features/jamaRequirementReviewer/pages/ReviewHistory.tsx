@@ -14,6 +14,7 @@ import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementRevie
 import { ReviewQualityBand } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewQualityBand';
 import { ReviewStatusChip } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewStatusChip';
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useReviewHistory } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import type { FindingDispositionStatus, ReviewWorkflow } from '@/types/api';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
@@ -37,6 +38,7 @@ const DISPOSITION_OPTIONS: Array<{ label: string; value: FindingDispositionStatu
 const PAGE_SIZE = 10;
 
 export default function ReviewHistory() {
+  const { data: currentUser } = useCurrentUser();
   const [workflow, setWorkflow] = useState<ReviewWorkflow | 'all'>('all');
   const [dispositionFilter, setDispositionFilter] = useState<FindingDispositionStatus | 'all'>('all');
   const [page, setPage] = useState(1);
@@ -133,6 +135,11 @@ export default function ReviewHistory() {
                   Workflow: {entry.workflow} • Subject: {entry.subject_id ?? 'N/A'} •{' '}
                   {new Date(entry.created_at).toLocaleString()}
                 </Typography>
+                {currentUser?.is_admin && (
+                  <Typography variant="body2" color="text.secondary">
+                    Run by: {entry.owner_name?.trim() || 'Unknown user'}
+                  </Typography>
+                )}
                 {isReviewIncomplete(entry.completion) && (
                   <ReviewIncompleteNotice completion={entry.completion} />
                 )}
