@@ -38,7 +38,7 @@ Updated exception classes with structured context:
 - Context-aware suggestions based on error code
 
 #### 2. Updated Pages
-- **RequirementReview**: Now uses `ErrorDisplay` component with retry functionality
+- **RequirementReview** and **SetReview**: Use `ErrorDisplay` with retry functionality
 
 ## Error Information Structure
 
@@ -119,15 +119,15 @@ except Exception as e:
 )}
 ```
 
-## Next Steps
+## Remaining follow-up ideas
 
-To fully implement error handling across the application:
+The items below are follow-up ideas, not claims that the shared error-handling
+work is complete across every application surface:
 
-1. **Update remaining Azure clients** (SearchService, BlobStorageClient)
-2. **Add error handling to ingestion service** with stage tracking
-3. **Update all frontend pages** to use ErrorDisplay
-4. **Add error boundaries** for React component crashes
-5. **Implement error analytics** to track common failures
+1. Review remaining service/client paths for consistent structured context.
+2. Extend `ErrorDisplay` to additional user-facing flows where a retry is useful.
+3. Consider React error boundaries for component-render failures.
+4. Consider error analytics for tracking common failures.
 
 ## Testing
 

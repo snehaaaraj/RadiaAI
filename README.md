@@ -301,14 +301,24 @@ button, so there's always a single place to check ingestion health.
       review has already been revised
 - [x] Read-only findings explaining what a category still leaves unmet
 
+### Set review workflow
+
+- [x] Parse a PDF containing multiple requirements and review each requirement
+      independently
+- [x] Show each requirement's score, findings, evidence, and final recommendation
+- [x] Report partial completion when only some requirements could be reviewed
+
 ### Document ingestion
 
 - [x] On-demand sync from SharePoint via `POST /api/v1/ingest`
 - [x] Automatic sync via optional Microsoft Graph webhook when SharePoint documents change
 - [x] Manual upload via API endpoint
 - [x] File-hash deduplication (skip unchanged)
-- [x] PDF, TXT extraction
+- [x] PDF, DOCX, TXT, MD, CSV, JSON, and XML text extraction
 - [x] Hybrid search (keyword + vector + semantic)
+- [x] Paginated document inventory, document details with indexed chunks, and
+      administrator-only removal of indexed content (source files are unchanged)
+- [x] Grounded chat with citations, including streamed answers
 
 ---
 
@@ -316,7 +326,7 @@ button, so there's always a single place to check ingestion health.
 
 ### Prerequisites
 
-- Node.js 20+ (for local frontend development)
+- Node.js 22.13+ or 24+ (for local frontend development; see `frontend/package.json`)
 - Python 3.12+ (for local backend development)
 - Azure subscription with: Azure OpenAI (GPT-5 + text-embedding-3-large), Azure AI Search, Azure Blob Storage
 
@@ -350,18 +360,29 @@ returns `no_standards_context` instead of findings.
 
 ### 3. Local frontend development
 
+Use Node.js 24 (recommended), or Node.js 22.13 or newer within the 22.x release
+line. Node.js 20 is not supported by the current PDF dependency.
+
 ```bash
 cd frontend
-npm install
+npm ci --include=dev
 npm run start
       # starts Vite dev server on :5173, proxies /api to :8000
 ```
+
+Run npm commands inside `frontend`; the repository root is not an npm package.
+`npm ci` installs the versions recorded in `frontend/package-lock.json`.
+`npm install` (or `npm i`) also installs the declared dependencies, but may update
+the lockfile within the version ranges in `frontend/package.json`. Commit both
+files when changing dependencies. Build, lint, and test commands require the
+development dependencies; do not omit them before building.
 
 ### 4. Frontend deployment to Vercel (temporary production path)
 
 This repository is configured to deploy the frontend from the repo root using [vercel.json](./vercel.json).
 
 1. Import this repo into Vercel (or run `vercel` from the repo root)
+   - Select Node.js 24.x in the project's build settings.
 2. Add `VITE_API_BASE_URL` in Vercel Project Settings → Environment Variables
    - Value format: `https://<your-azure-backend>.azurewebsites.net/api/v1`
    - Also add `VITE_ENTRA_CLIENT_ID`, `VITE_ENTRA_TENANT_ID`, and `VITE_ENTRA_API_SCOPE`
@@ -398,6 +419,7 @@ app role unless noted. See [docs/authentication.md](./docs/authentication.md).
 | GET / PUT / DELETE | `/api/v1/jama/account` | Status / link / unlink the caller's own Jama account |
 | GET | `/api/v1/jama/projects`, `/jama/requirements`, `/jama/requirements/{id}` | Jama access as the caller's linked Jama account |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
+| POST | `/api/v1/chat/stream` | Stream grounded RAG answers over server-sent events |
 | POST | `/api/v1/ingest` | **`Radia.Admin`.** Trigger document ingestion (blob or SharePoint) |
 | POST | `/api/v1/ingest/upload` | **`Radia.Admin`.** Upload and ingest a single document file |
 | GET | `/api/v1/ingest/status` | Outcome of the most recent ingestion run (manual or webhook) |
@@ -405,6 +427,7 @@ app role unless noted. See [docs/authentication.md](./docs/authentication.md).
 | POST | `/api/v1/ingest/webhook` | **Public; validated by Graph `clientState`.** Microsoft Graph change-notification receiver (auto-ingestion) |
 | POST | `/api/v1/ingest/webhook/subscribe` | **`Radia.Admin`.** Manually (re)create the SharePoint webhook subscription |
 | GET | `/api/v1/documents` | List indexed documents |
+| GET | `/api/v1/documents/{id}` | Get document metadata and its indexed chunks |
 | DELETE | `/api/v1/documents/{id}` | **`Radia.Admin`.** Delete an indexed document (source file untouched) |
 | POST | `/api/v1/chat` | RAG question answering |
 

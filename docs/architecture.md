@@ -60,13 +60,15 @@ The frontend is a single-page application built with React and TypeScript.
 - `/radia-ai` - Radia AI Resources
 - `/workspace` - Main application workspace
 - `/review/requirement` - Single requirement review
+- `/review/set` - Review multiple requirements parsed from a PDF
 - `/review/delta` - Delta review
 - `/review/history` - Review history
 - `/standards` - Standards catalog
 - `/chat` - Document Q&A
 - `/search` - Search
-- `/documents` - Documents
-- `/settings` - Personalization controls
+- `/documents` - Indexed document inventory and details
+- `/settings` - Personalization, Jama account linking, and document ingestion controls
+- `/jama-roundtrip` - Jama roundtrip feature entry point (currently a placeholder)
 
 ### Frontend behavior
 
@@ -76,6 +78,9 @@ The frontend is a single-page application built with React and TypeScript.
 - Review state preserved across navigation
 - Clear review actions to reset stored review state
 - Result presentation focused on score, category breakdown, one final recommended requirement, and expandable supporting evidence
+- Set review presents results independently for each parsed requirement and reports partial completion
+- Chat supports streamed responses as well as the standard response endpoint
+- Settings include per-user Jama account linking and role-gated SharePoint ingestion
 
 ## 4. Backend architecture
 
@@ -416,7 +421,13 @@ The target architecture includes these document-centric workflows:
 - chat over indexed content
 - document search (keyword / vector / hybrid)
 - document ingestion (SharePoint or uploaded file)
-- document listing
+- paginated document listing and document detail with indexed chunks
+- administrator-only deletion of indexed content (the original source file is not changed)
+
+The chat page supports both a standard response and a server-sent-events streaming
+response. Both use retrieval-grounded answers and return citations; the server
+returns a fixed no-answer response when the indexed content does not support an
+answer.
 
 Ingestion extracts text, chunks it, embeds it with `text-embedding-3-large`, and
 indexes it into Azure AI Search. File hashes are recorded so unchanged documents
@@ -466,8 +477,8 @@ The project supports:
 | Review history | Implemented | Persists review history and dispositions in Azure Blob Storage. |
 | Document ingestion and search | Implemented | Supports SharePoint and file-upload ingestion, chunking, embedding, and keyword/vector/hybrid search. |
 | Chat over indexed documents | Implemented | Provides grounded RAG responses, citations, streaming, no-answer behavior, and search-failure handling. |
-| Document listing and document management | Planned | `GET /api/v1/documents` currently returns an empty placeholder response; document detail and deletion are not implemented. |
-| Document-oriented workflows | In progress | Ingestion, search, and chat are available; document inventory and management workflows remain incomplete. |
+| Document inventory and management | Implemented | `GET /api/v1/documents` supports paging, filtering, and sorting; `GET /api/v1/documents/{id}` returns metadata and chunks; Admin can delete indexed content without changing the source file. |
+| Document-oriented workflows | Implemented | SharePoint/file ingestion, search, standard and streamed chat, document inventory, detail, and administrator-only indexed-content deletion are available. |
 | Dependency health probes | Implemented | `GET /health/live` is a lightweight process check; `GET /health/ready` (and the legacy `GET /health` alias) performs bounded, cached, real connectivity probes against Azure OpenAI, Azure AI Search, and Blob Storage (required) plus SharePoint and Jama (optional-but-configured), returning HTTP 503 only when a required dependency is down. |
 | Microsoft Entra ID authentication and authorization | Implemented | SPA sign-in with MSAL; API validates Entra access tokens (RS256/JWKS, issuer, audience, expiry, tenant, scope) and enforces `Radia.User` / `Radia.Admin` app roles on every non-public endpoint. Local/test environments may use a synthetic user; deployed environments fail closed. See [authentication.md](./authentication.md). |
 | Per-user Jama access | Implemented | Each user links their own Jama API credentials (encrypted at rest); all Jama calls run as that user so Jama enforces their project permissions. Review history is private per user. |
