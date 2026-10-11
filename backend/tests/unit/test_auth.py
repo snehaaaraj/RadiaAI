@@ -367,9 +367,7 @@ def test_document_management_requires_admin(
 
 
 @pytest.mark.unit
-def test_unrecognized_role_does_not_grant_access(
-    secured_client: TestClient, entra_tokens
-) -> None:
+def test_unrecognized_role_does_not_grant_access(secured_client: TestClient, entra_tokens) -> None:
     response = secured_client.get(
         "/api/v1/auth/me", headers=entra_tokens.headers(roles=["Unrecognized.Role"])
     )
@@ -378,9 +376,7 @@ def test_unrecognized_role_does_not_grant_access(
 
 
 @pytest.mark.unit
-def test_admins_pass_ingestion_authorization(
-    secured_client: TestClient, entra_tokens
-) -> None:
+def test_admins_pass_ingestion_authorization(secured_client: TestClient, entra_tokens) -> None:
     from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
         get_ingestion_job_store,
     )
@@ -527,9 +523,7 @@ def test_admin_sees_every_users_review_history(secured_client: TestClient, entra
     everyone = secured_client.get("/api/v1/review/history", headers=admin).json()["data"]
     mine = secured_client.get("/api/v1/review/history?mine_only=true", headers=admin).json()["data"]
 
-    assert {e["review_id"] for e in everyone["entries"]} == {
-        alice_review, bob_review, admin_review
-    }
+    assert {e["review_id"] for e in everyone["entries"]} == {alice_review, bob_review, admin_review}
     assert [e["review_id"] for e in mine["entries"]] == [admin_review]
 
 

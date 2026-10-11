@@ -52,6 +52,4 @@ router.include_router(standards.router, prefix="/standards", tags=["Standards"],
 router.include_router(jama.router, prefix="/jama", tags=["Jama"], dependencies=_user)
 
 # Administrators
-router.include_router(
-    ingest.router, prefix="/ingest", tags=["Ingestion"], dependencies=_admin
-)
+router.include_router(ingest.router, prefix="/ingest", tags=["Ingestion"], dependencies=_admin)
