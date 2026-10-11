@@ -18,8 +18,19 @@ import { msalInstance, signIn, signOut } from './msal';
 
 /** Provides MSAL context when Entra sign-in is configured. */
 export function AuthProvider({ children }: { children: ReactNode }) {
-  if (!msalInstance) return <>{children}</>;
-  return <MsalProvider instance={msalInstance}>{children}</MsalProvider>;
+  const [client] = useState(() => (
+    new QueryClient({
+      defaultOptions: {
+        queries: { retry: 1, staleTime: 30_000 },
+        mutations: { retry: 0 },
+      },
+    })
+  ));
+  const content = msalInstance
+    ? <MsalProvider instance={msalInstance}>{children}</MsalProvider>
+    : children;
+
+  return <QueryClientProvider client={client}>{content}</QueryClientProvider>;
 }
 
 /** Renders the app only for signed-in users; everyone else sees the sign-in screen. */
