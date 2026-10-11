@@ -1,9 +1,10 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CurrentUser } from '@/types/api';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
-import { AuthGate } from './AuthGate';
+import { AuthGate, AuthProvider } from './AuthGate';
 
 const mocks = vi.hoisted(() => ({
   account: { tenantId: 'tenant', localAccountId: 'alice' } as {
@@ -17,6 +18,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@/api/client', () => ({ default: { get: mocks.get } }));
 vi.mock('@/auth/msal', () => ({ msalInstance: {}, signIn: vi.fn(), signOut: mocks.signOut }));
 vi.mock('@azure/msal-react', () => ({
+  MsalProvider: ({ children }: { children: ReactNode }) => children,
   useAccount: () => mocks.account,
   useIsAuthenticated: () => mocks.authenticated,
   useMsal: () => ({
@@ -46,6 +48,24 @@ describe('authenticated account boundary', () => {
     mocks.account = { tenantId: 'tenant', localAccountId: 'alice' };
     mocks.authenticated = true;
   });
+
+  describe('application providers', () => {
+    it('provides React Query context to public content outside AuthGate', async () => {
+      mocks.history.mockResolvedValue('Public page loaded');
+      render(
+        <AuthProvider>
+          <QueryProbe />
+        </AuthProvider>
+      );
+
+      expect(await screen.findByText('Public page loaded')).toBeInTheDocument();
+    });
+  });
+
+  function QueryProbe() {
+    const { data } = useQuery({ queryKey: ['public-page'], queryFn: mocks.history });
+    return <div>{data}</div>;
+  }
 
   it('does not reuse identity or review-history cache after switching accounts', async () => {
     mocks.get.mockResolvedValue({ data: { data: user('alice') } });
