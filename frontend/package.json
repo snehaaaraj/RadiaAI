@@ -9,7 +9,6 @@
   "scripts": {
     "start": "vite",
     "dev": "vite",
-    "dev:local": "vite --mode local-preview",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
     "lint": "eslint src",
