@@ -458,7 +458,8 @@ The project supports:
 
 ## 12. Security and operational notes
 
-- Secrets are loaded from `.env`
+- Secrets are loaded from `backend/.env` (backend-only; frontend `.env` files hold only
+  public `VITE_*` build-time values)
 - Every non-public endpoint requires a validated Microsoft Entra ID token and a Radia
   app role ([authentication.md](./authentication.md))
 - Jama is accessed as each signed-in user's own linked Jama account
