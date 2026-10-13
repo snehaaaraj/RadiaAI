@@ -100,6 +100,7 @@ RadiaAi-2.0/
 │   │
 │   ├── tests/
 │   │   └── unit/                      # 55 unit tests
+│   ├── .env.example
 │   ├── pyproject.toml
 │   └── requirements.txt
 │
@@ -119,9 +120,10 @@ RadiaAi-2.0/
 │   │   │   ├── jamaRoundtrip/
 │   │   │   └── resources/
 │   │   └── types/                     # TypeScript API interfaces
+│   ├── .env.example
+│   ├── .env.production.example
 │   └── package.json
 │
-├── .env.example
 └── README.md
 ```
 
@@ -245,8 +247,8 @@ after queue submission without waiting for subscription-renewal network calls.
 
 Enable it with `SHAREPOINT_WEBHOOK_ENABLED=true` and
 `SHAREPOINT_WEBHOOK_PUBLIC_BASE_URL=https://<your-app-domain>` (see
-`.env.example`). `POST /api/v1/ingest/webhook/subscribe` can be called to
-manually (re)create the subscription, e.g. after first enabling the feature.
+`backend/.env.example`). `POST /api/v1/ingest/webhook/subscribe` can be called
+to manually (re)create the subscription, e.g. after first enabling the feature.
 
 **Seeing when ingestion completes:** the Home page polls the returned job ID at
 `GET /api/v1/ingest/jobs/{job_id}` while work is queued or running. It also polls
@@ -335,9 +337,24 @@ button, so there's always a single place to check ingestion health.
 ```bash
 git clone <repo-url>
 cd RadiaAi-2.0
-cp .env.example .env
-# Edit .env with your Azure credentials
 ```
+
+Backend and frontend each keep their own env files:
+
+```bash
+cp backend/.env.example backend/.env
+# Edit backend/.env with your Azure credentials
+
+cp frontend/.env.example frontend/.env
+# Edit frontend/.env if you need Microsoft sign-in locally (optional)
+```
+
+For a deployed backend environment, set the production values directly in your
+hosting provider's environment variable settings (e.g. Vercel Project Settings
+-> Environment Variables), using `backend/.env.example` as the reference for
+which variables exist. For a deployed frontend build, use
+`frontend/.env.production.example` instead - see its header for the stricter
+production requirements.
 
 ### 2. Local backend development
 
@@ -437,8 +454,11 @@ Interactive docs available at `/api/docs` (non-production environments).
 
 ## Configuration
 
-All configuration is managed via environment variables. See `.env.example` for
-the full reference with descriptions.
+All configuration is managed via environment variables, split between
+`backend/.env.example` (backend only; set production values directly in your
+hosting provider's environment variable settings) and `frontend/.env.example` /
+`frontend/.env.production.example` (frontend `VITE_*` variables only) for the
+full reference with descriptions.
 
 | Variable | Description |
 |----------|-------------|
@@ -462,7 +482,9 @@ the full reference with descriptions.
 
 ## Security Notes
 
-- Secrets are loaded from `.env` (never committed to git)
+- Secrets are loaded from `backend/.env` (never committed to git); the frontend's
+  `frontend/.env`/`frontend/.env.local` only ever contain public, build-time
+  `VITE_*` values
 - Microsoft Entra ID SSO with full access-token validation (signature, issuer, audience,
   expiry, tenant, scope) and app-role authorization on every endpoint. Deployed
   environments fail closed without Entra configuration.
