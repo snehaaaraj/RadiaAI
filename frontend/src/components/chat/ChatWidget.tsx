@@ -1,8 +1,8 @@
 /**
  * Floating chatbot widget - a fixed icon button in the bottom-right corner
- * that expands into a small messaging window. Conversation history is
- * persisted (see useChatWidgetHistory) so it is retained across page
- * navigation and reloads.
+ * that expands into a small messaging window. It shares the user's
+ * persisted conversation with the Chat page (see useChatHistory), so it is
+ * retained across page navigation and reloads.
  */
 
 import { useEffect, useRef, useState } from 'react';
@@ -22,7 +22,7 @@ import ForumIcon from '@mui/icons-material/Forum';
 import SendIcon from '@mui/icons-material/Send';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useChatStream } from '@/hooks/useChatStream';
-import { useChatWidgetHistory } from '@/hooks/useChatWidgetHistory';
+import { useChatHistory } from '@/hooks/useChatHistory';
 import { useAppContext } from '@/context/useAppContext';
 import type { ChatMessage } from '@/types/api';
 
@@ -33,7 +33,7 @@ const HISTORY_TURNS_SENT_TO_API = 10;
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
-  const { history, setHistory, clearHistory } = useChatWidgetHistory();
+  const { history, setHistory, clearHistory } = useChatHistory();
   const { motionPreference } = useAppContext();
   const { isStreaming, streamingText, sendMessage } = useChatStream();
   const endRef = useRef<HTMLDivElement>(null);

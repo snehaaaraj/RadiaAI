@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ChatMessage, CurrentUser } from '@/types/api';
-import { useChatHistory } from './useChatHistory';
+import { resetChatHistoryCache, useChatHistory } from './useChatHistory';
 
 const auth = vi.hoisted(() => ({ user: undefined as CurrentUser | undefined }));
 vi.mock('@/hooks/useCurrentUser', () => ({
@@ -26,19 +26,20 @@ const conversation: ChatMessage[] = [
 describe('user-scoped chat history', () => {
   beforeEach(() => {
     localStorage.clear();
+    resetChatHistoryCache();
     auth.user = alice;
   });
 
-  it.each(['page', 'widget'] as const)('persists %s history across remounts', (surface) => {
-    const first = renderHook(() => useChatHistory(surface));
+  it('persists history across remounts', () => {
+    const first = renderHook(() => useChatHistory());
     act(() => first.result.current.setHistory(conversation));
     first.unmount();
-    const second = renderHook(() => useChatHistory(surface));
+    const second = renderHook(() => useChatHistory());
     expect(second.result.current.history).toEqual(conversation);
   });
 
-  it.each(['page', 'widget'] as const)('isolates %s history from users and admins', (surface) => {
-    const { result, rerender } = renderHook(() => useChatHistory(surface));
+  it('isolates history from users and admins', () => {
+    const { result, rerender } = renderHook(() => useChatHistory());
     act(() => result.current.setHistory(conversation));
     const aliceSetter = result.current.setHistory;
 
@@ -65,7 +66,7 @@ describe('user-scoped chat history', () => {
   });
 
   it('separates identical user IDs in different tenants', () => {
-    const { result, rerender } = renderHook(() => useChatHistory('widget'));
+    const { result, rerender } = renderHook(() => useChatHistory());
     act(() => result.current.setHistory(conversation));
     auth.user = { ...alice, tenant_id: 'tenant-2' };
     rerender();
@@ -74,7 +75,7 @@ describe('user-scoped chat history', () => {
 
   it('does not expose or write history without a verified user', () => {
     auth.user = undefined;
-    const { result, rerender } = renderHook(() => useChatHistory('page'));
+    const { result, rerender } = renderHook(() => useChatHistory());
     act(() => result.current.setHistory(conversation));
     expect(result.current.history).toEqual([]);
     expect(localStorage.length).toBe(0);
@@ -89,28 +90,71 @@ describe('user-scoped chat history', () => {
     expect(result.current.history).toEqual(conversation);
   });
 
-  it('keeps page and pop-up conversations separate and clears only the current conversation', () => {
-    const page = renderHook(() => useChatHistory('page'));
-    const widget = renderHook(() => useChatHistory('widget'));
+  it('shares one conversation between the page and the pop-up', () => {
+    const page = renderHook(() => useChatHistory());
+    const widget = renderHook(() => useChatHistory());
     act(() => page.result.current.setHistory(conversation));
-    expect(widget.result.current.history).toEqual([]);
-    act(() => widget.result.current.setHistory(conversation));
+    expect(widget.result.current.history).toEqual(conversation);
+    act(() => widget.result.current.setHistory((prev) => [...prev, { role: 'user', content: 'Follow-up' }]));
+    expect(page.result.current.history).toEqual([...conversation, { role: 'user', content: 'Follow-up' }]);
     act(() => widget.result.current.clearHistory());
-    expect(widget.result.current.history).toEqual([]);
+    expect(page.result.current.history).toEqual([]);
+  });
+
+  it('records a reply that arrives after the sending surface unmounts', () => {
+    const widget = renderHook(() => useChatHistory());
+    act(() => widget.result.current.setHistory([conversation[0]]));
+    const widgetSetter = widget.result.current.setHistory;
+    widget.unmount();
+    const page = renderHook(() => useChatHistory());
+    act(() => widgetSetter((prev) => [...prev, conversation[1]]));
     expect(page.result.current.history).toEqual(conversation);
+  });
+
+  it('merges the former separate page and pop-up histories for the same user', () => {
+    const widgetTurn: ChatMessage = { role: 'user', content: 'Pop-up question' };
+    localStorage.setItem('radia-chat-page-history:tenant-1:alice', JSON.stringify(conversation));
+    localStorage.setItem('radia-chat-widget-history:tenant-1:alice', JSON.stringify([widgetTurn]));
+    const { result } = renderHook(() => useChatHistory());
+    expect(result.current.history).toEqual([...conversation, widgetTurn]);
+    expect(localStorage.getItem('radia-chat-page-history:tenant-1:alice')).toBeNull();
+    expect(localStorage.getItem('radia-chat-widget-history:tenant-1:alice')).toBeNull();
+    expect(JSON.parse(localStorage.getItem('radia-chat-history:tenant-1:alice') ?? '[]')).toEqual([
+      ...conversation,
+      widgetTurn,
+    ]);
   });
 
   it('does not assign the old shared pop-up history to any user', () => {
     localStorage.setItem('radia-chat-widget-history', JSON.stringify(conversation));
-    const { result } = renderHook(() => useChatHistory('widget'));
+    const { result } = renderHook(() => useChatHistory());
     expect(result.current.history).toEqual([]);
   });
 
+  it('restores the same user history after signing out and back in', () => {
+    const before = renderHook(() => useChatHistory());
+    act(() => before.result.current.setHistory(conversation));
+    before.unmount();
+
+    // logoutRedirect clears MSAL's session cache and reloads the app.
+    sessionStorage.clear();
+    resetChatHistoryCache();
+    auth.user = undefined;
+    const signedOut = renderHook(() => useChatHistory());
+    expect(signedOut.result.current.history).toEqual([]);
+    signedOut.unmount();
+
+    resetChatHistoryCache();
+    auth.user = { ...alice };
+    const after = renderHook(() => useChatHistory());
+    expect(after.result.current.history).toEqual(conversation);
+  });
+
   it('logs malformed stored data instead of rendering it', () => {
-    localStorage.setItem('radia-chat-page-history:tenant-1:alice', '[{"role":"invalid","content":1}]');
+    localStorage.setItem('radia-chat-history:tenant-1:alice', '[{"role":"invalid","content":1}]');
     const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
     try {
-      const { result } = renderHook(() => useChatHistory('page'));
+      const { result } = renderHook(() => useChatHistory());
       expect(result.current.history).toEqual([]);
       expect(log).toHaveBeenCalledWith('Unable to load chat history', expect.any(Error));
     } finally {
@@ -124,7 +168,7 @@ describe('user-scoped chat history', () => {
       throw new Error('Storage full');
     });
     try {
-      const { result } = renderHook(() => useChatHistory('page'));
+      const { result } = renderHook(() => useChatHistory());
       act(() => result.current.setHistory(conversation));
       expect(result.current.history).toEqual(conversation);
       expect(log).toHaveBeenCalledWith('Unable to save chat history', expect.any(Error));

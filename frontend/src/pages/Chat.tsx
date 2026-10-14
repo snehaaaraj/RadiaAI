@@ -19,7 +19,7 @@ interface ConversationTurn {
 
 export default function Chat() {
   const [input, setInput] = useState('');
-  const { history, setHistory } = useChatHistory('page');
+  const { history, setHistory } = useChatHistory();
   const endRef = useRef<HTMLDivElement>(null);
   const { isStreaming, streamingText, sendMessage } = useChatStream();
 
