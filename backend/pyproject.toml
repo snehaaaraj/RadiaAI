@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "radia-ai-backend"
-version = "0.1.0"
+dynamic = ["version"]
 description = "Radia AI - Enterprise RAG Platform Backend"
 requires-python = ">=3.12"
 dependencies = [
@@ -32,6 +32,12 @@ dependencies = [
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["app*", "radia_ai*"]
+
+[tool.setuptools.dynamic]
+version = { file = "app/VERSION" }
+
+[tool.setuptools.package-data]
+app = ["VERSION"]
 
 # ---------------------------------------------------------------------------
 # Ruff - linter + formatter (replaces flake8 + isort + pyupgrade)

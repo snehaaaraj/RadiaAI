@@ -1,5 +1,6 @@
-import { createContext, useCallback, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { NavigationGuardContext } from './useNavigationGuardContext';
 
 export interface NavigationGuardContextValue {
   /** Pages call this to register whether they have unsaved/in-progress state */
@@ -11,8 +12,6 @@ export interface NavigationGuardContextValue {
   handleConfirm: () => void;
   handleCancel: () => void;
 }
-
-export const NavigationGuardContext = createContext<NavigationGuardContextValue | null>(null);
 
 export function NavigationGuardProvider({ children }: { children: ReactNode }) {
   const navigate = useNavigate();

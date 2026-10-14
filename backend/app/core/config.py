@@ -12,6 +12,8 @@ from typing import Annotated, Any, Literal, cast
 from pydantic import AnyHttpUrl, Field, StringConstraints, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from app.core.version import APP_VERSION
+
 # Resolve .env location: check backend/.env first, then project root .env
 _BACKEND_DIR = Path(__file__).resolve().parent.parent.parent  # backend/
 _PROJECT_ROOT = _BACKEND_DIR.parent  # RadiaAi-2.0/
@@ -450,7 +452,6 @@ class AppSettings(BaseSettings):
 
     # --- Application ---
     app_name: str = Field(default="Radia AI", description="Human-readable application name")
-    app_version: str = Field(default="0.1.0")
     environment: DeploymentEnvironment = Field(
         default="production",
         description=(
@@ -564,6 +565,11 @@ class AppSettings(BaseSettings):
         if data.get("environment") == "production" and value:
             raise ValueError("debug=True is not allowed in the production environment")
         return value
+
+    @property
+    def app_version(self) -> str:
+        """Release version from ``app/VERSION``; deliberately not configurable via environment."""
+        return APP_VERSION
 
     @property
     def allows_local_auth_bypass(self) -> bool:

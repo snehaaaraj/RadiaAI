@@ -1,8 +1,10 @@
 /// <reference types="vite/client" />
 
+/** Release version, injected by Vite from backend/app/VERSION. */
+declare const __APP_VERSION__: string;
+
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL?: string;
-  readonly VITE_APP_VERSION?: string;
   /** Application (client) ID of the Radia SPA app registration. */
   readonly VITE_ENTRA_CLIENT_ID?: string;
   /** Directory (tenant) ID of the company Entra tenant. */

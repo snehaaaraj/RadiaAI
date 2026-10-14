@@ -5,8 +5,9 @@
  * Manages theme preferences, UI settings.
  */
 
-import { createContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ROUTES } from '@/utils/constants';
+import { AppContext } from './useAppContext';
 
 export type ThemePreference = 'light' | 'dark' | 'system';
 export type AccentColor = 'indigo' | 'violet' | 'teal' | 'rose';
@@ -70,8 +71,6 @@ export interface AppContextValue {
   setSoundOnReviewComplete: (enabled: boolean) => void;
   resetPersonalization: () => void;
 }
-
-export const AppContext = createContext<AppContextValue | null>(null);
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const [sidebarOpen, setSidebarOpenState] = useState<boolean>(() => {

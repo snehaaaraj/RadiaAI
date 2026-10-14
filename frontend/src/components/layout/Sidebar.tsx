@@ -25,7 +25,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useNavigationGuardContext } from '@/context/useNavigationGuardContext';
 import { useLocation } from 'react-router-dom';
 import { useAppContext } from '@/context/useAppContext';
-import { HEADER_HEIGHT, ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
+import { APP_VERSION, HEADER_HEIGHT, ROUTES, SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/utils/constants';
 import { SETTINGS_SECTION_ITEMS } from '@/utils/settingsSections';
 import { useActiveScrollSection } from '@/hooks/useActiveScrollSection';
 
@@ -246,7 +246,7 @@ export function Sidebar() {
         })}
       >
         <Typography variant="caption" color="text.secondary" noWrap>
-          v0.1.0 - Phase 4
+          v{APP_VERSION}
         </Typography>
       </Box>
     </Box>
