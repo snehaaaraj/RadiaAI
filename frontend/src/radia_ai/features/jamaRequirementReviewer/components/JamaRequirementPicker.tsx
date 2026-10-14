@@ -104,7 +104,7 @@ export function JamaRequirementPicker({
         }
       >
         {projectsErrorCode === 'JAMA_CREDENTIALS_INVALID'
-          ? 'Jama rejected your linked credentials. Re-link your Jama account to browse requirements.'
+          ? 'Your linked Jama credentials can no longer be used. Re-link your Jama account to browse requirements.'
           : 'Link your Jama account to browse requirements. You will only see projects you can access in Jama.'}
       </Alert>
     );

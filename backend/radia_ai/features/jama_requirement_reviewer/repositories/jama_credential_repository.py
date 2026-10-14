@@ -128,11 +128,28 @@ class JamaCredentialRepository:
             return None
         return JamaAccountLink.model_validate(record.model_dump(exclude={"ciphertext", "version"}))
 
+    def get_link_and_credentials(
+        self, subject_key: str
+    ) -> tuple[JamaAccountLink | None, JamaApiCredentials | None]:
+        """Return the stored link and its decrypted credentials from a single read.
+
+        A link with ``None`` credentials exists but can no longer be used (for example
+        the encryption key changed), so the user must re-link.
+        """
+        record = self._read(subject_key)
+        if record is None:
+            return None, None
+        link = JamaAccountLink.model_validate(record.model_dump(exclude={"ciphertext", "version"}))
+        return link, self._decrypt(record, subject_key)
+
     def get_credentials(self, subject_key: str) -> JamaApiCredentials | None:
         """Decrypt the user's credentials, or None when absent or undecryptable."""
         record = self._read(subject_key)
         if record is None:
             return None
+        return self._decrypt(record, subject_key)
+
+    def _decrypt(self, record: _StoredLink, subject_key: str) -> JamaApiCredentials | None:
         try:
             payload = json.loads(self._cipher.decrypt(record.ciphertext.encode()))
         except (InvalidToken, ValueError):

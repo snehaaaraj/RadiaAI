@@ -378,6 +378,32 @@ def test_encryption_key_rotation_keeps_existing_links_readable(encryption_key: s
 
 
 @pytest.mark.unit
+def test_unreadable_link_asks_user_to_relink_everywhere(
+    jama_app, jama_client, entra_tokens
+) -> None:
+    assert (
+        _link(jama_client, _alice(entra_tokens), "alice-client", "alice-secret").status_code == 200
+    )
+    # Simulate the server's encryption key changing between sessions.
+    jama_app.state.jama_credential_repository = JamaCredentialRepository(
+        jama_app.state.jama_blob_store, Fernet.generate_key().decode()
+    )
+
+    status = jama_client.get("/api/v1/jama/account", headers=_alice(entra_tokens))
+    projects = jama_client.get("/api/v1/jama/projects", headers=_alice(entra_tokens))
+
+    assert status.json()["data"]["linked"] is False
+    assert status.json()["data"]["relink_required"] is True
+    assert projects.status_code == 403
+    assert projects.json()["error"]["code"] == "JAMA_CREDENTIALS_INVALID"
+
+    assert (
+        _link(jama_client, _alice(entra_tokens), "alice-client", "alice-secret").status_code == 200
+    )
+    assert jama_client.get("/api/v1/jama/projects", headers=_alice(entra_tokens)).status_code == 200
+
+
+@pytest.mark.unit
 def test_invalid_encryption_key_is_a_configuration_error() -> None:
     from app.core.exceptions import ConfigurationError
 

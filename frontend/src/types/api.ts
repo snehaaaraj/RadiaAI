@@ -526,6 +526,8 @@ export interface JamaRequirement {
 export interface JamaAccountStatus {
   linking_enabled: boolean;
   linked: boolean;
+  /** A saved link exists but can no longer be used (e.g. the server key changed). */
+  relink_required: boolean;
   using_shared_account: boolean;
   jama_base_url: string | null;
   jama_user_id: number | null;

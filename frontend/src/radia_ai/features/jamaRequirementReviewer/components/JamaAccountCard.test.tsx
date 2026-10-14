@@ -22,6 +22,7 @@ const { JamaAccountCard } = await import('./JamaAccountCard');
 const unlinked: JamaAccountStatus = {
   linking_enabled: true,
   linked: false,
+  relink_required: false,
   using_shared_account: false,
   jama_base_url: 'https://jama.example',
   jama_user_id: null,
@@ -103,6 +104,14 @@ describe('JamaAccountCard', () => {
 
     await waitFor(() => expect(api.unlinkJamaAccount).toHaveBeenCalled());
     expect(await screen.findByRole('button', { name: 'Link Jama account' })).toBeInTheDocument();
+  });
+
+  it('asks the user to re-link when the saved link can no longer be used', async () => {
+    api.fetchJamaAccount.mockResolvedValue({ ...unlinked, relink_required: true });
+    renderCard();
+
+    expect(await screen.findByText(/saved Jama link can no longer be used/)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Link Jama account' })).toBeInTheDocument();
   });
 
   it('explains when linking is not enabled on the server', async () => {

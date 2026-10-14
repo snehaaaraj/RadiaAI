@@ -63,7 +63,10 @@ The shared service account (`JAMA_USERNAME`/`JAMA_PASSWORD` or
 - **Key rotation:** set `JAMA_CREDENTIAL_ENCRYPTION_KEY=<new>,<old>`. New links
   use the first key, and existing links still decrypt with the old one. Remove
   the old key once users have re-linked. Links encrypted only with a removed
-  key behave as "not linked".
+  key can no longer be used: Settings asks the user to re-link
+  (`relink_required: true`) and Jama endpoints return `JAMA_CREDENTIALS_INVALID`.
+  Keep the key identical across every deployment and instance that shares the
+  credential container, or users will appear linked on one and not another.
 
 ## Roles
 

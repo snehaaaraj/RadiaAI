@@ -113,6 +113,12 @@ export function JamaAccountCard() {
   return (
     <Box component="form" onSubmit={submit}>
       <Stack spacing={2}>
+        {account.relink_required && (
+          <Alert severity="warning" variant="outlined">
+            Your saved Jama link can no longer be used. Enter your Jama API credentials again to
+            re-link your account.
+          </Alert>
+        )}
         <Typography variant="body2" color="text.secondary">
           Link your Jama account so Radia can read and write Jama as you, limited to the projects
           you can access in Jama. Jama does not support Microsoft sign-in for its API, so this is
