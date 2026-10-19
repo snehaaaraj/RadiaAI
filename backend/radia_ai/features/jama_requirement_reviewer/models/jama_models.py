@@ -90,6 +90,10 @@ class JamaAccountStatus(BaseModel):
 
     linking_enabled: bool = Field(description="Server is configured for per-user Jama linking")
     linked: bool = False
+    relink_required: bool = Field(
+        default=False,
+        description="A saved link exists but can no longer be used; the user must re-link",
+    )
     using_shared_account: bool = Field(
         default=False, description="Local development only: requests use the shared account"
     )

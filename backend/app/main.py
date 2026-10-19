@@ -50,7 +50,6 @@ def _default_settings() -> AppSettings:
     """Provide non-production defaults for explicitly local or test environments."""
     return AppSettings.model_construct(
         app_name="Radia AI",
-        app_version="0.1.0",
         environment="local",
         debug=False,
         log_level="INFO",

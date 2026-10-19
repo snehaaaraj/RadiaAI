@@ -1,5 +1,7 @@
-import { useContext } from 'react';
-import { NavigationGuardContext, type NavigationGuardContextValue } from './NavigationGuardContext';
+import { createContext, useContext } from 'react';
+import type { NavigationGuardContextValue } from './NavigationGuardContext';
+
+export const NavigationGuardContext = createContext<NavigationGuardContextValue | null>(null);
 
 export function useNavigationGuardContext(): NavigationGuardContextValue {
   const ctx = useContext(NavigationGuardContext);

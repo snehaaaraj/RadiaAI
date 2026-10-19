@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
 import react from '@vitejs/plugin-react';
@@ -6,6 +7,10 @@ export { loadRadiaViteEnv } from './src/viteEnv';
 import { loadRadiaViteEnv } from './src/viteEnv';
 
 const FRONTEND_ROOT = path.dirname(fileURLToPath(import.meta.url));
+// Single source of truth for the release version, shared with the backend.
+const APP_VERSION = fs
+  .readFileSync(path.resolve(FRONTEND_ROOT, '../backend/app/VERSION'), 'utf8')
+  .trim();
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -14,6 +19,9 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    define: {
+      __APP_VERSION__: JSON.stringify(APP_VERSION),
+    },
     resolve: {
       alias: {
         '@': path.resolve(FRONTEND_ROOT, './src'),

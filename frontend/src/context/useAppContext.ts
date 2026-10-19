@@ -1,5 +1,7 @@
-import { useContext } from 'react';
-import { AppContext, type AppContextValue } from './AppContext';
+import { createContext, useContext } from 'react';
+import type { AppContextValue } from './AppContext';
+
+export const AppContext = createContext<AppContextValue | null>(null);
 
 export function useAppContext(): AppContextValue {
   const ctx = useContext(AppContext);

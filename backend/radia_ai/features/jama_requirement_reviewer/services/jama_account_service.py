@@ -89,12 +89,12 @@ class JamaAccountService:
 
     def status(self, user: AuthenticatedUser) -> JamaAccountStatus:
         base_url = self._settings.jama.base_url or None
-        link = (
-            self._repository.get_link(user.subject_key)
-            if self._repository is not None and self._settings.jama.has_base_url
-            else None
+        link, credentials = (
+            self._repository.get_link_and_credentials(user.subject_key)  # type: ignore[union-attr]
+            if self.linking_enabled
+            else (None, None)
         )
-        if link is not None:
+        if link is not None and credentials is not None:
             return JamaAccountStatus(
                 linking_enabled=True,
                 linked=True,
@@ -108,6 +108,7 @@ class JamaAccountService:
         return JamaAccountStatus(
             linking_enabled=self.linking_enabled,
             linked=False,
+            relink_required=link is not None,
             using_shared_account=self._shared_allowed(),
             jama_base_url=base_url,
         )
@@ -159,8 +160,11 @@ class JamaAccountService:
 
     def service_for(self, user: AuthenticatedUser) -> JamaService:
         """Return a Jama service acting as ``user``'s linked Jama account."""
+        link = None
         if self.linking_enabled:
-            credentials = self._repository.get_credentials(user.subject_key)  # type: ignore[union-attr]
+            link, credentials = self._repository.get_link_and_credentials(  # type: ignore[union-attr]
+                user.subject_key
+            )
             if credentials is not None:
                 return JamaService(self._client_factory(credentials))
 
@@ -168,6 +172,11 @@ class JamaAccountService:
             return self._shared_service  # type: ignore[return-value]
 
         self._require_linking()
+        if link is not None:
+            raise JamaCredentialsInvalidError(
+                "Your saved Jama link can no longer be used. Re-link your Jama account in "
+                "Settings to browse Jama.",
+            )
         raise JamaAccountNotLinkedError(
             "Link your Jama account to browse Jama. Radia then only shows the projects and "
             "items your own Jama account can access.",

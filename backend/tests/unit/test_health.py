@@ -19,6 +19,7 @@ import pytest
 from fastapi import FastAPI
 
 import app.api.v1.endpoints.health as health_module
+from app.core.version import APP_VERSION
 from app.schemas.health import DependencyHealth, HealthResponse, ServiceStatus
 
 if TYPE_CHECKING:
@@ -77,7 +78,7 @@ def test_liveness_returns_200_and_ok_status(client: TestClient) -> None:
     assert response.status_code == 200
     body = response.json()["data"]
     assert body["status"] == "ok"
-    assert "version" in body
+    assert body["version"] == APP_VERSION
     assert "environment" in body
     # Liveness must never report (or imply probing) dependency state.
     assert "dependencies" not in body
@@ -98,7 +99,7 @@ def test_readiness_returns_200_when_all_dependencies_reachable(client: TestClien
         client,
         HealthResponse(
             status=ServiceStatus.OK,
-            version="0.1.0",
+            version=APP_VERSION,
             environment="local",
             dependencies=[
                 _dep("azure_openai", ServiceStatus.OK, latency_ms=12.0, message="Reachable"),
@@ -124,7 +125,7 @@ def test_legacy_health_path_aliases_readiness(client: TestClient) -> None:
     _install_runner(
         client,
         HealthResponse(
-            status=ServiceStatus.OK, version="0.1.0", environment="local", dependencies=[]
+            status=ServiceStatus.OK, version=APP_VERSION, environment="local", dependencies=[]
         ),
     )
 
@@ -143,7 +144,7 @@ def test_readiness_returns_503_when_a_required_dependency_is_down(client: TestCl
         client,
         HealthResponse(
             status=ServiceStatus.DOWN,
-            version="0.1.0",
+            version=APP_VERSION,
             environment="local",
             dependencies=[
                 _dep("azure_openai", ServiceStatus.DOWN, message="Service unreachable"),
@@ -168,7 +169,7 @@ def test_readiness_returns_200_degraded_when_only_an_optional_dependency_is_down
         client,
         HealthResponse(
             status=ServiceStatus.DEGRADED,
-            version="0.1.0",
+            version=APP_VERSION,
             environment="local",
             dependencies=[
                 _dep("azure_openai", ServiceStatus.OK, message="Reachable"),
@@ -315,7 +316,7 @@ def test_readiness_includes_request_id(client: TestClient) -> None:
     _install_runner(
         client,
         HealthResponse(
-            status=ServiceStatus.OK, version="0.1.0", environment="local", dependencies=[]
+            status=ServiceStatus.OK, version=APP_VERSION, environment="local", dependencies=[]
         ),
     )
     response = client.get("/api/v1/health/ready")
@@ -327,7 +328,7 @@ def test_readiness_echoes_provided_request_id(client: TestClient) -> None:
     _install_runner(
         client,
         HealthResponse(
-            status=ServiceStatus.OK, version="0.1.0", environment="local", dependencies=[]
+            status=ServiceStatus.OK, version=APP_VERSION, environment="local", dependencies=[]
         ),
     )
     custom_id = "test-request-id-12345"
