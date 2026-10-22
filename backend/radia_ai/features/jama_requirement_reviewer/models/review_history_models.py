@@ -58,6 +58,34 @@ class ApplyFindingDispositionRequest(BaseModel):
     reviewer_id: str | None = None
 
 
+class RecommendationDecisionStatus(StrEnum):
+    """Reviewer decision states for a requirement's final recommendation."""
+
+    READY_TO_REPLACE = "ready_to_replace"
+    REJECTED = "rejected"
+    ACCEPTED_WITH_MODIFICATIONS = "accepted_with_modifications"
+
+
+class RecommendationDecision(BaseModel):
+    """Reviewer decision record for a requirement's final recommendation."""
+
+    decision: RecommendationDecisionStatus
+    reason: str = ""
+    modified_description: str | None = None
+    reviewer_id: str | None = None
+    updated_at: str
+
+
+class ApplyRecommendationDecisionRequest(BaseModel):
+    """Request body for applying a reviewer decision to a final recommendation."""
+
+    decision: RecommendationDecisionStatus
+    reason: str = ""
+    modified_description: str | None = None
+    # Ignored by the API: the reviewer is always the authenticated caller.
+    reviewer_id: str | None = None
+
+
 class ReviewHistoryEntry(BaseModel):
     """Stored record for a completed review run."""
 
@@ -79,6 +107,7 @@ class ReviewHistoryEntry(BaseModel):
     finding_to_requirement_map: dict[int, str] = Field(default_factory=dict)
     requirement_text: str | None = None
     final_recommendation: FinalRecommendation | None = None
+    recommendation_decision: RecommendationDecision | None = None
 
 
 class ReviewHistoryListResponse(BaseModel):

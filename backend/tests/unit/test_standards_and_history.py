@@ -85,6 +85,85 @@ def test_review_history_rejects_out_of_range_finding_index(
 
 
 @pytest.mark.unit
+def test_review_history_recommendation_decision_flow(client: TestClient) -> None:
+    review_response = client.post(
+        "/api/v1/review/requirement",
+        json={"requirement_id": "REQ-HIST-DECISION", "text": "The subsystem should respond fast."},
+    )
+    assert review_response.status_code == 200
+    review_id = review_response.json()["data"]["review_id"]
+
+    decision_response = client.post(
+        f"/api/v1/review/history/{review_id}/decision",
+        json={"decision": "ready_to_replace"},
+    )
+    assert decision_response.status_code == 200
+    decision_body = decision_response.json()
+    assert decision_body["success"] is True
+    recommendation_decision = decision_body["data"]["recommendation_decision"]
+    assert recommendation_decision["decision"] == "ready_to_replace"
+
+
+@pytest.mark.unit
+def test_review_history_recommendation_decision_requires_reason_when_rejected(
+    client: TestClient,
+) -> None:
+    review_response = client.post(
+        "/api/v1/review/requirement",
+        json={"requirement_id": "REQ-HIST-REJECT", "text": "The subsystem should respond fast."},
+    )
+    assert review_response.status_code == 200
+    review_id = review_response.json()["data"]["review_id"]
+
+    decision_response = client.post(
+        f"/api/v1/review/history/{review_id}/decision",
+        json={"decision": "rejected"},
+    )
+
+    assert decision_response.status_code == 422
+    decision_body = decision_response.json()
+    assert decision_body["success"] is False
+    assert "reason" in decision_body["error"]["message"].lower()
+
+
+@pytest.mark.unit
+def test_review_history_recommendation_decision_requires_modified_description(
+    client: TestClient,
+) -> None:
+    review_response = client.post(
+        "/api/v1/review/requirement",
+        json={"requirement_id": "REQ-HIST-MODIFY", "text": "The subsystem should respond fast."},
+    )
+    assert review_response.status_code == 200
+    review_id = review_response.json()["data"]["review_id"]
+
+    decision_response = client.post(
+        f"/api/v1/review/history/{review_id}/decision",
+        json={"decision": "accepted_with_modifications"},
+    )
+
+    assert decision_response.status_code == 422
+    decision_body = decision_response.json()
+    assert decision_body["success"] is False
+    assert "modified description" in decision_body["error"]["message"].lower()
+
+    decision_response = client.post(
+        f"/api/v1/review/history/{review_id}/decision",
+        json={
+            "decision": "accepted_with_modifications",
+            "modified_description": "The subsystem shall respond within 200 ms.",
+        },
+    )
+    assert decision_response.status_code == 200
+    recommendation_decision = decision_response.json()["data"]["recommendation_decision"]
+    assert recommendation_decision["decision"] == "accepted_with_modifications"
+    assert (
+        recommendation_decision["modified_description"]
+        == "The subsystem shall respond within 200 ms."
+    )
+
+
+@pytest.mark.unit
 def test_review_history_cleanup_deletes_old_entries(test_app) -> None:
     """Entries older than 10 days are automatically deleted during list."""
     from datetime import UTC, datetime, timedelta

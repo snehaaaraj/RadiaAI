@@ -14,14 +14,21 @@ import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Switch from '@mui/material/Switch';
+import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import type { ChipProps } from '@mui/material/Chip';
 import type {
   ApplyFindingDispositionRequest,
+  ApplyRecommendationDecisionRequest,
   FinalRecommendation,
   FindingDisposition,
+  RecommendationDecision,
+  RecommendationDecisionStatus,
   RecommendationStatus,
   ReviewFinding,
   SkillzRuleReference,
@@ -38,6 +45,18 @@ const STATUS_CHIP: Record<RecommendationStatus, { label: string; color: ChipProp
   needs_review: { label: 'Needs review', color: 'warning' },
   no_change: { label: 'No change needed', color: 'default' },
   failed: { label: 'Not generated', color: 'error' },
+};
+
+const DECISION_OPTIONS: Array<{ value: RecommendationDecisionStatus; label: string }> = [
+  { value: 'ready_to_replace', label: 'Ready to replace' },
+  { value: 'rejected', label: 'Reject with reason' },
+  { value: 'accepted_with_modifications', label: 'Accept, but modify' },
+];
+
+const DECISION_CHIP: Record<RecommendationDecisionStatus, { label: string; color: ChipProps['color'] }> = {
+  ready_to_replace: { label: 'Ready to replace', color: 'success' },
+  rejected: { label: 'Rejected', color: 'error' },
+  accepted_with_modifications: { label: 'Accepted with modifications', color: 'warning' },
 };
 
 function skillzChip(recommendation: FinalRecommendation): { label: string; color: ChipProps['color'] } {
@@ -61,6 +80,9 @@ interface FinalRecommendationPanelProps {
   dispositions?: FindingDisposition[];
   onApplyDisposition?: (reviewId: string, payload: ApplyFindingDispositionRequest) => void;
   isApplyingDisposition?: boolean;
+  decision?: RecommendationDecision | null;
+  onApplyDecision?: (reviewId: string, payload: ApplyRecommendationDecisionRequest) => void;
+  isApplyingDecision?: boolean;
   readOnly?: boolean;
 }
 
@@ -75,6 +97,9 @@ export function FinalRecommendationPanel({
   dispositions,
   onApplyDisposition,
   isApplyingDisposition = false,
+  decision,
+  onApplyDecision,
+  isApplyingDecision = false,
   readOnly = false,
 }: FinalRecommendationPanelProps) {
   const [ruleId, setRuleId] = useState<string | null>(null);
@@ -154,6 +179,15 @@ export function FinalRecommendationPanel({
           <DescriptionComparison
             original={recommendation.original_description}
             recommended={recommended}
+          />
+
+          <RecommendationDecisionPanel
+            reviewId={reviewId}
+            decision={decision}
+            recommendedDescription={recommended}
+            onApplyDecision={onApplyDecision}
+            isApplyingDecision={isApplyingDecision}
+            readOnly={readOnly}
           />
 
           {recommendation.summary && (
@@ -270,6 +304,151 @@ export function FinalRecommendationPanel({
         onClose={() => setRuleDialogOpen(false)}
       />
     </Stack>
+  );
+}
+
+interface RecommendationDecisionPanelProps {
+  reviewId?: string | null;
+  decision?: RecommendationDecision | null;
+  recommendedDescription: string;
+  onApplyDecision?: (reviewId: string, payload: ApplyRecommendationDecisionRequest) => void;
+  isApplyingDecision?: boolean;
+  readOnly?: boolean;
+}
+
+function RecommendationDecisionPanel({
+  reviewId,
+  decision,
+  recommendedDescription,
+  onApplyDecision,
+  isApplyingDecision = false,
+  readOnly = false,
+}: RecommendationDecisionPanelProps) {
+  const [selectedDecision, setSelectedDecision] = useState<RecommendationDecisionStatus | ''>(
+    decision?.decision ?? ''
+  );
+  const [reason, setReason] = useState(decision?.reason ?? '');
+  const [modifiedDescription, setModifiedDescription] = useState(
+    decision?.modified_description ?? recommendedDescription
+  );
+  const [saved, setSaved] = useState(false);
+
+  if (readOnly) {
+    if (!decision) return null;
+    const chip = DECISION_CHIP[decision.decision];
+    return (
+      <Box sx={styles.sectionBox}>
+        <Stack spacing={1}>
+          <Box sx={styles.decisionReadOnlyRow}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              Reviewer decision
+            </Typography>
+            <Chip label={chip.label} color={chip.color} size="small" />
+          </Box>
+          {decision.decision === 'rejected' && decision.reason && (
+            <Box>
+              <Typography variant="overline" color="text.secondary">
+                Reason
+              </Typography>
+              <Typography variant="body2">{decision.reason}</Typography>
+            </Box>
+          )}
+          {decision.decision === 'accepted_with_modifications' && decision.modified_description && (
+            <Box>
+              <Typography variant="overline" color="text.secondary">
+                Modified description
+              </Typography>
+              <Box sx={styles.decisionDetailBox}>
+                <Typography variant="body2">{decision.modified_description}</Typography>
+              </Box>
+            </Box>
+          )}
+        </Stack>
+      </Box>
+    );
+  }
+
+  if (!onApplyDecision) return null;
+
+  const canSubmit =
+    Boolean(reviewId && selectedDecision) &&
+    (selectedDecision !== 'rejected' || reason.trim().length > 0) &&
+    (selectedDecision !== 'accepted_with_modifications' || modifiedDescription.trim().length > 0);
+
+  return (
+    <Box sx={styles.sectionBox}>
+      <Stack spacing={1.5}>
+        <Typography variant="subtitle2" fontWeight={700}>
+          Reviewer decision
+        </Typography>
+        <ToggleButtonGroup
+          exclusive
+          size="small"
+          value={selectedDecision}
+          onChange={(_, value: RecommendationDecisionStatus | null) => setSelectedDecision(value ?? '')}
+        >
+          {DECISION_OPTIONS.map((option) => (
+            <ToggleButton key={option.value} value={option.value}>
+              {option.label}
+            </ToggleButton>
+          ))}
+        </ToggleButtonGroup>
+
+        {selectedDecision === 'rejected' && (
+          <TextField
+            multiline
+            minRows={2}
+            size="small"
+            required
+            label="Reason for rejecting"
+            placeholder="Explain why this recommendation should not replace the original"
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+          />
+        )}
+
+        {selectedDecision === 'accepted_with_modifications' && (
+          <TextField
+            multiline
+            minRows={3}
+            size="small"
+            required
+            label="Modified description"
+            value={modifiedDescription}
+            onChange={(event) => setModifiedDescription(event.target.value)}
+          />
+        )}
+
+        <Box sx={styles.actionRow}>
+          <Button
+            variant="contained"
+            size="small"
+            disabled={!canSubmit || isApplyingDecision}
+            onClick={() => {
+              if (!reviewId || !selectedDecision) return;
+              setSaved(false);
+              onApplyDecision(reviewId, {
+                decision: selectedDecision,
+                reason: selectedDecision === 'rejected' ? reason : '',
+                modified_description:
+                  selectedDecision === 'accepted_with_modifications' ? modifiedDescription : null,
+              });
+              setSaved(true);
+            }}
+          >
+            Save decision
+          </Button>
+          {saved && (
+            <Box sx={styles.savedIndicator}>
+              <CheckCircleIcon fontSize="small" />
+              <Typography variant="caption" fontWeight={700} color="success.main">
+                Saved
+              </Typography>
+            </Box>
+          )}
+        </Box>
+      </Stack>
+    </Box>
   );
 }
 

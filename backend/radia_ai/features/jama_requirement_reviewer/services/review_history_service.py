@@ -6,9 +6,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from app.core.exceptions import ValidationError
 from radia_ai.features.jama_requirement_reviewer.models.review_history_models import (
     ApplyFindingDispositionRequest,
+    ApplyRecommendationDecisionRequest,
     FindingDisposition,
+    RecommendationDecision,
+    RecommendationDecisionStatus,
     ReviewHistoryEntry,
     ReviewHistoryListResponse,
     ReviewWorkflow,
@@ -91,6 +95,44 @@ class ReviewHistoryService:
         )
         return self._repository.apply_disposition(
             review_id=review_id, disposition=disposition, owner_id=owner_id
+        )
+
+    def apply_recommendation_decision(
+        self,
+        review_id: str,
+        payload: ApplyRecommendationDecisionRequest,
+        reviewer_id: str | None = None,
+        owner_id: str | None = None,
+    ) -> ReviewHistoryEntry:
+        """Apply a decision on the final recommendation as ``reviewer_id``.
+
+        ``owner_id`` limits the update to that user's review. A reason is required
+        when rejecting, and a modified description is required when accepting with
+        modifications.
+        """
+        if payload.decision == RecommendationDecisionStatus.REJECTED and not payload.reason.strip():
+            raise ValidationError(
+                "A reason is required to reject the final recommendation.",
+                detail={"review_id": review_id},
+            )
+        if (
+            payload.decision == RecommendationDecisionStatus.ACCEPTED_WITH_MODIFICATIONS
+            and not (payload.modified_description or "").strip()
+        ):
+            raise ValidationError(
+                "Modified description is required when accepting with modifications.",
+                detail={"review_id": review_id},
+            )
+
+        decision = RecommendationDecision(
+            decision=payload.decision,
+            reason=payload.reason,
+            modified_description=payload.modified_description,
+            reviewer_id=reviewer_id,
+            updated_at=self._utc_now(),
+        )
+        return self._repository.apply_recommendation_decision(
+            review_id=review_id, decision=decision, owner_id=owner_id
         )
 
     def _new_review_id(self) -> str:

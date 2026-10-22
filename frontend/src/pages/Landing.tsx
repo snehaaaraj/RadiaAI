@@ -7,12 +7,15 @@ import CardContent from '@mui/material/CardContent';
 import Container from '@mui/material/Container';
 import Grid from '@mui/material/Grid2';
 import Stack from '@mui/material/Stack';
+import Tab from '@mui/material/Tab';
+import Tabs from '@mui/material/Tabs';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/layout/TopBar';
-import { useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { RadiaMark } from '@/components/layout/RadiaMark';
 import { useAppContext } from '@/context/useAppContext';
 import { NavigationGuardProvider } from '@/context/NavigationGuardContext';
@@ -35,12 +38,52 @@ const highlights = [
   },
 ] as const;
 
+type ToolResource = {
+  id: 'jama-requirement-review' | 'jama-roundtrip';
+  label: string;
+  description: string;
+  route: string;
+  ctaLabel: string;
+};
+
+const TOOL_RESOURCES: ToolResource[] = [
+  {
+    id: 'jama-requirement-review',
+    label: 'Jama Requirement Review',
+    description:
+      'Run AI-powered quality checks for Jama requirements with explainable findings/suggestions and resource traceability-ready outputs.',
+    route: ROUTES.HOME,
+    ctaLabel: 'Open workspace',
+  },
+  {
+    id: 'jama-roundtrip',
+    label: 'Jama Roundtrip',
+    description:
+      'Use the dedicated placeholder page to reserve structure for future Jama roundtrip automation, orchestration, and reporting flows.',
+    route: ROUTES.JAMA_ROUNDTRIP,
+    ctaLabel: 'Open placeholder',
+  },
+];
+
+const DEFAULT_TOOL_ID: ToolResource['id'] = 'jama-requirement-review';
+
 export default function Landing() {
   const theme = useTheme();
   const navigate = useNavigate();
   const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
   const isDark = theme.palette.mode === 'dark';
+
+  const [searchParams] = useSearchParams();
+  const requestedToolId = searchParams.get('tool');
+  const requestedTabToolId: ToolResource['id'] = requestedToolId === 'jama-roundtrip' ? 'jama-roundtrip' : DEFAULT_TOOL_ID;
+  const [selectedToolId, setSelectedToolId] = useState<ToolResource['id']>(requestedTabToolId);
+
+  useEffect(() => {
+    setSelectedToolId(requestedTabToolId);
+  }, [requestedTabToolId]);
+
+  const selectedTool = TOOL_RESOURCES.find((tool) => tool.id === selectedToolId) ?? TOOL_RESOURCES[0];
 
   const pageGradient = isDark
     ? 'radial-gradient(circle at 14% 10%, rgba(66, 97, 127, 0.20) 0%, rgba(66, 97, 127, 0) 38%), linear-gradient(180deg, #10192B 0%, #0E1728 55%, #0D1624 100%)'
@@ -130,17 +173,7 @@ export default function Landing() {
                       Intelligent requirements quality review, built for modern engineering teams.
                     </Typography>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                      {msalInstance ? (
-                        <LandingAuthAction />
-                      ) : (
-                        <Button
-                          variant="contained"
-                          size="large"
-                          onClick={() => navigate(ROUTES.RADIA_AI_RESOURCES)}
-                        >
-                          Enter workspace
-                        </Button>
-                      )}
+                      {msalInstance && <LandingAuthAction />}
                       <Button variant="outlined" size="large" onClick={() => navigate(ROUTES.SETTINGS)}>
                         Personalize experience
                       </Button>
@@ -183,6 +216,64 @@ export default function Landing() {
                 </Grid>
               ))}
             </Grid>
+
+            <Box>
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+                animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+                transition={{ duration: 0.35, ease: 'easeOut', delay: 0.16 }}
+              >
+                <Card
+                  sx={{
+                    border: '1px solid',
+                    borderColor: alpha(theme.palette.divider, isDark ? 0.55 : 0.9),
+                    backgroundColor: isDark ? alpha('#1A2640', 0.78) : alpha('#FFFFFF', 0.86),
+                  }}
+                >
+                  <CardContent sx={{ p: { xs: 2.5, md: 3.5 } }}>
+                    <Stack spacing={2.5}>
+                      <Box>
+                        <Typography variant="h4" fontWeight={800} gutterBottom>
+                          Radia AI Resources
+                        </Typography>
+                        <Typography variant="body1" color="text.secondary">
+                          Browse available tools and launch each workspace from one place.
+                        </Typography>
+                      </Box>
+
+                      <Tabs
+                        value={selectedToolId}
+                        onChange={(_event, value: ToolResource['id']) => setSelectedToolId(value)}
+                        variant="scrollable"
+                        allowScrollButtonsMobile
+                      >
+                        {TOOL_RESOURCES.map((tool) => (
+                          <Tab key={tool.id} value={tool.id} label={tool.label} />
+                        ))}
+                      </Tabs>
+
+                      <Card variant="outlined">
+                        <CardContent>
+                          <Stack spacing={2}>
+                            <Typography variant="h6" fontWeight={700}>
+                              {selectedTool.label}
+                            </Typography>
+                            <Typography variant="body2" color="text.secondary">
+                              {selectedTool.description}
+                            </Typography>
+                            <Box>
+                              <Button variant="contained" onClick={() => navigate(selectedTool.route)}>
+                                {selectedTool.ctaLabel}
+                              </Button>
+                            </Box>
+                          </Stack>
+                        </CardContent>
+                      </Card>
+                    </Stack>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </Box>
           </Stack>
         </Container>
       </Box>
@@ -192,18 +283,9 @@ export default function Landing() {
 
 function LandingAuthAction() {
   const isAuthenticated = useIsAuthenticated();
-  const navigate = useNavigate();
 
   if (isAuthenticated) {
-    return (
-      <Button
-        variant="contained"
-        size="large"
-        onClick={() => navigate(ROUTES.RADIA_AI_RESOURCES)}
-      >
-        Enter workspace
-      </Button>
-    );
+    return null;
   }
 
   return (

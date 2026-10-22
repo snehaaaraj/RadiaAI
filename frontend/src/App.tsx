@@ -17,7 +17,6 @@ import SetReview from '@/radia_ai/features/jamaRequirementReviewer/pages/SetRevi
 import ReviewHistory from '@/radia_ai/features/jamaRequirementReviewer/pages/ReviewHistory';
 import Standards from '@/radia_ai/features/jamaRequirementReviewer/pages/Standards';
 import JamaRoundtripHome from '@/radia_ai/features/jamaRoundtrip/pages/JamaRoundtripHome';
-import RadiaResources from '@/radia_ai/features/resources/pages/RadiaResources';
 import { createAppTheme } from '@/theme';
 import { ROUTES } from '@/utils/constants';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -30,7 +29,6 @@ export default function App() {
           <Routes>
             <Route path={ROUTES.LANDING} element={<Landing />} />
             <Route element={<AuthGate><Outlet /></AuthGate>}>
-              <Route path={ROUTES.RADIA_AI_RESOURCES} element={<RadiaResources />} />
               <Route path={ROUTES.JAMA_ROUNDTRIP} element={<JamaRoundtripHome />} />
               <Route element={<AppLayout />}>
                 <Route path={ROUTES.HOME} element={<Home />} />

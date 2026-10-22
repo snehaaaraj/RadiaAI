@@ -65,7 +65,7 @@ export default function JamaRoundtripHome() {
                 </Card>
 
                 <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                  <Button variant="contained" onClick={() => navigate(ROUTES.RADIA_AI_RESOURCES)}>
+                  <Button variant="contained" onClick={() => navigate(ROUTES.LANDING)}>
                     Back to resources
                   </Button>
                   <Button variant="outlined" onClick={() => navigate(ROUTES.HOME)}>

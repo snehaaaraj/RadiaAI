@@ -29,6 +29,7 @@ import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/co
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
 import { FinalRecommendationPanel } from '@/radia_ai/features/jamaRequirementReviewer/components/FinalRecommendationPanel';
 import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
+import { useApplyRecommendationDecision } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import {
   SET_REVIEW_CONCURRENCY,
   formatSetReviewError,
@@ -80,6 +81,7 @@ export default function SetReview() {
   const resultRef = useRef<HTMLDivElement | null>(null);
 
   const { statuses, isRunning, runQueue, runSingle, reset: resetQueue } = useSetReviewQueue();
+  const { mutate: applyDecision, isPending: isApplyingDecision } = useApplyRecommendationDecision();
 
   const buildQueueItem = useCallback(
     (req: ParsedRequirement, index: number): SetReviewQueueItem => ({
@@ -562,6 +564,8 @@ export default function SetReview() {
                   recommendation={activeResult.final_recommendation}
                   findings={activeResult.findings}
                   reviewId={activeResult.review_id}
+                  onApplyDecision={(reviewId, payload) => applyDecision({ reviewId, payload })}
+                  isApplyingDecision={isApplyingDecision}
                 />
               ) : (
                 <ReviewChangeSet findings={activeResult.findings} reviewId={activeResult.review_id} />

@@ -21,6 +21,7 @@ from radia_ai.features.jama_requirement_reviewer.schemas.review import (
 )
 from radia_ai.features.jama_requirement_reviewer.schemas.review_history import (
     ApplyFindingDispositionRequest,
+    ApplyRecommendationDecisionRequest,
     ReviewHistoryEntry,
     ReviewHistoryListResponse,
     ReviewWorkflow,
@@ -164,6 +165,35 @@ async def apply_finding_disposition(
 ) -> APIResponse[ReviewHistoryEntry]:
     updated_entry = await to_thread.run_sync(
         lambda: service.apply_disposition(
+            review_id=review_id,
+            payload=body,
+            reviewer_id=user.email or user.user_id,
+            owner_id=None if user.is_admin else user.subject_key,
+        )
+    )
+    return APIResponse(data=updated_entry, request_id=request.state.request_id)
+
+
+@router.post(
+    "/history/{review_id}/decision",
+    response_model=APIResponse[ReviewHistoryEntry],
+    summary="Apply reviewer decision for the final recommendation",
+    description=(
+        "Records whether the final recommendation is ready to replace the original, "
+        "rejected with a reason, or accepted with modifications. Only the review's "
+        "owner (or an administrator) can record a decision."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def apply_recommendation_decision(
+    review_id: str,
+    body: ApplyRecommendationDecisionRequest,
+    request: Request,
+    user: RadiaUserDep,
+    service: ReviewHistoryServiceDep,
+) -> APIResponse[ReviewHistoryEntry]:
+    updated_entry = await to_thread.run_sync(
+        lambda: service.apply_recommendation_decision(
             review_id=review_id,
             payload=body,
             reviewer_id=user.email or user.user_id,

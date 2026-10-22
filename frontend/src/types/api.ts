@@ -451,6 +451,26 @@ export interface ApplyFindingDispositionRequest {
   reviewer_id?: string | null;
 }
 
+export type RecommendationDecisionStatus =
+  | 'ready_to_replace'
+  | 'rejected'
+  | 'accepted_with_modifications';
+
+export interface RecommendationDecision {
+  decision: RecommendationDecisionStatus;
+  reason: string;
+  modified_description: string | null;
+  reviewer_id: string | null;
+  updated_at: string;
+}
+
+export interface ApplyRecommendationDecisionRequest {
+  decision: RecommendationDecisionStatus;
+  reason?: string;
+  modified_description?: string | null;
+  reviewer_id?: string | null;
+}
+
 export interface ReviewHistoryEntry {
   review_id: string;
   workflow: ReviewWorkflow;
@@ -468,6 +488,7 @@ export interface ReviewHistoryEntry {
   finding_to_requirement_map: Record<number, string>; // For delta: flattened index -> requirement_id
   requirement_text?: string | null;
   final_recommendation?: FinalRecommendation | null;
+  recommendation_decision?: RecommendationDecision | null;
 }
 
 export interface ReviewHistoryListResponse {

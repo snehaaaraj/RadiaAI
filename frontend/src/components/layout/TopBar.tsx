@@ -26,7 +26,6 @@ type LandingNavItem = {
 const SUPPORT_EMAIL = 'sneha.nagaraju@radia.com';
 const BUG_REPORT_EMAIL = 'sneha.nagaraju@radia.com';
 const LANDING_NAV_ITEMS: LandingNavItem[] = [
-  { label: 'RADIA AI', path: ROUTES.RADIA_AI_RESOURCES },
   { label: 'Jama Requirement Reviewer', path: ROUTES.HOME },
   { label: 'Jama Roundtrip', path: ROUTES.JAMA_ROUNDTRIP },
 ];
@@ -67,7 +66,7 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
   const closeSupport = () => setSupportAnchor(null);
   const isSettingsPage = location.pathname === ROUTES.SETTINGS;
   const currentSubpageLabel = WORKSPACE_SUBPAGE_LABELS[location.pathname] ?? 'Workspace';
-  const showGlobalSettings = location.pathname !== ROUTES.LANDING && !isSettingsPage;
+  const showGlobalSettings = !isSettingsPage;
 
   return (
     <AppBar
@@ -170,7 +169,7 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
               color={brandWordmarkColor}
               sx={{ letterSpacing: '-0.02em', lineHeight: 1.05 }}
             >
-              RADIA
+              RADIA AI
             </Typography>
           </Link>
         </Box>
@@ -223,7 +222,7 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
                   color={brandWordmarkColor}
                   variant="subtitle1"
                   fontWeight={700}
-                  onClick={() => guardedNavigate(ROUTES.RADIA_AI_RESOURCES)}
+                  onClick={() => guardedNavigate(ROUTES.LANDING)}
                   sx={{
                     px: 0.35,
                     py: 0.2,
@@ -255,7 +254,7 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
                   color={brandWordmarkColor}
                   variant="subtitle1"
                   fontWeight={700}
-                  onClick={() => guardedNavigate(ROUTES.RADIA_AI_RESOURCES)}
+                  onClick={() => guardedNavigate(ROUTES.LANDING)}
                   sx={{
                     px: 0.35,
                     py: 0.2,
@@ -319,7 +318,7 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
         )}
         <Box sx={{ flexGrow: 1 }} />
 
-        {location.pathname !== ROUTES.LANDING && location.pathname !== ROUTES.CHAT && (
+        {location.pathname !== ROUTES.CHAT && (
           <Button
             color="inherit"
             onClick={() => guardedNavigate(ROUTES.CHAT)}
