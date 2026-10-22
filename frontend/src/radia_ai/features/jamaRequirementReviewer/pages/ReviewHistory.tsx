@@ -16,7 +16,7 @@ import { ReviewStatusChip } from '@/radia_ai/features/jamaRequirementReviewer/co
 import { LoadingSpinner } from '@/components/common/LoadingSpinner';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { useReviewHistory } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
-import type { FindingDispositionStatus, ReviewWorkflow } from '@/types/api';
+import type { FindingDispositionStatus, RecommendationDecisionStatus, ReviewWorkflow } from '@/types/api';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
 import { isReviewFailed, isReviewIncomplete } from '@/utils/reviewCompletion';
@@ -35,23 +35,35 @@ const DISPOSITION_OPTIONS: Array<{ label: string; value: FindingDispositionStatu
   { label: 'Deferred', value: 'Deferred' },
 ];
 
+const DECISION_OPTIONS: Array<{ label: string; value: RecommendationDecisionStatus | 'all' }> = [
+  { label: 'All decisions', value: 'all' },
+  { label: 'Ready to replace', value: 'ready_to_replace' },
+  { label: 'Rejected', value: 'rejected' },
+  { label: 'Accepted with modifications', value: 'accepted_with_modifications' },
+];
+
 const PAGE_SIZE = 10;
 
 export default function ReviewHistory() {
   const { data: currentUser } = useCurrentUser();
   const [workflow, setWorkflow] = useState<ReviewWorkflow | 'all'>('all');
   const [dispositionFilter, setDispositionFilter] = useState<FindingDispositionStatus | 'all'>('all');
+  const [decisionFilter, setDecisionFilter] = useState<RecommendationDecisionStatus | 'all'>('all');
   const [page, setPage] = useState(1);
   const selectedWorkflow = workflow === 'all' ? undefined : workflow;
   const { data, isLoading, isError, error } = useReviewHistory(selectedWorkflow, 50);
 
   const filteredEntries = useMemo(() => {
     if (!data?.entries) return [];
-    if (dispositionFilter === 'all') return data.entries;
-    return data.entries.filter((entry) =>
-      entry.dispositions.some((d) => d.disposition === dispositionFilter)
-    );
-  }, [data?.entries, dispositionFilter]);
+    return data.entries.filter((entry) => {
+      const matchesDisposition =
+        dispositionFilter === 'all' ||
+        entry.dispositions.some((d) => d.disposition === dispositionFilter);
+      const matchesDecision =
+        decisionFilter === 'all' || entry.recommendation_decision?.decision === decisionFilter;
+      return matchesDisposition && matchesDecision;
+    });
+  }, [data?.entries, dispositionFilter, decisionFilter]);
 
   const totalPages = Math.ceil(filteredEntries.length / PAGE_SIZE);
   const pagedEntries = filteredEntries.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
@@ -63,6 +75,10 @@ export default function ReviewHistory() {
   };
   const handleDispositionChange = (value: FindingDispositionStatus | 'all') => {
     setDispositionFilter(value);
+    setPage(1);
+  };
+  const handleDecisionChange = (value: RecommendationDecisionStatus | 'all') => {
+    setDecisionFilter(value);
     setPage(1);
   };
 
@@ -105,6 +121,21 @@ export default function ReviewHistory() {
           sx={reviewHistoryStyles.filterSelect}
         >
           {DISPOSITION_OPTIONS.map((option) => (
+            <MenuItem key={option.value} value={option.value}>
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
+
+        <TextField
+          select
+          size="small"
+          label="Recommendation decision"
+          value={decisionFilter}
+          onChange={(e) => handleDecisionChange(e.target.value as RecommendationDecisionStatus | 'all')}
+          sx={reviewHistoryStyles.filterSelect}
+        >
+          {DECISION_OPTIONS.map((option) => (
             <MenuItem key={option.value} value={option.value}>
               {option.label}
             </MenuItem>
@@ -167,6 +198,7 @@ export default function ReviewHistory() {
                     findings={entry.findings}
                     reviewId={entry.review_id}
                     dispositions={entry.dispositions}
+                    decision={entry.recommendation_decision}
                     readOnly
                   />
                 ) : (

@@ -94,4 +94,31 @@ export const finalRecommendationStyles = {
     fontFamily: 'monospace',
     fontSize: 13,
   } satisfies SxProps<Theme>,
+  decisionReadOnlyRow: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 1,
+    flexWrap: 'wrap',
+  } satisfies SxProps<Theme>,
+  decisionDetailBox: {
+    p: 1.25,
+    borderRadius: 2,
+    border: '1px solid',
+    borderColor: 'divider',
+    bgcolor: 'action.hover',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word',
+  } satisfies SxProps<Theme>,
+  actionRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 1.5,
+  } satisfies SxProps<Theme>,
+  savedIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 0.5,
+    color: 'success.main',
+  } satisfies SxProps<Theme>,
 };

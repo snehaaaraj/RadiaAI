@@ -1,6 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { applyFindingDisposition, fetchReviewHistory } from '@/radia_ai/features/jamaRequirementReviewer/api/review';
-import type { ApplyFindingDispositionRequest, ReviewWorkflow } from '@/types/api';
+import {
+  applyFindingDisposition,
+  applyRecommendationDecision,
+  fetchReviewHistory,
+} from '@/radia_ai/features/jamaRequirementReviewer/api/review';
+import type {
+  ApplyFindingDispositionRequest,
+  ApplyRecommendationDecisionRequest,
+  ReviewWorkflow,
+} from '@/types/api';
 
 export const REVIEW_HISTORY_QUERY_KEY = (workflow?: ReviewWorkflow, limit = 100) =>
   ['review-history', workflow ?? 'all', limit] as const;
@@ -23,6 +31,22 @@ export function useApplyFindingDisposition() {
   return useMutation({
     mutationFn: ({ reviewId, payload }: ApplyFindingDispositionVariables) =>
       applyFindingDisposition(reviewId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['review-history'] });
+    },
+  });
+}
+
+interface ApplyRecommendationDecisionVariables {
+  reviewId: string;
+  payload: ApplyRecommendationDecisionRequest;
+}
+
+export function useApplyRecommendationDecision() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reviewId, payload }: ApplyRecommendationDecisionVariables) =>
+      applyRecommendationDecision(reviewId, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['review-history'] });
     },

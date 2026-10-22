@@ -20,6 +20,7 @@ from app.core.azure_clients import BlobStorageClient
 from app.core.exceptions import ValidationError
 from radia_ai.features.jama_requirement_reviewer.models.review_history_models import (
     FindingDisposition,
+    RecommendationDecision,
     ReviewHistoryEntry,
     ReviewWorkflow,
 )
@@ -155,5 +156,30 @@ class ReviewHistoryRepository:
         ]
         updated_dispositions.append(disposition)
         updated_entry = entry.model_copy(update={"dispositions": updated_dispositions})
+        self._put(updated_entry)
+        return updated_entry
+
+    def apply_recommendation_decision(
+        self,
+        review_id: str,
+        decision: RecommendationDecision,
+        owner_id: str | None = None,
+    ) -> ReviewHistoryEntry:
+        """Record a decision on the final recommendation; ``owner_id`` restricts the update."""
+        entry = self._get(review_id)
+        # Another user's review is reported as missing so review ids cannot be probed.
+        if entry is None or (owner_id is not None and entry.owner_id != owner_id):
+            raise ValidationError(
+                "Review ID not found in history.",
+                detail={"review_id": review_id},
+            )
+
+        if entry.final_recommendation is None:
+            raise ValidationError(
+                "This review has no final recommendation to decide on.",
+                detail={"review_id": review_id},
+            )
+
+        updated_entry = entry.model_copy(update={"recommendation_decision": decision})
         self._put(updated_entry)
         return updated_entry

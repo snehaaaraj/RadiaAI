@@ -2,6 +2,7 @@ import apiClient from '@/api/client';
 import type {
   APIResponse,
   ApplyFindingDispositionRequest,
+  ApplyRecommendationDecisionRequest,
   DeltaReviewInput,
   DeltaReviewResponse,
   RequirementReviewInput,
@@ -52,6 +53,17 @@ export async function applyFindingDisposition(
 ): Promise<ReviewHistoryEntry> {
   const { data } = await apiClient.post<APIResponse<ReviewHistoryEntry>>(
     `/review/history/${reviewId}/disposition`,
+    payload
+  );
+  return data.data;
+}
+
+export async function applyRecommendationDecision(
+  reviewId: string,
+  payload: ApplyRecommendationDecisionRequest
+): Promise<ReviewHistoryEntry> {
+  const { data } = await apiClient.post<APIResponse<ReviewHistoryEntry>>(
+    `/review/history/${reviewId}/decision`,
     payload
   );
   return data.data;

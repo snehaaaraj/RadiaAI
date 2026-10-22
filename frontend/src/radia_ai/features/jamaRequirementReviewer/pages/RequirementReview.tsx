@@ -18,7 +18,7 @@ import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/com
 import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
 import { useRequirementReview } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useRequirementReview';
-import { useApplyFindingDisposition } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
+import { useApplyFindingDisposition, useApplyRecommendationDecision } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import {
   REQUIREMENT_REVIEW_RESULT_KEY,
   purgeLegacyReviewResults,
@@ -82,6 +82,7 @@ export default function RequirementReview() {
     error,
   } = useRequirementReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
+  const { mutate: applyDecision, isPending: isApplyingDecision } = useApplyRecommendationDecision();
   const playReviewCompleteSound = useReviewCompleteSound();
 
   // On mount: if disposition was saved last time, clear all review data
@@ -417,6 +418,11 @@ export default function RequirementReview() {
                     applyDisposition({ reviewId, payload });
                   }}
                   isApplyingDisposition={isApplyingDisposition}
+                  onApplyDecision={(reviewId, payload) => {
+                    sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
+                    applyDecision({ reviewId, payload });
+                  }}
+                  isApplyingDecision={isApplyingDecision}
                 />
               ) : (
                 <ReviewChangeSet
