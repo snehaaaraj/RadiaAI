@@ -157,7 +157,10 @@ def test_review_history_recommendation_decision_requires_modified_description(
     assert decision_response.status_code == 200
     recommendation_decision = decision_response.json()["data"]["recommendation_decision"]
     assert recommendation_decision["decision"] == "accepted_with_modifications"
-    assert recommendation_decision["modified_description"] == "The subsystem shall respond within 200 ms."
+    assert (
+        recommendation_decision["modified_description"]
+        == "The subsystem shall respond within 200 ms."
+    )
 
 
 @pytest.mark.unit

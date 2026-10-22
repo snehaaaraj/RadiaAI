@@ -14,7 +14,7 @@ import Typography from '@mui/material/Typography';
 import { alpha, useTheme } from '@mui/material/styles';
 import { motion } from 'framer-motion';
 import { TopBar } from '@/components/layout/TopBar';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { RadiaMark } from '@/components/layout/RadiaMark';
 import { useAppContext } from '@/context/useAppContext';
@@ -73,8 +73,6 @@ export default function Landing() {
   const { motionPreference } = useAppContext();
   const reduceMotion = motionPreference === 'reduced';
   const isDark = theme.palette.mode === 'dark';
-  const resourcesRef = useRef<HTMLDivElement | null>(null);
-  const scrollToResources = () => resourcesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   const [searchParams] = useSearchParams();
   const requestedToolId = searchParams.get('tool');
@@ -175,17 +173,7 @@ export default function Landing() {
                       Intelligent requirements quality review, built for modern engineering teams.
                     </Typography>
                     <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                      {msalInstance ? (
-                        <LandingAuthAction onEnterWorkspace={scrollToResources} />
-                      ) : (
-                        <Button
-                          variant="contained"
-                          size="large"
-                          onClick={scrollToResources}
-                        >
-                          Enter workspace
-                        </Button>
-                      )}
+                      {msalInstance && <LandingAuthAction />}
                       <Button variant="outlined" size="large" onClick={() => navigate(ROUTES.SETTINGS)}>
                         Personalize experience
                       </Button>
@@ -229,7 +217,7 @@ export default function Landing() {
               ))}
             </Grid>
 
-            <Box ref={resourcesRef}>
+            <Box>
               <motion.div
                 initial={reduceMotion ? false : { opacity: 0, y: 16 }}
                 animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
@@ -293,19 +281,11 @@ export default function Landing() {
   );
 }
 
-function LandingAuthAction({ onEnterWorkspace }: { onEnterWorkspace: () => void }) {
+function LandingAuthAction() {
   const isAuthenticated = useIsAuthenticated();
 
   if (isAuthenticated) {
-    return (
-      <Button
-        variant="contained"
-        size="large"
-        onClick={onEnterWorkspace}
-      >
-        Enter workspace
-      </Button>
-    );
+    return null;
   }
 
   return (
