@@ -212,7 +212,7 @@ export type ReviewStatus =
   | 'Not Evaluated';
 export type PassFail = 'Pass' | 'Fail';
 export type FindingSeverity = 'Low' | 'Medium' | 'High' | 'Critical';
-export type ReviewWorkflow = 'requirement' | 'delta';
+export type ReviewWorkflow = 'requirement' | 'delta' | 'set';
 export type FindingDispositionStatus = 'Accepted' | 'Rejected' | 'Deferred';
 
 export type ReviewCompletionStatus = 'complete' | 'partial' | 'failed';
@@ -294,6 +294,8 @@ export interface RequirementReviewInput {
   text: string;
   requirement_level?: string | null;
   metadata?: Record<string, string>;
+  /** Where this review was submitted from; recorded in history for filtering. */
+  source?: 'single' | 'set';
 }
 
 export interface DeltaReviewInput {

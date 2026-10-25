@@ -76,12 +76,14 @@ async def review_requirement(
 ) -> APIResponse[RequirementReviewResponse]:
     logger.info("requirement_review_requested", requirement_id=body.requirement_id or "")
     response = await to_thread.run_sync(service.review_requirement, body)
+    workflow = ReviewWorkflow.SET if body.source == "set" else ReviewWorkflow.REQUIREMENT
     review_id = await to_thread.run_sync(
         lambda: history_service.record_requirement_review(
             subject_id=body.requirement_id,
             response=response,
             owner_id=user.subject_key,
             owner_name=user.display_name or user.email,
+            workflow=workflow,
         )
     )
     response = response.model_copy(update={"review_id": review_id})
