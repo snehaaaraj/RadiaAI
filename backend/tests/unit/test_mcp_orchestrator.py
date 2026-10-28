@@ -11,6 +11,7 @@ import pytest
 
 from app.core.config import MCPSettings
 from app.services.mcp.client import MCPClientAdapter
+from app.services.mcp.errors import MCPUnavailableError
 from app.services.mcp.orchestrator import run_chat_with_tools
 from app.services.mcp.transport import MCPToolCallResult, MCPToolDescriptor
 
@@ -104,6 +105,37 @@ async def test_falls_back_to_plain_completion_when_no_tools_are_available() -> N
 
     assert result.used_mcp is False
     assert result.answer == "Plain answer, no tools involved."
+
+
+async def test_falls_back_to_plain_completion_when_tool_discovery_fails() -> None:
+    """Regression test: mcp-radia being unreachable/misconfigured (e.g. a wrong
+    MCP_SERVER_URL causing every request to 404) must never crash the chat
+    response - it must degrade to a plain, tool-less answer instead, exactly
+    like having zero allowed tools.
+    """
+    settings = _settings()
+
+    class FailingTransport:
+        async def list_tools(self):  # type: ignore[no-untyped-def]
+            raise MCPUnavailableError("The MCP server endpoint was not found.")
+
+    mcp_client = _adapter_with_fake_transport(settings, FailingTransport())
+    openai_client = FakeOpenAIClient(final_answer="Plain answer despite MCP being down.")
+
+    result = await run_chat_with_tools(
+        openai_client=openai_client,  # type: ignore[arg-type]
+        mcp_client=mcp_client,
+        settings=settings,
+        system_prompt="system",
+        question="What is the sky?",
+        conversation_history=[],
+        model="gpt",
+        max_tokens=100,
+        trusted_source_hosts=frozenset(),
+    )
+
+    assert result.used_mcp is False
+    assert result.answer == "Plain answer despite MCP being down."
 
 
 async def test_executes_an_approved_tool_call_and_surfaces_a_validated_source() -> None:

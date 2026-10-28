@@ -120,9 +120,15 @@ async def run_chat_with_tools(
     """Run the bounded tool-augmented chat loop and return the final answer.
 
     Falls back to a plain (tool-less) completion if MCP has no approved
-    tools available right now - the caller does not need to branch on that.
+    tools available right now, or if mcp-radia cannot be reached at all for
+    tool discovery - the caller does not need to branch on either case, and
+    an MCP outage must never prevent chat from answering ordinary questions.
     """
-    tools = await mcp_client.available_tools()
+    try:
+        tools = await mcp_client.available_tools()
+    except MCPError:
+        logger.warning("mcp_tool_discovery_failed", exc_info=True)
+        tools = []
     messages: list[dict[str, Any]] = [{"role": "system", "content": system_prompt}]
     messages.extend(conversation_history)
     messages.append({"role": "user", "content": question})
