@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { buildContribution, buildFinding, buildRecommendation } from '../test/recommendationFixtures';
 import { FinalRecommendationPanel } from './FinalRecommendationPanel';
@@ -95,6 +95,145 @@ describe('FinalRecommendationPanel', () => {
 
     expect(screen.getByText('Skillz not applied')).toBeInTheDocument();
     expect(screen.getByText('Skillz not applied: the Skillz rules could not be loaded.')).toBeInTheDocument();
+  });
+
+  describe('writing to Jama', () => {
+    const jamaTarget = { itemId: 101, documentKey: 'SYS-REQ-1', webUrl: null };
+
+    it('confirms and writes the exact recommended text for Ready to replace', () => {
+      const onApplyDecision = vi.fn();
+      render(
+        <FinalRecommendationPanel
+          recommendation={buildRecommendation()}
+          findings={[buildFinding()]}
+          reviewId="rev-1"
+          onApplyDecision={onApplyDecision}
+          jamaTarget={jamaTarget}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Ready to replace' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save & write to Jama' }));
+
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByText('Write to Jama SYS-REQ-1?')).toBeInTheDocument();
+      expect(within(dialog).getByTestId('jama-write-preview')).toHaveTextContent(
+        /^The system shall respond within 2 s\.$/
+      );
+      expect(onApplyDecision).not.toHaveBeenCalled();
+
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Write to Jama' }));
+
+      expect(onApplyDecision).toHaveBeenCalledWith(
+        'rev-1',
+        { decision: 'ready_to_replace', reason: '', modified_description: null },
+        { writeToJama: true }
+      );
+    });
+
+    it('writes the reviewer-modified text for Accept, but modify', () => {
+      const onApplyDecision = vi.fn();
+      render(
+        <FinalRecommendationPanel
+          recommendation={buildRecommendation()}
+          findings={[buildFinding()]}
+          reviewId="rev-1"
+          onApplyDecision={onApplyDecision}
+          jamaTarget={jamaTarget}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Accept, but modify' }));
+      fireEvent.change(screen.getByLabelText(/Modified description/), {
+        target: { value: 'The system shall respond within 1 s.' },
+      });
+      fireEvent.click(screen.getByRole('button', { name: 'Save & write to Jama' }));
+
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByTestId('jama-write-preview')).toHaveTextContent(
+        /^The system shall respond within 1 s\.$/
+      );
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Write to Jama' }));
+
+      expect(onApplyDecision).toHaveBeenCalledWith(
+        'rev-1',
+        {
+          decision: 'accepted_with_modifications',
+          reason: '',
+          modified_description: 'The system shall respond within 1 s.',
+        },
+        { writeToJama: true }
+      );
+    });
+
+    it('never offers a Jama write for a rejection or a review not pulled from Jama', () => {
+      const onApplyDecision = vi.fn();
+      const { rerender } = render(
+        <FinalRecommendationPanel
+          recommendation={buildRecommendation()}
+          findings={[buildFinding()]}
+          reviewId="rev-1"
+          onApplyDecision={onApplyDecision}
+          jamaTarget={jamaTarget}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Reject with reason' }));
+      expect(screen.getByRole('button', { name: 'Save decision' })).toBeInTheDocument();
+
+      rerender(
+        <FinalRecommendationPanel
+          recommendation={buildRecommendation()}
+          findings={[buildFinding()]}
+          reviewId="rev-1"
+          onApplyDecision={onApplyDecision}
+        />
+      );
+      fireEvent.click(screen.getByRole('button', { name: 'Ready to replace' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Save decision' }));
+
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      expect(onApplyDecision).toHaveBeenCalledWith(
+        'rev-1',
+        { decision: 'ready_to_replace', reason: '', modified_description: null },
+        { writeToJama: false }
+      );
+    });
+
+    it('shows the write result and errors', () => {
+      const { rerender } = render(
+        <FinalRecommendationPanel
+          recommendation={buildRecommendation()}
+          findings={[buildFinding()]}
+          reviewId="rev-1"
+          onApplyDecision={vi.fn()}
+          jamaTarget={jamaTarget}
+          jamaWriteError="This Jama item was changed after it was reviewed."
+        />
+      );
+      expect(screen.getByText('Not written to Jama')).toBeInTheDocument();
+      expect(screen.getByText('This Jama item was changed after it was reviewed.')).toBeInTheDocument();
+
+      rerender(
+        <FinalRecommendationPanel
+          recommendation={buildRecommendation()}
+          findings={[buildFinding()]}
+          reviewId="rev-1"
+          onApplyDecision={vi.fn()}
+          jamaTarget={jamaTarget}
+          jamaWrite={{
+            item_id: 101,
+            document_key: 'SYS-REQ-1',
+            decision: 'ready_to_replace',
+            description: 'The system shall respond within 2 s.',
+            written_by: 'engineer@example.com',
+            written_at: '2026-01-01T00:00:00Z',
+            web_url: null,
+          }}
+        />
+      );
+      expect(screen.getByText('Written to Jama')).toBeInTheDocument();
+    });
   });
 
   it('falls back to the individual suggestions when synthesis failed', () => {

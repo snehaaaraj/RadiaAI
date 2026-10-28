@@ -320,6 +320,13 @@ class JamaPermissionDeniedError(RadiaBaseException):
     error_code = "JAMA_PERMISSION_DENIED"
 
 
+class JamaWriteConflictError(RadiaBaseException):
+    """Raised when a Jama write would overwrite a change made since the review, or the item is locked."""
+
+    http_status = HTTPStatus.CONFLICT
+    error_code = "JAMA_WRITE_CONFLICT"
+
+
 class JamaServiceError(RadiaBaseException):
     """Raised when a call to the Jama REST API fails."""
 

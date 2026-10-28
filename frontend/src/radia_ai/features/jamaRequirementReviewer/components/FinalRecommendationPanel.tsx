@@ -27,6 +27,7 @@ import type {
   ApplyRecommendationDecisionRequest,
   FinalRecommendation,
   FindingDisposition,
+  JamaWriteRecord,
   RecommendationDecision,
   RecommendationDecisionStatus,
   RecommendationStatus,
@@ -81,10 +82,35 @@ interface FinalRecommendationPanelProps {
   onApplyDisposition?: (reviewId: string, payload: ApplyFindingDispositionRequest) => void;
   isApplyingDisposition?: boolean;
   decision?: RecommendationDecision | null;
-  onApplyDecision?: (reviewId: string, payload: ApplyRecommendationDecisionRequest) => void;
+  onApplyDecision?: (
+    reviewId: string,
+    payload: ApplyRecommendationDecisionRequest,
+    options?: ApplyDecisionOptions
+  ) => void;
   isApplyingDecision?: boolean;
+  /** The Jama item the review was run on; when set, accepted decisions are written back to it. */
+  jamaTarget?: JamaWriteTarget | null;
+  jamaWrite?: JamaWriteRecord | null;
+  isWritingToJama?: boolean;
+  jamaWriteError?: string | null;
   readOnly?: boolean;
 }
+
+export interface JamaWriteTarget {
+  itemId: number;
+  documentKey: string | null;
+  webUrl?: string | null;
+}
+
+export interface ApplyDecisionOptions {
+  /** Write the approved Description to the Jama item once the decision is saved. */
+  writeToJama?: boolean;
+}
+
+const JAMA_WRITABLE_DECISIONS: ReadonlySet<RecommendationDecisionStatus> = new Set([
+  'ready_to_replace',
+  'accepted_with_modifications',
+]);
 
 /**
  * The primary review artifact: ONE recommended Description that can replace the
@@ -100,6 +126,10 @@ export function FinalRecommendationPanel({
   decision,
   onApplyDecision,
   isApplyingDecision = false,
+  jamaTarget,
+  jamaWrite,
+  isWritingToJama = false,
+  jamaWriteError,
   readOnly = false,
 }: FinalRecommendationPanelProps) {
   const [ruleId, setRuleId] = useState<string | null>(null);
@@ -187,6 +217,10 @@ export function FinalRecommendationPanel({
             recommendedDescription={recommended}
             onApplyDecision={onApplyDecision}
             isApplyingDecision={isApplyingDecision}
+            jamaTarget={jamaTarget}
+            jamaWrite={jamaWrite}
+            isWritingToJama={isWritingToJama}
+            jamaWriteError={jamaWriteError}
             readOnly={readOnly}
           />
 
@@ -311,8 +345,12 @@ interface RecommendationDecisionPanelProps {
   reviewId?: string | null;
   decision?: RecommendationDecision | null;
   recommendedDescription: string;
-  onApplyDecision?: (reviewId: string, payload: ApplyRecommendationDecisionRequest) => void;
+  onApplyDecision?: FinalRecommendationPanelProps['onApplyDecision'];
   isApplyingDecision?: boolean;
+  jamaTarget?: JamaWriteTarget | null;
+  jamaWrite?: JamaWriteRecord | null;
+  isWritingToJama?: boolean;
+  jamaWriteError?: string | null;
   readOnly?: boolean;
 }
 
@@ -322,6 +360,10 @@ function RecommendationDecisionPanel({
   recommendedDescription,
   onApplyDecision,
   isApplyingDecision = false,
+  jamaTarget,
+  jamaWrite,
+  isWritingToJama = false,
+  jamaWriteError,
   readOnly = false,
 }: RecommendationDecisionPanelProps) {
   const [selectedDecision, setSelectedDecision] = useState<RecommendationDecisionStatus | ''>(
@@ -332,6 +374,7 @@ function RecommendationDecisionPanel({
     decision?.modified_description ?? recommendedDescription
   );
   const [saved, setSaved] = useState(false);
+  const [confirmJamaOpen, setConfirmJamaOpen] = useState(false);
 
   if (readOnly) {
     if (!decision) return null;
@@ -363,6 +406,7 @@ function RecommendationDecisionPanel({
               </Box>
             </Box>
           )}
+          {jamaWrite && <JamaWriteStatus record={jamaWrite} />}
         </Stack>
       </Box>
     );
@@ -374,6 +418,28 @@ function RecommendationDecisionPanel({
     Boolean(reviewId && selectedDecision) &&
     (selectedDecision !== 'rejected' || reason.trim().length > 0) &&
     (selectedDecision !== 'accepted_with_modifications' || modifiedDescription.trim().length > 0);
+
+  const willWriteToJama = Boolean(jamaTarget) && selectedDecision !== '' && JAMA_WRITABLE_DECISIONS.has(selectedDecision);
+  // Exactly what the backend writes for the chosen decision.
+  const textForJama =
+    selectedDecision === 'accepted_with_modifications' ? modifiedDescription.trim() : recommendedDescription.trim();
+  const jamaLabel = jamaTarget ? jamaTarget.documentKey ?? `item ${jamaTarget.itemId}` : '';
+
+  const submitDecision = (writeToJama: boolean) => {
+    if (!reviewId || !selectedDecision) return;
+    setSaved(false);
+    onApplyDecision(
+      reviewId,
+      {
+        decision: selectedDecision,
+        reason: selectedDecision === 'rejected' ? reason : '',
+        modified_description:
+          selectedDecision === 'accepted_with_modifications' ? modifiedDescription : null,
+      },
+      { writeToJama }
+    );
+    setSaved(true);
+  };
 
   return (
     <Box sx={styles.sectionBox}>
@@ -423,20 +489,16 @@ function RecommendationDecisionPanel({
           <Button
             variant="contained"
             size="small"
-            disabled={!canSubmit || isApplyingDecision}
+            disabled={!canSubmit || isApplyingDecision || isWritingToJama}
             onClick={() => {
-              if (!reviewId || !selectedDecision) return;
-              setSaved(false);
-              onApplyDecision(reviewId, {
-                decision: selectedDecision,
-                reason: selectedDecision === 'rejected' ? reason : '',
-                modified_description:
-                  selectedDecision === 'accepted_with_modifications' ? modifiedDescription : null,
-              });
-              setSaved(true);
+              if (willWriteToJama) {
+                setConfirmJamaOpen(true);
+              } else {
+                submitDecision(false);
+              }
             }}
           >
-            Save decision
+            {willWriteToJama ? 'Save & write to Jama' : 'Save decision'}
           </Button>
           {saved && (
             <Box sx={styles.savedIndicator}>
@@ -447,8 +509,76 @@ function RecommendationDecisionPanel({
             </Box>
           )}
         </Box>
+
+        {isWritingToJama && (
+          <Alert severity="info">Writing the approved Description to Jama {jamaLabel}…</Alert>
+        )}
+        {!isWritingToJama && jamaWriteError && (
+          <Alert severity="error">
+            <AlertTitle>Not written to Jama</AlertTitle>
+            {jamaWriteError}
+          </Alert>
+        )}
+        {!isWritingToJama && !jamaWriteError && jamaWrite && <JamaWriteStatus record={jamaWrite} />}
       </Stack>
+
+      <Dialog open={confirmJamaOpen} onClose={() => setConfirmJamaOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Write to Jama {jamaLabel}?</DialogTitle>
+        <DialogContent dividers>
+          <Stack spacing={1.5}>
+            <Typography variant="body2">
+              The Description of{' '}
+              {jamaTarget?.webUrl ? (
+                <Link href={jamaTarget.webUrl} target="_blank" rel="noopener noreferrer">
+                  {jamaLabel}
+                </Link>
+              ) : (
+                jamaLabel
+              )}{' '}
+              will be replaced with the{' '}
+              {selectedDecision === 'accepted_with_modifications' ? 'modified' : 'recommended'} text
+              below. No other field is changed.
+            </Typography>
+            <Box sx={styles.decisionDetailBox}>
+              <Typography variant="body2" sx={{ whiteSpace: 'pre-wrap' }} data-testid="jama-write-preview">
+                {textForJama}
+              </Typography>
+            </Box>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setConfirmJamaOpen(false)}>Cancel</Button>
+          <Button
+            variant="contained"
+            onClick={() => {
+              setConfirmJamaOpen(false);
+              submitDecision(true);
+            }}
+          >
+            Write to Jama
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
+  );
+}
+
+function JamaWriteStatus({ record }: { record: JamaWriteRecord }) {
+  const label = record.document_key ?? `item ${record.item_id}`;
+  return (
+    <Alert severity="success">
+      <AlertTitle>Written to Jama</AlertTitle>
+      The {record.decision === 'accepted_with_modifications' ? 'modified' : 'recommended'} Description was
+      written to{' '}
+      {record.web_url ? (
+        <Link href={record.web_url} target="_blank" rel="noopener noreferrer">
+          {label}
+        </Link>
+      ) : (
+        label
+      )}
+      {record.written_by ? ` by ${record.written_by}` : ''} on {new Date(record.written_at).toLocaleString()}.
+    </Alert>
   );
 }
 

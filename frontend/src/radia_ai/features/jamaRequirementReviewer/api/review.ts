@@ -68,3 +68,11 @@ export async function applyRecommendationDecision(
   );
   return data.data;
 }
+
+/** Write the Description approved by the saved decision back to the reviewed Jama item. */
+export async function writeDecisionToJama(reviewId: string): Promise<ReviewHistoryEntry> {
+  const { data } = await apiClient.post<APIResponse<ReviewHistoryEntry>>(
+    `/review/history/${reviewId}/jama-write`
+  );
+  return data.data;
+}

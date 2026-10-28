@@ -305,6 +305,10 @@ export interface RequirementReviewInput {
   metadata?: Record<string, string>;
   /** Where this review was submitted from; recorded in history for filtering. */
   source?: 'single' | 'set';
+  /** Numeric Jama item id when the requirement was pulled from Jama (enables write-back). */
+  jama_item_id?: number | null;
+  /** The Jama item's modified date when it was pulled, used to detect later edits in Jama. */
+  jama_modified_date?: string | null;
 }
 
 export interface DeltaReviewInput {
@@ -482,6 +486,18 @@ export interface ApplyRecommendationDecisionRequest {
   reviewer_id?: string | null;
 }
 
+/** Audit record of a reviewer-approved Description written back to Jama. */
+export interface JamaWriteRecord {
+  item_id: number;
+  document_key: string | null;
+  decision: RecommendationDecisionStatus;
+  description: string;
+  written_by: string | null;
+  written_at: string;
+  web_url: string | null;
+  modified_date?: string | null;
+}
+
 export interface ReviewHistoryEntry {
   review_id: string;
   workflow: ReviewWorkflow;
@@ -500,6 +516,10 @@ export interface ReviewHistoryEntry {
   requirement_text?: string | null;
   final_recommendation?: FinalRecommendation | null;
   recommendation_decision?: RecommendationDecision | null;
+  /** Set when the reviewed requirement was pulled from Jama. */
+  jama_item_id?: number | null;
+  jama_modified_date?: string | null;
+  jama_write?: JamaWriteRecord | null;
 }
 
 export interface ReviewHistoryListResponse {

@@ -17,7 +17,7 @@ logger = get_logger(__name__)
 
 
 class JamaService:
-    """Read operations for Jama projects and requirements."""
+    """Read and write operations for Jama projects and requirements."""
 
     def __init__(self, client: JamaClient) -> None:
         self._client = client
@@ -58,4 +58,13 @@ class JamaService:
     def get_requirement(self, item_id: int) -> JamaRequirement:
         requirement = self._client.get_requirement(item_id)
         logger.info("jama_requirement_read", item_id=item_id, document_key=requirement.document_key)
+        return requirement
+
+    def update_requirement_description(self, item_id: int, description: str) -> JamaRequirement:
+        requirement = self._client.update_description(item_id, description)
+        logger.info(
+            "jama_requirement_description_written",
+            item_id=item_id,
+            document_key=requirement.document_key,
+        )
         return requirement

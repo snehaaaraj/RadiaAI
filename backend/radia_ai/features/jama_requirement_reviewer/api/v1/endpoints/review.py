@@ -7,6 +7,7 @@ from app.core.logging import get_logger
 from app.core.security import RadiaUserDep
 from app.schemas.common import APIResponse
 from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
+    JamaServiceDep,
     RequirementDeltaReviewServiceDep,
     RequirementReviewServiceDep,
     ReviewHistoryServiceDep,
@@ -84,6 +85,8 @@ async def review_requirement(
             owner_id=user.subject_key,
             owner_name=user.display_name or user.email,
             workflow=workflow,
+            jama_item_id=body.jama_item_id,
+            jama_modified_date=body.jama_modified_date,
         )
     )
     response = response.model_copy(update={"review_id": review_id})
@@ -199,6 +202,38 @@ async def apply_recommendation_decision(
             review_id=review_id,
             payload=body,
             reviewer_id=user.email or user.user_id,
+            owner_id=None if user.is_admin else user.subject_key,
+        )
+    )
+    return APIResponse(data=updated_entry, request_id=request.state.request_id)
+
+
+@router.post(
+    "/history/{review_id}/jama-write",
+    response_model=APIResponse[ReviewHistoryEntry],
+    summary="Write the approved Description back to Jama",
+    description=(
+        "Writes the Description approved by the saved reviewer decision to the Jama item "
+        "the review was run on: the final recommendation for 'Ready to replace', or the "
+        "reviewer's modified text for 'Accept, but modify'. Rejected recommendations are "
+        "never written. Only the Description field is changed, and the write runs as the "
+        "signed-in user's linked Jama account so Jama enforces their permissions."
+    ),
+    status_code=status.HTTP_200_OK,
+)
+async def write_decision_to_jama(
+    review_id: str,
+    request: Request,
+    user: RadiaUserDep,
+    service: ReviewHistoryServiceDep,
+    jama_service: JamaServiceDep,
+) -> APIResponse[ReviewHistoryEntry]:
+    logger.info("jama_write_requested", review_id=review_id)
+    updated_entry = await to_thread.run_sync(
+        lambda: service.write_decision_to_jama(
+            review_id=review_id,
+            jama_service=jama_service,
+            written_by=user.email or user.user_id,
             owner_id=None if user.is_admin else user.subject_key,
         )
     )

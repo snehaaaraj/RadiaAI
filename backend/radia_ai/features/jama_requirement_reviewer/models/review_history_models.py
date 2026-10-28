@@ -87,6 +87,20 @@ class ApplyRecommendationDecisionRequest(BaseModel):
     reviewer_id: str | None = None
 
 
+class JamaWriteRecord(BaseModel):
+    """Audit record of a reviewer-approved Description written back to Jama."""
+
+    item_id: int
+    document_key: str | None = None
+    decision: RecommendationDecisionStatus
+    description: str
+    written_by: str | None = None
+    written_at: str
+    web_url: str | None = None
+    # Jama's modifiedDate after the write; a later re-write expects to find this value.
+    modified_date: str | None = None
+
+
 class ReviewHistoryEntry(BaseModel):
     """Stored record for a completed review run."""
 
@@ -109,6 +123,10 @@ class ReviewHistoryEntry(BaseModel):
     requirement_text: str | None = None
     final_recommendation: FinalRecommendation | None = None
     recommendation_decision: RecommendationDecision | None = None
+    # Set when the reviewed requirement was pulled from Jama.
+    jama_item_id: int | None = None
+    jama_modified_date: str | None = None
+    jama_write: JamaWriteRecord | None = None
 
 
 class ReviewHistoryListResponse(BaseModel):
@@ -124,6 +142,8 @@ def create_requirement_history_entry(
     subject_id: str | None,
     response: RequirementReviewResponse,
     workflow: ReviewWorkflow = ReviewWorkflow.REQUIREMENT,
+    jama_item_id: int | None = None,
+    jama_modified_date: str | None = None,
 ) -> ReviewHistoryEntry:
     """Create a normalized history entry from single requirement response."""
     return ReviewHistoryEntry(
@@ -138,6 +158,8 @@ def create_requirement_history_entry(
         determinism=response.determinism,
         requirement_text=response.requirement_text,
         final_recommendation=response.final_recommendation,
+        jama_item_id=jama_item_id,
+        jama_modified_date=jama_modified_date,
     )
 
 

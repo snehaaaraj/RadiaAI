@@ -18,7 +18,7 @@ import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/com
 import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
 import { useRequirementReview } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useRequirementReview';
-import { useApplyFindingDisposition, useApplyRecommendationDecision } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
+import { useApplyFindingDisposition, useApplyRecommendationDecision, useWriteDecisionToJama } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import {
   REQUIREMENT_REVIEW_RESULT_KEY,
   purgeLegacyReviewResults,
@@ -29,6 +29,7 @@ import { usePersistentState } from '@/hooks/usePersistentState';
 import type { RequirementReviewResponse } from '@/types/api';
 import type { JamaRequirement } from '@/types/api';
 import { ErrorDisplay } from '@/components/ErrorDisplay';
+import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import { normalizeRequirementLevel, REQUIREMENT_LEVELS } from '@/utils/requirementLevels';
 import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import { getReviewQualityScore } from '@/utils/reviewQuality';
@@ -38,12 +39,17 @@ import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { requirementReviewStyles } from './RequirementReview.styles';
 
 type InputMode = 'paste' | 'upload' | 'jama';
+type JamaSource = { itemId: number; documentKey: string | null; modifiedDate: string | null; webUrl: string | null };
 type RequirementReviewFormState = {
   requirementId: string;
   requirementLevel: string;
   text: string;
   inputMode: InputMode;
   uploadedFilename: string;
+  /** The Jama item currently loaded into the form. */
+  jamaSource?: JamaSource | null;
+  /** The Jama item the displayed review result was run on (the write-back target). */
+  reviewedJamaSource?: JamaSource | null;
 };
 
 const DEFAULT_FORM_STATE: RequirementReviewFormState = {
@@ -52,6 +58,8 @@ const DEFAULT_FORM_STATE: RequirementReviewFormState = {
   text: '',
   inputMode: 'paste',
   uploadedFilename: '',
+  jamaSource: null,
+  reviewedJamaSource: null,
 };
 
 const DISPOSITION_SAVED_KEY = 'requirement-review-disposition-saved';
@@ -72,6 +80,10 @@ export default function RequirementReview() {
   const [text, setText] = useState(formState.text);
   const [inputMode, setInputMode] = useState<InputMode>(formState.inputMode);
   const [uploadedFilename, setUploadedFilename] = useState(formState.uploadedFilename);
+  const [jamaSource, setJamaSource] = useState<JamaSource | null>(formState.jamaSource ?? null);
+  const [reviewedJamaSource, setReviewedJamaSource] = useState<JamaSource | null>(
+    formState.reviewedJamaSource ?? null
+  );
 
   const {
     mutate: runReview,
@@ -83,6 +95,13 @@ export default function RequirementReview() {
   } = useRequirementReview();
   const { mutate: applyDisposition, isPending: isApplyingDisposition } = useApplyFindingDisposition();
   const { mutate: applyDecision, isPending: isApplyingDecision } = useApplyRecommendationDecision();
+  const {
+    mutate: writeToJama,
+    data: jamaWriteEntry,
+    error: jamaWriteMutationError,
+    isPending: isWritingToJama,
+    reset: resetJamaWrite,
+  } = useWriteDecisionToJama();
   const playReviewCompleteSound = useReviewCompleteSound();
 
   // On mount: if disposition was saved last time, clear all review data
@@ -97,6 +116,8 @@ export default function RequirementReview() {
       setText(DEFAULT_FORM_STATE.text);
       setInputMode(DEFAULT_FORM_STATE.inputMode);
       setUploadedFilename(DEFAULT_FORM_STATE.uploadedFilename);
+      setJamaSource(null);
+      setReviewedJamaSource(null);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -141,7 +162,8 @@ export default function RequirementReview() {
     const normalized = normalizeRequirementText(content);
     setText(normalized);
     setUploadedFilename(filename);
-    updateFormState({ text: normalized, uploadedFilename: filename });
+    setJamaSource(null);
+    updateFormState({ text: normalized, uploadedFilename: filename, jamaSource: null });
   };
 
   const handleClearFile = () => {
@@ -160,10 +182,17 @@ export default function RequirementReview() {
       (part) => part.trim().length > 0
     );
     const nextText = normalizeRequirementText(parts.join('\n\n'));
+    const nextJamaSource: JamaSource = {
+      itemId: requirement.id,
+      documentKey: requirement.document_key,
+      modifiedDate: requirement.modified_date,
+      webUrl: requirement.web_url,
+    };
     setRequirementId(nextId);
     setText(nextText);
     setUploadedFilename('');
-    updateFormState({ requirementId: nextId, text: nextText, uploadedFilename: '' });
+    setJamaSource(nextJamaSource);
+    updateFormState({ requirementId: nextId, text: nextText, uploadedFilename: '', jamaSource: nextJamaSource });
   };
 
   const handleClearAll = () => {
@@ -175,20 +204,30 @@ export default function RequirementReview() {
     setText(DEFAULT_FORM_STATE.text);
     setInputMode(DEFAULT_FORM_STATE.inputMode);
     setUploadedFilename(DEFAULT_FORM_STATE.uploadedFilename);
+    setJamaSource(null);
+    setReviewedJamaSource(null);
     resetResult();
+    resetJamaWrite();
   };
 
   const submitReview = () => {
     if (!text.trim()) return;
+    // Only a requirement still loaded from Jama is a valid write-back target.
+    const source = inputMode === 'jama' ? jamaSource : null;
     runReview(
       {
         requirement_id: requirementId || undefined,
         requirement_level: requirementLevel,
         text: text.trim(),
+        jama_item_id: source?.itemId ?? null,
+        jama_modified_date: source?.modifiedDate ?? null,
       },
       {
         onSuccess: (response) => {
           setPersistedResult(response);
+          setReviewedJamaSource(source);
+          updateFormState({ reviewedJamaSource: source });
+          resetJamaWrite();
           // Don't signal "review complete" for a review that never ran.
           if (!isReviewFailed(response.completion)) {
             playReviewCompleteSound();
@@ -418,11 +457,36 @@ export default function RequirementReview() {
                     applyDisposition({ reviewId, payload });
                   }}
                   isApplyingDisposition={isApplyingDisposition}
-                  onApplyDecision={(reviewId, payload) => {
+                  onApplyDecision={(reviewId, payload, options) => {
                     sessionStorage.setItem(DISPOSITION_SAVED_KEY, 'true');
-                    applyDecision({ reviewId, payload });
+                    resetJamaWrite();
+                    applyDecision(
+                      { reviewId, payload },
+                      {
+                        // The backend writes the text of the decision it just stored.
+                        onSuccess: () => {
+                          if (options?.writeToJama) writeToJama(reviewId);
+                        },
+                      }
+                    );
                   }}
                   isApplyingDecision={isApplyingDecision}
+                  jamaTarget={
+                    reviewedJamaSource
+                      ? {
+                          itemId: reviewedJamaSource.itemId,
+                          documentKey: reviewedJamaSource.documentKey,
+                          webUrl: reviewedJamaSource.webUrl,
+                        }
+                      : null
+                  }
+                  jamaWrite={jamaWriteEntry?.jama_write ?? null}
+                  isWritingToJama={isWritingToJama}
+                  jamaWriteError={
+                    jamaWriteMutationError
+                      ? getApiErrorMessage(jamaWriteMutationError, 'Could not write to Jama.')
+                      : null
+                  }
                 />
               ) : (
                 <ReviewChangeSet

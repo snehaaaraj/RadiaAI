@@ -3,6 +3,7 @@ import {
   applyFindingDisposition,
   applyRecommendationDecision,
   fetchReviewHistory,
+  writeDecisionToJama,
 } from '@/radia_ai/features/jamaRequirementReviewer/api/review';
 import type {
   ApplyFindingDispositionRequest,
@@ -47,6 +48,16 @@ export function useApplyRecommendationDecision() {
   return useMutation({
     mutationFn: ({ reviewId, payload }: ApplyRecommendationDecisionVariables) =>
       applyRecommendationDecision(reviewId, payload),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['review-history'] });
+    },
+  });
+}
+
+export function useWriteDecisionToJama() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (reviewId: string) => writeDecisionToJama(reviewId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['review-history'] });
     },

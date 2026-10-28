@@ -3,6 +3,7 @@
 from radia_ai.features.jama_requirement_reviewer.models.review_history_models import (
     ApplyFindingDispositionRequest,
     ApplyRecommendationDecisionRequest,
+    JamaWriteRecord,
     RecommendationDecision,
     RecommendationDecisionStatus,
     ReviewHistoryEntry,
@@ -13,6 +14,7 @@ from radia_ai.features.jama_requirement_reviewer.models.review_history_models im
 __all__ = [
     "ApplyFindingDispositionRequest",
     "ApplyRecommendationDecisionRequest",
+    "JamaWriteRecord",
     "RecommendationDecision",
     "RecommendationDecisionStatus",
     "ReviewHistoryEntry",

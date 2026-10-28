@@ -20,6 +20,7 @@ Operations used by the app:
   - :meth:`search_requirements`  -> GET /rest/v1/abstractitems
   - :meth:`get_requirement`      -> GET /rest/v1/items/{id}
   - :meth:`get_current_user`     -> GET /rest/v1/users/current
+  - :meth:`update_description`   -> PATCH /rest/v1/items/{id} (Description field only)
 
 All failures are surfaced as domain exceptions so the API layer maps them to
 consistent error envelopes.
@@ -42,6 +43,7 @@ from app.core.exceptions import (
     JamaNotConfiguredError,
     JamaPermissionDeniedError,
     JamaServiceError,
+    JamaWriteConflictError,
 )
 from app.core.logging import get_logger
 from radia_ai.features.jama_requirement_reviewer.models.jama_models import (
@@ -122,6 +124,20 @@ def _strip_html(value: str | None) -> str:
     # Collapse runs of spaces but preserve newlines.
     lines = [_WS_RE.sub(" ", line).strip() for line in text.splitlines()]
     return "\n".join(line for line in lines if line != "").strip()
+
+
+def plain_text_to_jama_html(text: str) -> str:
+    """Convert plain text into the rich-text HTML Jama stores in its Description field.
+
+    Blank-line separated blocks become paragraphs and single newlines become line
+    breaks, so the text reads in Jama exactly as the reviewer approved it.
+    """
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    paragraphs = [block.strip() for block in re.split(r"\n\s*\n", normalized) if block.strip()]
+    return "".join(
+        "<p>" + "<br />".join(html.escape(line, quote=False) for line in block.split("\n")) + "</p>"
+        for block in paragraphs
+    )
 
 
 class JamaClient:
@@ -292,6 +308,12 @@ class JamaClient:
                     "Your Jama account does not have permission to access this Jama resource.",
                     detail={"path": path, "jama_status_code": status_code},
                 ) from exc
+            if method != "GET" and status_code in (409, 423):
+                raise JamaWriteConflictError(
+                    "Jama could not save the change because the item is locked or was "
+                    "changed by someone else. Unlock the item in Jama and try again.",
+                    detail={"path": path, "jama_status_code": status_code},
+                ) from exc
             raise JamaServiceError(
                 "Jama API returned an error response.",
                 operation=path,
@@ -409,6 +431,24 @@ class JamaClient:
                 detail={"item_id": item_id},
             )
         return self._requirement_from_raw(cast(dict[str, Any], data))
+
+    def update_description(self, item_id: int, description: str) -> JamaRequirement:
+        """Replace only the Description field of an item and return the updated item.
+
+        Uses a JSON Patch so no other field (name, rationale, status, ...) is touched.
+        """
+        self._request(
+            "PATCH",
+            f"items/{item_id}",
+            json=[
+                {
+                    "op": "replace",
+                    "path": "/fields/description",
+                    "value": plain_text_to_jama_html(description),
+                }
+            ],
+        )
+        return self.get_requirement(item_id)
 
     def get_current_user(self) -> JamaUserProfile:
         """Return the Jama user the current credentials authenticate as."""

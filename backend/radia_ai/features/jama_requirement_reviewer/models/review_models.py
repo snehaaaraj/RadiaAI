@@ -319,6 +319,20 @@ class RequirementReviewInput(BaseModel):
             "runs can be filtered by originating workflow."
         ),
     )
+    jama_item_id: int | None = Field(
+        default=None,
+        description=(
+            "Numeric Jama item id when the requirement was pulled from Jama. Recorded "
+            "so the reviewer's accepted Description can be written back to that item."
+        ),
+    )
+    jama_modified_date: str | None = Field(
+        default=None,
+        description=(
+            "The Jama item's modifiedDate when it was pulled, used to refuse a write-back "
+            "that would overwrite a change made in Jama after the review."
+        ),
+    )
 
 
 class ReviewVersionEntry(BaseModel):

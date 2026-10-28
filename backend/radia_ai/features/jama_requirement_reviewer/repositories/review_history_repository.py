@@ -20,6 +20,7 @@ from app.core.azure_clients import BlobStorageClient
 from app.core.exceptions import ValidationError
 from radia_ai.features.jama_requirement_reviewer.models.review_history_models import (
     FindingDisposition,
+    JamaWriteRecord,
     RecommendationDecision,
     ReviewHistoryEntry,
     ReviewWorkflow,
@@ -181,5 +182,25 @@ class ReviewHistoryRepository:
             )
 
         updated_entry = entry.model_copy(update={"recommendation_decision": decision})
+        self._put(updated_entry)
+        return updated_entry
+
+    def get_entry(self, review_id: str, owner_id: str | None = None) -> ReviewHistoryEntry:
+        """Return one entry; ``owner_id`` restricts lookup to that user's review."""
+        entry = self._get(review_id)
+        # Another user's review is reported as missing so review ids cannot be probed.
+        if entry is None or (owner_id is not None and entry.owner_id != owner_id):
+            raise ValidationError(
+                "Review ID not found in history.",
+                detail={"review_id": review_id},
+            )
+        return entry
+
+    def record_jama_write(
+        self, review_id: str, record: JamaWriteRecord, owner_id: str | None = None
+    ) -> ReviewHistoryEntry:
+        """Record that the approved Description was written back to Jama."""
+        entry = self.get_entry(review_id, owner_id=owner_id)
+        updated_entry = entry.model_copy(update={"jama_write": record})
         self._put(updated_entry)
         return updated_entry
