@@ -19,9 +19,6 @@ from __future__ import annotations
 import asyncio
 
 import anyio
-from jsonschema import Draft202012Validator
-from jsonschema.exceptions import SchemaError
-from jsonschema.exceptions import ValidationError as JSONSchemaValidationError
 
 from app.core.config import MCPSettings
 from app.core.logging import get_logger
@@ -32,6 +29,7 @@ from app.services.mcp.errors import (
     MCPToolNotAllowedError,
     MCPUnavailableError,
 )
+from app.services.mcp.schema_validation import SchemaValidationError, validate
 from app.services.mcp.transport import MCPToolCallResult, MCPToolDescriptor, MCPTransport
 
 logger = get_logger(__name__)
@@ -157,15 +155,8 @@ class MCPClientAdapter:
         if not schema:
             return
         try:
-            Draft202012Validator(schema).validate(arguments)
-        except JSONSchemaValidationError as exc:
+            validate(arguments, schema)
+        except SchemaValidationError as exc:
             raise MCPToolArgumentsInvalidError(
                 f"Arguments for '{descriptor.name}' failed validation: {exc.message}"
             ) from exc
-        except SchemaError:
-            # mcp-radia's own schema is malformed - fail safe (reject the call)
-            # rather than execute unvalidated arguments against a live system.
-            logger.error("mcp_tool_schema_invalid", tool=descriptor.name)
-            raise MCPToolArgumentsInvalidError(
-                f"Tool '{descriptor.name}' has an invalid schema and cannot be called."
-            ) from None

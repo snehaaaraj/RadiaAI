@@ -18,9 +18,6 @@ openai==1.58.1          # Azure OpenAI uses the openai SDK
 # HTTP client
 httpx==0.28.1
 
-# Schema validation for MCP tool-call arguments (chat integration)
-jsonschema==4.23.0
-
 # Document extraction
 PyMuPDF==1.25.1         # PDF text extraction
 python-docx==1.1.2      # DOCX text extraction
