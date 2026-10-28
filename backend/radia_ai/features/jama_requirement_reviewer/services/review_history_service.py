@@ -205,9 +205,7 @@ class ReviewHistoryService:
         return self._repository.record_jama_write(review_id, record, owner_id=owner_id)
 
     @staticmethod
-    def _approved_description(
-        entry: ReviewHistoryEntry, decision: RecommendationDecision
-    ) -> str:
+    def _approved_description(entry: ReviewHistoryEntry, decision: RecommendationDecision) -> str:
         if decision.decision == RecommendationDecisionStatus.READY_TO_REPLACE:
             recommendation = entry.final_recommendation
             text = recommendation.recommended_description if recommendation else None
