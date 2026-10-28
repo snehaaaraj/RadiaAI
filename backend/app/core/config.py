@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Annotated, Any, Literal, cast
 
 from pydantic import AnyHttpUrl, Field, StringConstraints, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.core.version import APP_VERSION
 
@@ -239,7 +239,7 @@ class SkillzSettings(BaseSettings):
         ),
         description="Path of the Skillz package zip within the SharePoint drive",
     )
-    applicable_levels: list[str] = Field(
+    applicable_levels: Annotated[list[str], NoDecode] = Field(
         default=["aircraft"],
         description="Requirement levels (case-insensitive) governed by this Skillz package",
     )
@@ -252,7 +252,11 @@ class SkillzSettings(BaseSettings):
     @field_validator("applicable_levels", mode="before")
     @classmethod
     def parse_applicable_levels(cls, value: str | list[str]) -> list[str]:
-        """Accept a list, a JSON list string, or a comma-separated string."""
+        """Accept a list, a JSON list string, or a comma-separated string.
+
+        Requires ``NoDecode`` on the field above - see ``MCPSettings.parse_allowed_tools``
+        for why a plain value like ``aircraft`` would otherwise crash at startup.
+        """
         if isinstance(value, list):
             return value
         import json
@@ -399,7 +403,7 @@ class MCPSettings(BaseSettings):
         gt=0,
         description="Tool results larger than this are truncated before reaching the model.",
     )
-    allowed_tools: list[str] = Field(
+    allowed_tools: Annotated[list[str], NoDecode] = Field(
         default=["jama_get_item", "jama_search", "jama_get_children"],
         description=(
             "Server-side allowlist. A tool mcp-radia advertises but that is not listed here "
@@ -412,7 +416,15 @@ class MCPSettings(BaseSettings):
     @field_validator("allowed_tools", mode="before")
     @classmethod
     def parse_allowed_tools(cls, value: str | list[str]) -> list[str]:
-        """Accept a list, a JSON list string, or a comma-separated string."""
+        """Accept a list, a JSON list string, or a comma-separated string.
+
+        Requires ``NoDecode`` on the field above: pydantic-settings otherwise
+        tries to ``json.loads()`` any environment value for a ``list[str]``
+        field *before* this validator ever runs, which raises ``SettingsError``
+        outright for a plain comma-separated value like
+        ``jama_get_item,jama_search`` - the exact format this field is
+        documented (and intended) to accept.
+        """
         if isinstance(value, list):
             return value
         import json
@@ -559,7 +571,7 @@ class AppSettings(BaseSettings):
 
     # --- API ---
     api_prefix: str = Field(default="/api/v1")
-    allowed_origins: list[str] = Field(
+    allowed_origins: Annotated[list[str], NoDecode] = Field(
         default=["http://localhost:5173", "http://localhost:3000"],
         description="CORS allowed origins",
     )
@@ -572,7 +584,7 @@ class AppSettings(BaseSettings):
     )
 
     # --- Auth ---
-    local_dev_user_roles: list[str] = Field(
+    local_dev_user_roles: Annotated[list[str], NoDecode] = Field(
         default=["Radia.Admin"],
         description=(
             "App roles granted to the synthetic user that is used only when ENVIRONMENT is "
@@ -591,7 +603,11 @@ class AppSettings(BaseSettings):
     @field_validator("local_dev_user_roles", mode="before")
     @classmethod
     def parse_local_dev_user_roles(cls, value: str | list[str]) -> list[str]:
-        """Accept a list, a JSON list string, or a comma-separated string."""
+        """Accept a list, a JSON list string, or a comma-separated string.
+
+        Requires ``NoDecode`` on the field above - see ``MCPSettings.parse_allowed_tools``
+        for why a bare comma-separated value would otherwise crash at startup.
+        """
         if isinstance(value, list):
             return value
         import json
@@ -607,7 +623,11 @@ class AppSettings(BaseSettings):
     @field_validator("allowed_origins", mode="before")
     @classmethod
     def parse_allowed_origins(cls, value: str | list[str]) -> list[str]:
-        """Parse ALLOWED_ORIGINS from JSON string or list."""
+        """Parse ALLOWED_ORIGINS from JSON string, comma-separated string, or list.
+
+        Requires ``NoDecode`` on the field above - see ``MCPSettings.parse_allowed_tools``
+        for why a bare comma-separated value would otherwise crash at startup.
+        """
         if isinstance(value, str):
             import json
 
