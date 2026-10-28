@@ -334,7 +334,12 @@ class JamaClient:
         remote = extract_remote_message(exc.response.text)
         if status == 404:
             raise ItemNotFoundError(
-                "The requested Jama resource was not found.",
+                "The requested Jama resource was not found. If this numeric id was derived from "
+                "a document key (e.g. the '42' in SRS-42), that is not the same value as the "
+                "numeric item id - call jama_search with the document key as the query to find "
+                "the correct numeric id, then retry with that id. Do not assume the item was "
+                "deleted or otherwise changed; this error only means the numeric id used was not "
+                "found.",
                 system=SYSTEM,
                 operation=path,
                 status_code=status,
