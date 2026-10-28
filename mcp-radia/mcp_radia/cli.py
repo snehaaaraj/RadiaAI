@@ -14,7 +14,7 @@ import sys
 from collections.abc import Sequence
 
 from mcp_radia import __version__
-from mcp_radia.auth import require_service_token
+from mcp_radia.asgi import build_http_app
 from mcp_radia.config import ServerSettings, get_settings
 from mcp_radia.logging import configure_logging, get_logger
 from mcp_radia.server import build_server
@@ -70,12 +70,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         import uvicorn
 
         try:
-            app = require_service_token(
-                server.streamable_http_app(
-                    streamable_http_path=settings.http_path, host=settings.host
-                ),
-                token=settings.service_token,
-            )
+            app = build_http_app(settings, stateless=False)
         except ValueError as exc:
             logger.error("mcp_server_misconfigured", error=str(exc))
             print(f"error: {exc}", file=sys.stderr)

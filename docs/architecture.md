@@ -478,9 +478,15 @@ overall deadline, never executes a tool outside the allowlist regardless of what
   has not linked Jama simply does not get Jama-backed answers; mcp-radia never
   falls back to a shared credential on the backend's behalf.
 - mcp-radia itself requires a shared service-to-service bearer token
-  (`MCP_SERVICE_TOKEN` / mcp-radia's `MCP_RADIA_SERVICE_TOKEN`) on every request,
-  and is deployed with ingress restricted to the private network - see
-  [`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep).
+  (`MCP_SERVICE_TOKEN` / mcp-radia's `MCP_RADIA_SERVICE_TOKEN`) on every request.
+  **Deployment-dependent network exposure:** the Azure Container Apps template
+  ([`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep)) restricts ingress to the
+  private network, so the bearer token is defense-in-depth on top of network
+  isolation. The **Vercel deployment path below has no such network boundary**
+  - mcp-radia's URL is reachable from the public internet, and the bearer
+    token is the *only* thing standing between the internet and whatever Jama
+    data it is configured to reach. This tradeoff is accepted for demo
+    purposes only; see the Vercel walkthrough below for what that implies.
 - Jira and Confluence linking is **on hold**: the Settings page shows a disabled
   "Link Atlassian account" placeholder, and no Jira/Confluence tools are in the
   default allowlist.
@@ -503,17 +509,90 @@ Key services:
 - Azure Blob Storage
 - Microsoft Entra ID
 - SharePoint
-- mcp-radia (optional, disabled by default - see 10.1 and the deployment walkthrough below)
+- mcp-radia (optional, disabled by default - see 10.1 and the deployment walkthroughs below)
 
 The project supports:
 
 - local backend development with Uvicorn
 - local frontend development with Vite
 - frontend deployment to Vercel from the repo root (`vercel.json`)
-- mcp-radia deployed separately to Azure Container Apps with internal-only ingress
-  ([`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep))
+- mcp-radia deployed either to **Vercel** (demo path, bearer-token-only - see below)
+  or to **Azure Container Apps with internal-only ingress** for a production
+  posture ([`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep))
 
-### MCP deployment and rollback walkthrough
+### MCP deployment walkthrough - Vercel (demo)
+
+This path mirrors how the backend itself is already deployed to Vercel
+(`backend/api/index.py` + `backend/vercel.json`): mcp-radia gets its own
+sibling `api/index.py` + `vercel.json`, deployed as its **own, separate**
+Vercel project (own URL, own environment variables, own dependency set - it
+never shares a build or a Python environment with the backend).
+
+mcp-radia's Streamable HTTP app runs in the MCP SDK's **stateless** mode for
+this path specifically: a serverless function gives no guarantee that two
+requests reach the same warm instance, so no in-memory session could survive
+between them regardless of mode. Each request is independently self-contained
+(no `initialize` handshake is required before a tool call) - see
+[`mcp_radia/asgi.py`](../mcp-radia/mcp_radia/asgi.py) for exactly what differs
+from the Azure/local path, including a Host-header check that had to be
+disabled specifically for this mode (a public domain is not loopback, and the
+SDK's auto-protection assumes it is).
+
+**Security tradeoff, stated plainly:** unlike the Container Apps path, Vercel
+has no "internal-only" networking option on this project's plan. mcp-radia's
+URL is publicly reachable; `MCP_RADIA_SERVICE_TOKEN` is the only access
+control. Anyone who obtains that token (e.g. a repository/environment-variable
+leak, a compromised backend) can call mcp-radia directly - bypassing
+Microsoft Entra ID sign-in and the backend entirely - and reach whatever Jama
+data mcp-radia is configured with. This is accepted here only because the
+goal is a demo with a scoped Jama trial instance, not a production rollout of
+real, sensitive requirements data. Do not point a demo deployment of this kind
+at a production Jama tenant.
+
+Steps:
+
+1. **Deploy mcp-radia to its own Vercel project**, with the project root set
+   to the `mcp-radia/` directory (same idea as the existing backend/frontend
+   Vercel projects, which are rooted at `backend/` and the repo root
+   respectively). Set these as that Vercel project's environment variables
+   (not `.env` - Vercel never sees `.env`, same as the backend today):
+   ```bash
+   MCP_RADIA_SERVICE_TOKEN=<generate: openssl rand -hex 32>
+   MCP_RADIA_ENVIRONMENT=production
+   JAMA_BASE_URL=https://yourorg.jamacloud.com      # your Jama trial instance
+   JAMA_AUTH_TYPE=basic                              # or oauth
+   JAMA_USERNAME=...                                 # shared-account fallback
+   JAMA_PASSWORD=...
+   ```
+   Deploy. Note the resulting URL, e.g. `https://mcp-radia-yourname.vercel.app`.
+2. **Configure the backend's MCP client** in the backend's own Vercel project
+   environment variables (or `backend/.env` for local testing):
+   ```bash
+   MCP_ENABLED=true
+   MCP_SERVER_URL=https://mcp-radia-yourname.vercel.app/mcp
+   MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
+   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children
+   ```
+   Redeploy the backend (or restart it locally) so the new variables take effect.
+3. **Verify the handshake and tool discovery**: ask the chat a Jama-shaped
+   question (e.g. "What does Jama item 12345 say?"). A `mcp_tools_discovered`
+   log line confirms the handshake; `mcp_tool_iteration_complete` confirms a
+   tool call executed.
+4. **Test an authenticated read-only request** end-to-end: sign in to Radia AI
+   with your Microsoft account (unchanged - this still gates the whole app),
+   link your Jama account in Settings, and ask about a Jama item you can read.
+   The response's `used_mcp`/`sources` fields (and the chat UI's "Engineering
+   data" chip) confirm the tool path was used.
+5. **Disable MCP without disrupting ordinary chat**: set `MCP_ENABLED=false`
+   on the backend and redeploy/restart. Chat immediately reverts to
+   document-only RAG answers; nothing else changes.
+6. **Roll back safely**: mcp-radia is an independent Vercel project - rolling
+   back its deployment (Vercel's own "Promote to Production" / instant
+   rollback on a prior deployment) never requires touching the backend or
+   frontend. Rolling the backend back to `MCP_ENABLED=false` is likewise an
+   instant, data-free rollback of just this feature.
+
+### MCP deployment walkthrough - Azure Container Apps (production posture)
 
 1. **Start mcp-radia locally** (for development/testing before any cloud deployment):
    ```bash
@@ -554,9 +633,11 @@ The project supports:
    the public internet. **Known gap:** the backend is currently deployed to
    Vercel, which cannot reach a Container Apps internal endpoint directly; until
    the backend is also network-integrated with mcp-radia (e.g. moved onto Azure
-   with VNet integration, or fronted by an authenticated private gateway), only
-   local/same-network deployments of both services can use this integration in
-   production. This is called out here deliberately rather than treated as solved.
+   with VNet integration, or fronted by an authenticated private gateway), this
+   path requires the backend to also run somewhere network-reachable from
+   mcp-radia's internal endpoint. Use the Vercel demo path above if both
+   services should simply be reachable from each other with no extra
+   infrastructure.
 8. **Restart/roll back safely**: mcp-radia is independent of the backend and
    frontend - restarting or rolling back its Container App (e.g. `az containerapp
    revision` commands) does not require redeploying either. Rolling the backend
@@ -571,8 +652,10 @@ The project supports:
   app role ([authentication.md](./authentication.md))
 - Jama is accessed as each signed-in user's own linked Jama account
 - The MCP chat integration is disabled by default, allowlists tools server-side,
-  validates arguments against each tool's schema, and is bound to a bearer-token-protected,
-  internal-only mcp-radia deployment - see section 10.1
+  validates arguments against each tool's schema, and requires a bearer token on
+  every request to mcp-radia; the production (Azure) deployment also restricts
+  mcp-radia's network ingress, while the Vercel demo deployment relies on the
+  bearer token alone - see section 10.1 for that explicit tradeoff
 - API responses use a consistent error envelope
 - Request IDs are propagated across logs and responses
 - Input validation is handled with Pydantic
@@ -594,7 +677,7 @@ The project supports:
 | Microsoft Entra ID authentication and authorization | Implemented | SPA sign-in with MSAL; API validates Entra access tokens (RS256/JWKS, issuer, audience, expiry, tenant, scope) and enforces `Radia.User` / `Radia.Admin` app roles on every non-public endpoint. Local/test environments may use a synthetic user; deployed environments fail closed. See [authentication.md](./authentication.md). |
 | Per-user Jama access | Implemented | Each user links their own Jama API credentials (encrypted at rest); all Jama calls run as that user so Jama enforces their project permissions. Review history is private per user. |
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
-| MCP chat integration (Jama) | Implemented, disabled by default | Bounded tool-calling loop over a separately deployed `mcp-radia` server; server-side allowlist + schema validation + per-user Jama credential forwarding. Jira/Confluence tools and Atlassian account linking are on hold (Settings shows a disabled placeholder). Production rollout additionally requires resolving backend-to-mcp-radia network reachability (see section 11). |
+| MCP chat integration (Jama) | Implemented, disabled by default | Bounded tool-calling loop over a separately deployed `mcp-radia` server; server-side allowlist + schema validation + per-user Jama credential forwarding. Jira/Confluence tools and Atlassian account linking are on hold (Settings shows a disabled placeholder). Deployable to Vercel (demo; bearer-token-only, no network isolation - see section 11) or Azure Container Apps (production posture; internal-only ingress). |
 
 ## 14. Summary
 

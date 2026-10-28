@@ -1,0 +1,8 @@
+# Vercel's @vercel/python builder reads this file, not pyproject.toml.
+# Kept deliberately minimal: only what api/index.py needs to build the ASGI
+# app. `uvicorn` is intentionally omitted - Vercel's runtime serves the ASGI
+# app directly and never runs our own server loop.
+mcp>=2.2.0,<3
+pydantic>=2.10,<3
+pydantic-settings>=2.7,<3
+structlog>=24.4
