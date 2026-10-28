@@ -102,6 +102,12 @@ class RAGService:
         self._openai = openai_client
         self._search = search_service
 
+    @property
+    def openai_client(self) -> OpenAIClient:
+        """The underlying Azure OpenAI client, for callers that need raw completions
+        (e.g. the MCP tool-calling orchestrator) rather than the grounded helpers below."""
+        return self._openai
+
     def retrieve(
         self,
         query: str,

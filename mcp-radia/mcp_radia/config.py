@@ -64,6 +64,15 @@ class ServerSettings(BaseSettings):
         default="/mcp",
         description="URL path the Streamable HTTP transport is mounted at.",
     )
+    service_token: str = Field(
+        default="",
+        description=(
+            "Shared bearer token the HTTP transport requires on every request. "
+            "Required to start the HTTP transport; ignored by stdio. Generate "
+            "with e.g. `openssl rand -hex 32` and configure the same value on "
+            "the RadiaAI backend's MCP client."
+        ),
+    )
 
     @property
     def http_url(self) -> str:

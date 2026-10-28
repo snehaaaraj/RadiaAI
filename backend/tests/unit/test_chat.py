@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Any, cast
 import pytest
 from fastapi import FastAPI
 
+from app.core.config import MCPSettings, get_settings
 from app.core.exceptions import SearchError
 from app.prompts.chat_prompts import (
     CHAT_SYSTEM_PROMPT,
@@ -21,7 +22,12 @@ from app.prompts.chat_prompts import (
     NO_ANSWER_MESSAGE,
 )
 from app.rag.service import RetrievedContext
-from radia_ai.features.jama_requirement_reviewer.dependencies.container import get_rag_service
+from app.services.mcp.client import MCPClientAdapter
+from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
+    get_jama_account_service,
+    get_mcp_client,
+    get_rag_service,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -52,6 +58,7 @@ class DummyRAGService:
     stream_calls: list[dict[str, Any]] = field(default_factory=list)
     raise_on_retrieve: Exception | None = None
     raise_on_generate: Exception | None = None
+    openai_client: Any = None
 
     def retrieve(
         self,
@@ -131,9 +138,34 @@ class DummyRAGService:
 
 
 def _install(client: TestClient, dummy: DummyRAGService) -> FastAPI:
+    """Wire the dummy RAG service and a disabled MCP client, matching production
+    DI shape without needing the app's full lifespan (Azure clients, etc.) to run."""
     app = cast(FastAPI, client.app)
     app.dependency_overrides[get_rag_service] = lambda: dummy
+    app.dependency_overrides[get_mcp_client] = lambda: MCPClientAdapter(MCPSettings(_env_file=None))
+    app.dependency_overrides[get_jama_account_service] = lambda: _NoLinkJamaAccountService()
     return app
+
+
+@pytest.fixture(autouse=True)
+def _reset_mcp_dependency_overrides(client: TestClient):
+    """Undo ``_install``'s overrides after each test.
+
+    ``test_app`` is session-scoped (see conftest.py), so anything a test
+    installs on it must be removed again - otherwise it leaks into unrelated
+    test modules that rely on the real ``get_jama_account_service`` DI chain.
+    """
+    yield
+    app = cast(FastAPI, client.app)
+    app.dependency_overrides.pop(get_mcp_client, None)
+    app.dependency_overrides.pop(get_jama_account_service, None)
+
+
+class _NoLinkJamaAccountService:
+    """Stands in for ``JamaAccountService``: no user has a linked Jama account."""
+
+    def credentials_for(self, user: object) -> None:
+        return None
 
 
 @pytest.mark.unit
@@ -445,3 +477,190 @@ def test_chat_stream_reports_search_service_failure(client: TestClient) -> None:
     body = response.json()
     assert body["success"] is False
     assert body["error"]["code"] == "SEARCH_ERROR"
+
+
+# ---------------------------------------------------------------------------
+# MCP-augmented chat (Phase 3 integration): only reached once MCP is enabled.
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class _FakeOpenAIToolClient:
+    """Scripts one tool call then a final answer, for the MCP-enabled chat path."""
+
+    def chat_completion_with_tools(
+        self, messages, tools, *, model=None, max_tokens=None, temperature=None
+    ):  # type: ignore[no-untyped-def]
+        from types import SimpleNamespace
+
+        if not any(m.get("role") == "tool" for m in messages):
+            return SimpleNamespace(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="call-1",
+                        function=SimpleNamespace(name="jama_get_item", arguments='{"item_id": 42}'),
+                    )
+                ],
+            )
+        return SimpleNamespace(
+            content="SRS-42 requires battery state-of-charge reporting.", tool_calls=None
+        )
+
+    def chat_completion(self, messages, *, model=None, max_tokens=None, temperature=None) -> str:  # type: ignore[no-untyped-def]
+        return "fallback"
+
+
+class _FakeMCPTransport:
+    """Serves one Jama item for jama_get_item, never touching the network."""
+
+    async def list_tools(self):  # type: ignore[no-untyped-def]
+        from app.services.mcp.transport import MCPToolDescriptor
+
+        return [MCPToolDescriptor(name="jama_get_item", description="", input_schema={})]
+
+    async def call_tool(self, name, arguments, *, extra_headers=None):  # type: ignore[no-untyped-def]
+        from app.services.mcp.transport import MCPToolCallResult
+
+        return MCPToolCallResult(
+            text="SRS-42: battery shall report state of charge.",
+            is_error=False,
+            structured_content={
+                "document_key": "SRS-42",
+                "web_url": "https://example.jamacloud.com/perspective.req#/items/42",
+            },
+        )
+
+
+def _enabled_mcp_client() -> MCPClientAdapter:
+    adapter = MCPClientAdapter(
+        MCPSettings(
+            _env_file=None,
+            enabled=True,
+            server_url="https://mcp-radia.internal/mcp",
+            service_token="tok",
+            allowed_tools=["jama_get_item"],
+        )
+    )
+    adapter._transport = _FakeMCPTransport()  # type: ignore[assignment]
+    return adapter
+
+
+@pytest.mark.unit
+def test_mcp_enabled_question_triggers_tool_call_and_returns_sources(
+    client: TestClient, test_settings
+) -> None:
+    """A question with no matching document chunks is still answered via an MCP tool call."""
+    dummy = DummyRAGService(chunks=[], openai_client=_FakeOpenAIToolClient())
+    app = _install(client, dummy)
+    app.dependency_overrides[get_mcp_client] = lambda: _enabled_mcp_client()
+    # Source-URL validation only accepts a host matching the configured Jama
+    # instance; point it at the fake item's host for this test.
+    settings_with_jama = test_settings.model_copy(
+        update={
+            "jama": test_settings.jama.model_copy(
+                update={"base_url": "https://example.jamacloud.com"}
+            )
+        }
+    )
+    app.dependency_overrides[get_settings] = lambda: settings_with_jama
+    try:
+        response = client.post(
+            "/api/v1/chat",
+            json={"question": "What does Jama item 42 say about state of charge?"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_mcp_client, None)
+        app.dependency_overrides[get_settings] = lambda: test_settings
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["used_mcp"] is True
+    assert body["answer"] == "SRS-42 requires battery state-of-charge reporting."
+    assert body["sources"] == [
+        {"label": "SRS-42", "url": "https://example.jamacloud.com/perspective.req#/items/42"}
+    ]
+
+
+@pytest.mark.unit
+def test_mcp_disabled_behaves_exactly_like_before(client: TestClient) -> None:
+    """With MCP disabled (the default), empty retrieval still refuses - unchanged behavior."""
+    dummy = DummyRAGService(chunks=[])
+    _install(client, dummy)  # default override: MCPSettings(enabled=False)
+
+    response = client.post("/api/v1/chat", json={"question": "Unrelated to Jama entirely"})
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["answer"] == NO_ANSWER_MESSAGE
+    assert body["used_mcp"] is False
+    assert body["sources"] == []
+    assert dummy.generate_calls == []  # never reached generation at all
+
+
+class _UnavailableMCPTransport:
+    """Every tool call fails, simulating mcp-radia being unreachable."""
+
+    async def list_tools(self):  # type: ignore[no-untyped-def]
+        from app.services.mcp.transport import MCPToolDescriptor
+
+        return [MCPToolDescriptor(name="jama_get_item", description="", input_schema={})]
+
+    async def call_tool(self, name, arguments, *, extra_headers=None):  # type: ignore[no-untyped-def]
+        from app.services.mcp.errors import MCPUnavailableError
+
+        raise MCPUnavailableError("mcp-radia is unreachable")
+
+
+@pytest.mark.unit
+def test_mcp_tool_failure_produces_a_safe_answer_not_a_crash(client: TestClient) -> None:
+    class _AlwaysCallsToolClient:
+        def chat_completion_with_tools(
+            self, messages, tools, *, model=None, max_tokens=None, temperature=None
+        ):  # type: ignore[no-untyped-def]
+            from types import SimpleNamespace
+
+            if not any(m.get("role") == "tool" for m in messages):
+                return SimpleNamespace(
+                    content=None,
+                    tool_calls=[
+                        SimpleNamespace(
+                            id="call-1",
+                            function=SimpleNamespace(
+                                name="jama_get_item", arguments='{"item_id": 1}'
+                            ),
+                        )
+                    ],
+                )
+            return SimpleNamespace(
+                content="I could not retrieve that item right now.", tool_calls=None
+            )
+
+        def chat_completion(
+            self, messages, *, model=None, max_tokens=None, temperature=None
+        ) -> str:  # type: ignore[no-untyped-def]
+            return "fallback"
+
+    dummy = DummyRAGService(chunks=[], openai_client=_AlwaysCallsToolClient())
+    app = _install(client, dummy)
+    adapter = MCPClientAdapter(
+        MCPSettings(
+            _env_file=None,
+            enabled=True,
+            server_url="https://mcp-radia.internal/mcp",
+            service_token="tok",
+            allowed_tools=["jama_get_item"],
+        )
+    )
+    adapter._transport = _UnavailableMCPTransport()  # type: ignore[assignment]
+    app.dependency_overrides[get_mcp_client] = lambda: adapter
+    try:
+        response = client.post("/api/v1/chat", json={"question": "Get Jama item 1"})
+    finally:
+        app.dependency_overrides.pop(get_mcp_client, None)
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert "could not retrieve" in body["answer"].lower()
+    assert body["used_mcp"] is False
+    assert body["sources"] == []

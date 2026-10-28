@@ -6,20 +6,32 @@ import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
 import CircularProgress from '@mui/material/CircularProgress';
+import Chip from '@mui/material/Chip';
+import Link from '@mui/material/Link';
+import Stack from '@mui/material/Stack';
 import SendIcon from '@mui/icons-material/Send';
 import BoltIcon from '@mui/icons-material/Bolt';
+import HubIcon from '@mui/icons-material/Hub';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
-import type { ChatMessage } from '@/types/api';
+import type { ChatMessage, ChatSource } from '@/types/api';
 
 interface ConversationTurn {
   role: 'user' | 'assistant';
   content: string;
 }
 
+/** Per-turn MCP metadata, kept separately from the persisted chat history so the
+ * localStorage schema (ChatMessage: role + content only) never changes shape. */
+interface McpTurnInfo {
+  usedMcp: boolean;
+  sources: ChatSource[];
+}
+
 export default function Chat() {
   const [input, setInput] = useState('');
   const { history, setHistory } = useChatHistory();
+  const [mcpInfoByIndex, setMcpInfoByIndex] = useState<Record<number, McpTurnInfo>>({});
   const endRef = useRef<HTMLDivElement>(null);
   const { isStreaming, streamingText, sendMessage } = useChatStream();
 
@@ -47,7 +59,17 @@ export default function Chat() {
       { question, conversation_history: apiHistory, citation_style: 'none' },
       {
         onDone: (data) => {
-          setHistory((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+          setHistory((prev) => {
+            const next = [...prev, { role: 'assistant' as const, content: data.answer }];
+            if (data.used_mcp) {
+              const index = next.length - 1;
+              setMcpInfoByIndex((info) => ({
+                ...info,
+                [index]: { usedMcp: true, sources: data.sources ?? [] },
+              }));
+            }
+            return next;
+          });
           scrollToEnd();
         },
         onError: (message) => {
@@ -106,6 +128,28 @@ export default function Chat() {
                 {turn.content}
               </Typography>
             </Paper>
+            {mcpInfoByIndex[i]?.usedMcp && (
+              <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" mt={0.5}>
+                <Chip
+                  icon={<HubIcon />}
+                  label="Engineering data"
+                  size="small"
+                  color="info"
+                  variant="outlined"
+                />
+                {mcpInfoByIndex[i].sources.map((source) => (
+                  <Link
+                    key={source.url}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    variant="caption"
+                  >
+                    {source.label}
+                  </Link>
+                ))}
+              </Stack>
+            )}
           </Box>
         ))}
 

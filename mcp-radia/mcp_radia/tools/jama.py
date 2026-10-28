@@ -7,7 +7,7 @@ connector failures into ``ToolError`` via the shared guard. All logic lives in
 
 from typing import Annotated
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
 from mcp_radia.connectors.jama import (
@@ -19,6 +19,7 @@ from mcp_radia.connectors.jama import (
 )
 from mcp_radia.logging import get_logger
 from mcp_radia.tools._guard import READ_ONLY, guard
+from mcp_radia.tools._identity import jama_client_for_request
 
 logger = get_logger(__name__)
 
@@ -46,9 +47,15 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
         annotations=READ_ONLY,
     )
     async def jama_get_item(
+        ctx: Context,
         item_id: Annotated[int, Field(description="Numeric Jama item id, e.g. 12345.", gt=0)],
     ) -> JamaItem:
-        return await guard("jama_get_item", lambda: client.get_item(item_id))
+        scoped, owned = jama_client_for_request(ctx, client)
+        try:
+            return await guard("jama_get_item", lambda: scoped.get_item(item_id))
+        finally:
+            if owned:
+                await scoped.aclose()
 
     @server.tool(
         name="jama_search",
@@ -72,6 +79,7 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
         annotations=READ_ONLY,
     )
     async def jama_search(
+        ctx: Context,
         query: Annotated[
             str | None,
             Field(default=None, description="Free-text to match against item content."),
@@ -95,16 +103,21 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             ),
         ] = MAX_PAGE_SIZE,
     ) -> JamaSearchResult:
-        return await guard(
-            "jama_search",
-            lambda: client.search(
-                query=query,
-                project_id=project_id,
-                item_type_id=item_type_id,
-                start_at=start_at,
-                max_results=max_results,
-            ),
-        )
+        scoped, owned = jama_client_for_request(ctx, client)
+        try:
+            return await guard(
+                "jama_search",
+                lambda: scoped.search(
+                    query=query,
+                    project_id=project_id,
+                    item_type_id=item_type_id,
+                    start_at=start_at,
+                    max_results=max_results,
+                ),
+            )
+        finally:
+            if owned:
+                await scoped.aclose()
 
     @server.tool(
         name="jama_get_children",
@@ -128,6 +141,7 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
         annotations=READ_ONLY,
     )
     async def jama_get_children(
+        ctx: Context,
         item_id: Annotated[
             int, Field(description="Numeric Jama item id of the parent, e.g. 12345.", gt=0)
         ],
@@ -144,10 +158,15 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             ),
         ] = MAX_PAGE_SIZE,
     ) -> JamaChildrenResult:
-        return await guard(
-            "jama_get_children",
-            lambda: client.get_children(item_id, start_at=start_at, max_results=max_results),
-        )
+        scoped, owned = jama_client_for_request(ctx, client)
+        try:
+            return await guard(
+                "jama_get_children",
+                lambda: scoped.get_children(item_id, start_at=start_at, max_results=max_results),
+            )
+        finally:
+            if owned:
+                await scoped.aclose()
 
     names = ["jama_get_item", "jama_search", "jama_get_children"]
     logger.info("jama_tools_registered", tools=names, configured=client.is_configured)

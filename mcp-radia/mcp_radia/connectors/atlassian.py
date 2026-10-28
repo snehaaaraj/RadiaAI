@@ -22,6 +22,7 @@ from mcp_radia.connectors.errors import (
     ItemNotFoundError,
     extract_remote_message,
 )
+from mcp_radia.connectors.retry import get_with_retry
 from mcp_radia.logging import get_logger
 
 logger = get_logger(__name__)
@@ -126,8 +127,11 @@ class AtlassianClient:
         auth = httpx2.BasicAuth(self._settings.email, self._settings.api_token)
 
         try:
-            response = await client.get(
+            response = await get_with_retry(
+                client,
                 url,
+                system=self.system,
+                operation=path,
                 params=params,
                 headers={"Accept": "application/json"},
                 auth=auth,

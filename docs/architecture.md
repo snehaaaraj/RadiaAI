@@ -438,6 +438,60 @@ startup, which keeps cold starts viable on serverless hosting. The review pipeli
 depends on this index being populated: with an empty index, reviews return
 `no_standards_context` rather than findings.
 
+## 10.1 MCP (Model Context Protocol) engineering-data chat integration
+
+Chat can optionally ground an answer in live engineering-system data (Jama today;
+Jira/Confluence remain on hold) by calling read-only tools on the separately
+deployed [`mcp-radia`](../mcp-radia/README.md) server, instead of relying only on
+the indexed-document RAG pipeline above. **Disabled by default** (`MCP_ENABLED=false`);
+when disabled, chat behaves exactly as described in section 10.
+
+### Request flow
+
+```
+Browser (signed-in user)
+  -> POST /api/v1/chat[/stream]  (Entra ID token, enforced as today)
+  -> RAG retrieval (unchanged)
+  -> if MCP enabled: bounded tool-calling loop
+       -> MCPClientAdapter discovers tools via mcp-radia's tools/list
+       -> intersects with the server-side allowlist (MCP_ALLOWED_TOOLS)
+       -> validates the model's requested arguments against the tool's own JSON Schema
+       -> calls mcp-radia over Streamable HTTP (service bearer token + internal network)
+       -> mcp-radia calls Jama as the signed-in user's own linked account, if linked
+  -> grounded answer (+ sources, used_mcp) returned to the chat UI, unchanged SSE/JSON shape
+```
+
+Key modules: [`app/services/mcp/client.py`](../backend/app/services/mcp/client.py)
+(allowlist + schema validation + session reuse), [`transport.py`](../backend/app/services/mcp/transport.py)
+(JSON-RPC/Streamable HTTP, built on `httpx` rather than the official `mcp` SDK - see
+the module docstring for why), and [`orchestrator.py`](../backend/app/services/mcp/orchestrator.py)
+(the bounded tool-calling loop: `MCP_MAX_TOOL_ITERATIONS` sequential calls, `MCP_MAX_TOTAL_SECONDS`
+overall deadline, never executes a tool outside the allowlist regardless of what the model requests).
+
+### Identity and credentials
+
+- The chat endpoint's existing Entra ID authentication and `Radia.User`/`Radia.Admin`
+  authorization are unchanged and still enforced on every request.
+- A signed-in user's own linked Jama OAuth credentials (the same link used by the
+  Jama Requirement Reviewer, `JamaAccountService`) are forwarded to mcp-radia as
+  per-request headers, so Jama itself enforces that user's permissions. A user who
+  has not linked Jama simply does not get Jama-backed answers; mcp-radia never
+  falls back to a shared credential on the backend's behalf.
+- mcp-radia itself requires a shared service-to-service bearer token
+  (`MCP_SERVICE_TOKEN` / mcp-radia's `MCP_RADIA_SERVICE_TOKEN`) on every request,
+  and is deployed with ingress restricted to the private network - see
+  [`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep).
+- Jira and Confluence linking is **on hold**: the Settings page shows a disabled
+  "Link Atlassian account" placeholder, and no Jira/Confluence tools are in the
+  default allowlist.
+
+### Failure handling
+
+MCP failures (disabled, unreachable, timed out, disallowed tool, invalid
+arguments) are caught in the orchestrator and surfaced as a plain-language
+answer or tool-result message - never a raw exception, stack trace, or
+unhandled 500 - and never stop the rest of chat from working.
+
 ## 11. Configuration and deployment
 
 Runtime configuration is controlled through environment variables.
@@ -449,12 +503,65 @@ Key services:
 - Azure Blob Storage
 - Microsoft Entra ID
 - SharePoint
+- mcp-radia (optional, disabled by default - see 10.1 and the deployment walkthrough below)
 
 The project supports:
 
 - local backend development with Uvicorn
 - local frontend development with Vite
 - frontend deployment to Vercel from the repo root (`vercel.json`)
+- mcp-radia deployed separately to Azure Container Apps with internal-only ingress
+  ([`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep))
+
+### MCP deployment and rollback walkthrough
+
+1. **Start mcp-radia locally** (for development/testing before any cloud deployment):
+   ```bash
+   cd mcp-radia
+   cp .env.example .env   # fill in JAMA_BASE_URL + a generated MCP_RADIA_SERVICE_TOKEN
+   pip install -e ".[dev]"
+   mcp-radia http          # http://127.0.0.1:8081/mcp
+   ```
+2. **Start the backend and frontend** as usual (see the repo root README).
+3. **Configure the backend's MCP client** in `backend/.env`:
+   ```bash
+   MCP_ENABLED=true
+   MCP_SERVER_URL=http://127.0.0.1:8081/mcp
+   MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
+   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children
+   ```
+4. **Verify the handshake and tool discovery**: start the backend, then ask the
+   chat a Jama-shaped question (e.g. "What does Jama item 12345 say?"). A
+   `mcp_tools_discovered` log line confirms the handshake; `mcp_tool_iteration_complete`
+   confirms a tool call executed.
+5. **Test an authenticated read-only request** end-to-end: sign in, link a Jama
+   account in Settings, and ask about a Jama item you know you can read in Jama.
+   The response's `used_mcp`/`sources` fields (and the chat UI's "Engineering data"
+   chip) confirm the tool path was used.
+6. **Disable MCP without disrupting ordinary chat**: set `MCP_ENABLED=false` (or
+   remove `MCP_SERVER_URL`/`MCP_SERVICE_TOKEN`) and restart the backend. Chat
+   immediately reverts to document-only RAG answers; nothing else changes.
+7. **Deploy mcp-radia to Azure Container Apps**:
+   ```bash
+   az deployment group create \
+     --resource-group <rg> \
+     --template-file infra/mcp-radia.bicep \
+     --parameters containerImage=<registry>/mcp-radia:<tag> \
+                  mcpServiceToken=<generated secret> \
+                  jamaBaseUrl=https://yourorg.jamacloud.com
+   ```
+   The template defaults to internal-only ingress - it is never reachable from
+   the public internet. **Known gap:** the backend is currently deployed to
+   Vercel, which cannot reach a Container Apps internal endpoint directly; until
+   the backend is also network-integrated with mcp-radia (e.g. moved onto Azure
+   with VNet integration, or fronted by an authenticated private gateway), only
+   local/same-network deployments of both services can use this integration in
+   production. This is called out here deliberately rather than treated as solved.
+8. **Restart/roll back safely**: mcp-radia is independent of the backend and
+   frontend - restarting or rolling back its Container App (e.g. `az containerapp
+   revision` commands) does not require redeploying either. Rolling the backend
+   back to a build with `MCP_ENABLED=false` (or simply flipping that one setting)
+   is a safe, instant rollback of the chat-facing feature with no data migration.
 
 ## 12. Security and operational notes
 
@@ -463,6 +570,9 @@ The project supports:
 - Every non-public endpoint requires a validated Microsoft Entra ID token and a Radia
   app role ([authentication.md](./authentication.md))
 - Jama is accessed as each signed-in user's own linked Jama account
+- The MCP chat integration is disabled by default, allowlists tools server-side,
+  validates arguments against each tool's schema, and is bound to a bearer-token-protected,
+  internal-only mcp-radia deployment - see section 10.1
 - API responses use a consistent error envelope
 - Request IDs are propagated across logs and responses
 - Input validation is handled with Pydantic
@@ -484,6 +594,7 @@ The project supports:
 | Microsoft Entra ID authentication and authorization | Implemented | SPA sign-in with MSAL; API validates Entra access tokens (RS256/JWKS, issuer, audience, expiry, tenant, scope) and enforces `Radia.User` / `Radia.Admin` app roles on every non-public endpoint. Local/test environments may use a synthetic user; deployed environments fail closed. See [authentication.md](./authentication.md). |
 | Per-user Jama access | Implemented | Each user links their own Jama API credentials (encrypted at rest); all Jama calls run as that user so Jama enforces their project permissions. Review history is private per user. |
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
+| MCP chat integration (Jama) | Implemented, disabled by default | Bounded tool-calling loop over a separately deployed `mcp-radia` server; server-side allowlist + schema validation + per-user Jama credential forwarding. Jira/Confluence tools and Atlassian account linking are on hold (Settings shows a disabled placeholder). Production rollout additionally requires resolving backend-to-mcp-radia network reachability (see section 11). |
 
 ## 14. Summary
 
