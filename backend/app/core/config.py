@@ -404,7 +404,7 @@ class MCPSettings(BaseSettings):
         description="Tool results larger than this are truncated before reaching the model.",
     )
     allowed_tools: Annotated[list[str], NoDecode] = Field(
-        default=["jama_get_item", "jama_search", "jama_get_children"],
+        default=["jama_get_item", "jama_search", "jama_get_children", "jama_list_projects"],
         description=(
             "Server-side allowlist. A tool mcp-radia advertises but that is not listed here "
             "is never offered to the model and never executed, regardless of what the model "

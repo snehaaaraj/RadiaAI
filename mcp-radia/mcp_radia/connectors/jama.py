@@ -18,6 +18,7 @@ Read operations only:
   - :meth:`JamaClient.get_item`      -> GET /rest/{version}/items/{id}
   - :meth:`JamaClient.search`        -> GET /rest/{version}/abstractitems
   - :meth:`JamaClient.get_children`  -> GET /rest/{version}/items/{id}/children
+  - :meth:`JamaClient.list_projects` -> GET /rest/{version}/projects
 """
 
 import asyncio
@@ -63,6 +64,7 @@ __all__ = [
     "JamaChildrenResult",
     "JamaClient",
     "JamaItem",
+    "JamaProjectSummary",
     "JamaSearchResult",
     "JamaSettings",
     "strip_html",
@@ -120,6 +122,15 @@ class JamaItemSummary(BaseModel):
     name: str = Field(default="", description="Item name / title.")
     item_type_id: int | None = Field(default=None, description="Numeric item type id.")
     project_id: int | None = Field(default=None, description="Owning project id.")
+    parent_id: int | None = Field(
+        default=None,
+        description=(
+            "Numeric id of this item's container (document-tree) parent, from Jama's "
+            "location.parent.item - the 'what sits above this in the tree' relationship. "
+            "Distinct from a traceability relationship (list_related_items) and from "
+            "containment children (jama_get_children). None for a top-level item."
+        ),
+    )
     web_url: str | None = Field(default=None, description="Browser URL for a human to open.")
 
 
@@ -134,6 +145,15 @@ class JamaItem(BaseModel):
     status: str | None = Field(default=None, description="Workflow status, if the type has one.")
     item_type_id: int | None = Field(default=None, description="Numeric item type id.")
     project_id: int | None = Field(default=None, description="Owning project id.")
+    parent_id: int | None = Field(
+        default=None,
+        description=(
+            "Numeric id of this item's container (document-tree) parent, from Jama's "
+            "location.parent.item - the 'what sits above this in the tree' relationship. "
+            "Distinct from a traceability relationship (list_related_items) and from "
+            "containment children (jama_get_children). None for a top-level item."
+        ),
+    )
     created_date: str | None = Field(default=None, description="ISO 8601 creation timestamp.")
     modified_date: str | None = Field(default=None, description="ISO 8601 last-modified timestamp.")
     web_url: str | None = Field(default=None, description="Browser URL for a human to open.")
@@ -146,6 +166,20 @@ class JamaItem(BaseModel):
             "raw HTML and dominated the payload."
         ),
     )
+
+
+class JamaProjectSummary(BaseModel):
+    """A single row in a Jama project listing.
+
+    Exists so a caller can resolve a project's name/key to its numeric id
+    before calling :meth:`JamaClient.search` with ``project_id`` - the same
+    "search first, never guess a numeric id" pattern item lookups already
+    need (see :meth:`JamaClient.search`).
+    """
+
+    id: int = Field(description="Numeric Jama project id.")
+    project_key: str | None = Field(default=None, description="Short project key, e.g. SAND.")
+    name: str = Field(default="", description="Project display name.")
 
 
 class JamaRelatedItem(BaseModel):
@@ -372,6 +406,22 @@ class JamaClient:
             return f"{base}/perspective.req#/items/{item_id}"
         return f"{base}/perspective.req#/items/{item_id}?projectId={project_id}"
 
+    @staticmethod
+    def _parent_id_from_raw(raw: dict[str, Any]) -> int | None:
+        """Extract the document-tree parent id from Jama's ``location.parent.item``.
+
+        A top-level item (no parent) omits ``location`` or ``location.parent``
+        entirely rather than sending a null - both are treated as "no parent".
+        """
+        location = raw.get("location")
+        if not isinstance(location, dict):
+            return None
+        parent = location.get("parent")
+        if not isinstance(parent, dict):
+            return None
+        parent_item = parent.get("item")
+        return int(parent_item) if isinstance(parent_item, int) else None
+
     def _summary_from_raw(self, raw: dict[str, Any]) -> JamaItemSummary:
         fields = raw.get("fields") or {}
         item_id = int(raw["id"])
@@ -383,6 +433,7 @@ class JamaClient:
             name=str(fields.get("name") or ""),
             item_type_id=raw.get("itemType"),
             project_id=project_id,
+            parent_id=self._parent_id_from_raw(raw),
             web_url=self._web_url(item_id, project_id),
         )
 
@@ -400,10 +451,20 @@ class JamaClient:
             status=str(status) if status is not None else None,
             item_type_id=raw.get("itemType"),
             project_id=project_id,
+            parent_id=self._parent_id_from_raw(raw),
             created_date=raw.get("createdDate"),
             modified_date=raw.get("modifiedDate"),
             web_url=self._web_url(item_id, project_id),
             fields={k: v for k, v in fields.items() if k not in _FIELDS_SURFACED_ELSEWHERE},
+        )
+
+    @staticmethod
+    def _project_from_raw(raw: dict[str, Any]) -> JamaProjectSummary:
+        fields: dict[str, Any] = raw.get("fields") or {}
+        return JamaProjectSummary(
+            id=int(raw["id"]),
+            project_key=raw.get("projectKey") or fields.get("projectKey"),
+            name=str(fields.get("name") or ""),
         )
 
     # -- public API ---------------------------------------------------------
@@ -530,3 +591,31 @@ class JamaClient:
             start_at=int(page_info.get("startIndex", start_at)),
             max_results=capped,
         )
+
+    async def list_projects(
+        self, *, start_at: int = 0, max_results: int = MAX_PAGE_SIZE
+    ) -> list[JamaProjectSummary]:
+        """List projects visible to the configured account.
+
+        Exists so a caller can resolve a project's name or key (e.g. "the
+        sandbox project") to the numeric id :meth:`search` requires, instead
+        of guessing one - the same reason :meth:`search` itself exists for
+        items. One page only: an instance's project count is normally small
+        enough that paging is rarely needed, and the caller can pass
+        ``start_at`` for the rare case it is.
+        """
+        capped = max(1, min(max_results, MAX_PAGE_SIZE))
+        params: dict[str, Any] = {"startAt": max(0, start_at), "maxResults": capped}
+
+        payload = await self._get("projects", params=params)
+        raw_projects = payload.get("data") or []
+        if not isinstance(raw_projects, list):
+            raise ConnectorServiceError(
+                "Jama projects returned an unexpected 'data' shape (expected a list).",
+                system=SYSTEM,
+                operation="projects",
+            )
+
+        results = [self._project_from_raw(p) for p in raw_projects if isinstance(p, dict)]
+        logger.info("jama_projects_listed", count=len(results))
+        return results

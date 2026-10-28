@@ -15,6 +15,7 @@ from mcp_radia.connectors.jama import (
     JamaChildrenResult,
     JamaClient,
     JamaItem,
+    JamaProjectSummary,
     JamaSearchResult,
 )
 from mcp_radia.logging import get_logger
@@ -33,16 +34,19 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
         description=(
             "Read the full content of ONE Jama Connect requirement that you can already "
             "identify, by its numeric item id. Returns the item's name, full description "
-            "as plain text, workflow status, project, created/modified timestamps, a web "
-            "URL, and any custom fields defined on the item type.\n"
+            "as plain text, workflow status, project, its document-tree parent_id (the item "
+            "directly above it in the tree, or null if top-level), created/modified "
+            "timestamps, a web URL, and any custom fields defined on the item type.\n"
             "\n"
             "Use when asked things like: 'show me Jama item 12345', 'what does that "
-            "requirement actually say?', 'pull up the full text of item 12345'.\n"
+            "requirement actually say?', 'pull up the full text of item 12345', 'what is the "
+            "parent of item 12345?'.\n"
             "\n"
             "Does NOT find items - you must already have the numeric id. To find an item "
             "from words, or from a document key like SRS-42, use jama_search first. Returns "
             "only this one item: it does not list the items nested under it (jama_get_children) "
-            "or the items traced to it (list_related_items)."
+            "or the items traced to it (list_related_items). parent_id is the document-tree "
+            "parent (containment), not a traceability relationship."
         ),
         annotations=READ_ONLY,
     )
@@ -69,6 +73,10 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             "Use when asked things like: 'find the battery state-of-charge requirements', "
             "'what requirements mention thermal runaway?', 'list the safety requirements in "
             "project 7'. Also use this to turn a document key like SRS-42 into a numeric id.\n"
+            "\n"
+            "project_id must be a real numeric Jama project id - never guess one from a "
+            "project's name. If you only know the project by name (e.g. 'the sandbox "
+            "project'), call jama_list_projects first to find its numeric id.\n"
             "\n"
             "This is content search across MANY items. It does NOT follow links between "
             "items: a query naming one item returns items whose TEXT matches those words, "
@@ -168,7 +176,49 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             if owned:
                 await scoped.aclose()
 
-    names = ["jama_get_item", "jama_search", "jama_get_children"]
+    @server.tool(
+        name="jama_list_projects",
+        title="List Jama projects",
+        description=(
+            "List Jama Connect projects visible to the configured account: their numeric "
+            "id, short project key, and display name.\n"
+            "\n"
+            "Use this to resolve a project you only know by name (e.g. 'the sandbox "
+            "project', 'the WindRunner project') to the numeric project id that "
+            "jama_search's project_id argument requires. Never guess a project's numeric "
+            "id from its name or position - call this first.\n"
+            "\n"
+            "Takes no required arguments. Returns one page; use start_at to page through "
+            "more on an instance with many projects."
+        ),
+        annotations=READ_ONLY,
+    )
+    async def jama_list_projects(
+        ctx: Context,
+        start_at: Annotated[
+            int, Field(default=0, ge=0, description="Zero-based offset for paging.")
+        ] = 0,
+        max_results: Annotated[
+            int,
+            Field(
+                default=MAX_PAGE_SIZE,
+                ge=1,
+                le=MAX_PAGE_SIZE,
+                description=f"Page size, 1-{MAX_PAGE_SIZE}.",
+            ),
+        ] = MAX_PAGE_SIZE,
+    ) -> list[JamaProjectSummary]:
+        scoped, owned = jama_client_for_request(ctx, client)
+        try:
+            return await guard(
+                "jama_list_projects",
+                lambda: scoped.list_projects(start_at=start_at, max_results=max_results),
+            )
+        finally:
+            if owned:
+                await scoped.aclose()
+
+    names = ["jama_get_item", "jama_search", "jama_get_children", "jama_list_projects"]
     logger.info("jama_tools_registered", tools=names, configured=client.is_configured)
     if not client.is_configured:
         # Registered but not usable: the tools stay visible so a client can

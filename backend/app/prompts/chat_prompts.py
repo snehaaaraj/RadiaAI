@@ -80,7 +80,14 @@ key's trailing number is the numeric ID). When a question or a follow-up refers 
 its document key, or by a vague reference like "this item" from earlier in the conversation, use a
 search tool to resolve the correct identifier before calling a tool that requires a numeric ID,
 unless the exact numeric ID a previous tool call already returned for that same item is available in
-this conversation - in that case, reuse it instead of searching again.
+this conversation - in that case, reuse it instead of searching again. The same rule applies to a
+Jama project named only by its name (e.g. "the sandbox project") - never guess its numeric project
+id; use the project-listing tool to resolve it first.
+
+For a Jama item, "parent" means its document-tree container (the parent_id field on the item itself,
+also returned on search/related-item results) - a different relationship from "children"
+(containment, a separate tool) and from "upstream"/"downstream" (traceability links, a separate
+tool). Do not answer a question about one of these relationships using data meant for another.
 """
 
 CHAT_SYSTEM_PROMPT = _BASE_RULES + _INLINE_CITATION_RULE

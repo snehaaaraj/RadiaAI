@@ -13,6 +13,7 @@ from tests.conftest import connected_client
 from tests.jama_fixtures import (
     CHILDREN_PAYLOAD,
     ITEM_PAYLOAD,
+    PROJECTS_PAYLOAD,
     SEARCH_PAYLOAD,
     basic_settings,
     json_responder,
@@ -43,6 +44,7 @@ async def test_both_jama_tools_are_advertised() -> None:
         "jama_get_item",
         "jama_search",
         "jama_get_children",
+        "jama_list_projects",
     }
 
 
@@ -53,7 +55,7 @@ async def test_tools_are_annotated_read_only() -> None:
     async with connected_client(server) as session:
         tools = {t.name: t for t in (await session.list_tools()).tools}
 
-    for name in ("jama_get_item", "jama_search", "jama_get_children"):
+    for name in ("jama_get_item", "jama_search", "jama_get_children", "jama_list_projects"):
         annotations = tools[name].annotations
         assert annotations is not None
         assert annotations.read_only_hint is True
@@ -118,6 +120,19 @@ async def test_search_with_no_arguments_is_allowed() -> None:
     assert result.structured_content["total"] == 137
 
 
+async def test_list_projects_resolves_project_names_to_numeric_ids() -> None:
+    server, handler = _server_with(json_responder(PROJECTS_PAYLOAD))
+
+    async with connected_client(server) as session:
+        result = await session.call_tool("jama_list_projects", {})
+
+    assert not result.is_error
+    assert result.structured_content is not None
+    projects = result.structured_content["result"]
+    assert {p["project_key"]: p["id"] for p in projects} == {"BATT": 7, "SAND": 42}
+    assert handler.last_request.url.path == "/rest/v1/projects"
+
+
 async def test_a_missing_item_becomes_a_tool_error_not_a_crash() -> None:
     server, _ = _server_with(json_responder({"meta": {}}, status_code=404))
 
@@ -150,6 +165,7 @@ async def test_tools_are_still_listed_when_jama_is_unconfigured() -> None:
         "jama_get_item",
         "jama_search",
         "jama_get_children",
+        "jama_list_projects",
     }
 
 

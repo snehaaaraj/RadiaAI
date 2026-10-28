@@ -17,8 +17,10 @@ from tests.jama_fixtures import (
     CHILDREN_PAYLOAD,
     EMPTY_CHILDREN_PAYLOAD,
     ITEM_PAYLOAD,
+    PROJECTS_PAYLOAD,
     SEARCH_PAYLOAD,
     TOKEN_PAYLOAD,
+    TOP_LEVEL_ITEM_PAYLOAD,
     basic_settings,
     json_responder,
     make_client,
@@ -169,6 +171,41 @@ async def test_get_item_raises_not_found_on_404() -> None:
         await client.get_item(999)
 
 
+async def test_get_item_maps_the_document_tree_parent_id() -> None:
+    """Jama's location.parent.item is the real containment parent, distinct from
+    both children (jama_get_children) and traceability relationships
+    (list_related_items) - this must be parsed and exposed, not silently dropped."""
+    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+
+    item = await client.get_item(12345)
+
+    assert item.parent_id == 999
+
+
+async def test_get_item_parent_id_is_none_for_a_top_level_item() -> None:
+    """Jama omits location.parent entirely for a top-level item - that is 'no parent',
+    not an error, and must not be confused with the item itself being unreachable."""
+    client, _ = make_client(basic_settings(), json_responder(TOP_LEVEL_ITEM_PAYLOAD))
+
+    item = await client.get_item(99999)
+
+    assert item.parent_id is None
+
+
+async def test_search_results_also_carry_parent_id() -> None:
+    """Summaries (search/children/related) use the same raw-item mapping as get_item,
+    so parent_id must be consistently available there too, not just on the full item."""
+    payload = {
+        "meta": {"status": "OK", "pageInfo": {"startIndex": 0, "resultCount": 1, "totalResults": 1}},
+        "data": [ITEM_PAYLOAD["data"]],
+    }
+    client, _ = make_client(basic_settings(), json_responder(payload))
+
+    result = await client.search(query="battery")
+
+    assert result.results[0].parent_id == 999
+
+
 async def test_get_item_raises_not_found_when_payload_has_no_data() -> None:
     """A 200 with an empty body is still 'not there' from the caller's view."""
     client, _ = make_client(basic_settings(), json_responder({"meta": {"status": "OK"}}))
@@ -293,6 +330,35 @@ async def test_search_rejects_a_non_list_data_field() -> None:
 
     with pytest.raises(ConnectorServiceError):
         await client.search()
+
+
+# -- projects (name -> numeric id resolution) --------------------------------
+
+
+async def test_list_projects_maps_results() -> None:
+    client, handler = make_client(basic_settings(), json_responder(PROJECTS_PAYLOAD))
+
+    projects = await client.list_projects()
+
+    assert [p.id for p in projects] == [7, 42]
+    assert projects[1].project_key == "SAND"
+    assert projects[1].name == "Sandbox"
+    assert handler.last_request.url.path == "/rest/v1/projects"
+
+
+async def test_list_projects_rejects_a_non_list_data_field() -> None:
+    client, _ = make_client(basic_settings(), json_responder({"data": {"id": 1}}))
+
+    with pytest.raises(ConnectorServiceError):
+        await client.list_projects()
+
+
+async def test_list_projects_clamps_page_size_to_what_jama_accepts() -> None:
+    client, handler = make_client(basic_settings(), json_responder(PROJECTS_PAYLOAD))
+
+    await client.list_projects(max_results=500)
+
+    assert handler.last_request.url.params["maxResults"] == str(MAX_PAGE_SIZE)
 
 
 # -- children (containment hierarchy) ----------------------------------------

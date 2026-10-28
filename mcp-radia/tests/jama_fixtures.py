@@ -24,6 +24,12 @@ ITEM_PAYLOAD: dict[str, Any] = {
         "itemType": 31,
         "createdDate": "2026-01-05T10:00:00.000+0000",
         "modifiedDate": "2026-02-11T14:30:00.000+0000",
+        "location": {
+            "sortOrder": 1,
+            "globalSortOrder": 4063,
+            "sequence": "2.1.7.1.2",
+            "parent": {"item": 999},
+        },
         "fields": {
             "name": "Battery shall report state of charge",
             "description": (
@@ -33,6 +39,19 @@ ITEM_PAYLOAD: dict[str, Any] = {
             "status": "Approved",
             "customField123": "traced-to-JIRA-451",
         },
+    },
+}
+
+#: A top-level item: Jama omits location.parent entirely rather than nulling it.
+TOP_LEVEL_ITEM_PAYLOAD: dict[str, Any] = {
+    "meta": {"status": "OK"},
+    "data": {
+        "id": 99999,
+        "documentKey": "SET-1",
+        "project": 7,
+        "itemType": 30,
+        "location": {"sortOrder": 0, "globalSortOrder": 1, "sequence": "1"},
+        "fields": {"name": "Top-level requirement set"},
     },
 }
 
@@ -93,6 +112,25 @@ EMPTY_CHILDREN_PAYLOAD: dict[str, Any] = {
         "pageInfo": {"startIndex": 0, "resultCount": 0, "totalResults": 0},
     },
     "data": [],
+}
+
+PROJECTS_PAYLOAD: dict[str, Any] = {
+    "meta": {
+        "status": "OK",
+        "pageInfo": {"startIndex": 0, "resultCount": 2, "totalResults": 2},
+    },
+    "data": [
+        {
+            "id": 7,
+            "projectKey": "BATT",
+            "fields": {"name": "Battery Management System", "projectKey": "BATT"},
+        },
+        {
+            "id": 42,
+            "projectKey": "SAND",
+            "fields": {"name": "Sandbox", "projectKey": "SAND"},
+        },
+    ],
 }
 
 
