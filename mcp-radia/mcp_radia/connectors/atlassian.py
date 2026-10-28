@@ -20,6 +20,7 @@ from mcp_radia.connectors.errors import (
     ConnectorNotConfiguredError,
     ConnectorServiceError,
     ItemNotFoundError,
+    extract_remote_message,
 )
 from mcp_radia.logging import get_logger
 
@@ -163,6 +164,7 @@ class AtlassianClient:
     def _raise_for_status(self, exc: httpx2.HTTPStatusError, path: str) -> NoReturn:
         """Translate an HTTP error status into the right connector exception."""
         status = exc.response.status_code
+        remote = extract_remote_message(exc.response.text)
         if status in (401, 403):
             raise ConnectorAuthError(
                 f"{self.system.title()} rejected the request. Check {self.config_hint}, and "
@@ -170,6 +172,7 @@ class AtlassianClient:
                 system=self.system,
                 operation=path,
                 status_code=status,
+                remote_message=remote,
             ) from exc
         if status == 404:
             raise ItemNotFoundError(
@@ -177,6 +180,7 @@ class AtlassianClient:
                 system=self.system,
                 operation=path,
                 status_code=status,
+                remote_message=remote,
             ) from exc
         if status == 429:
             # Atlassian Cloud rate-limits aggressively; say so plainly rather
@@ -186,10 +190,12 @@ class AtlassianClient:
                 system=self.system,
                 operation=path,
                 status_code=status,
+                remote_message=remote,
             ) from exc
         raise ConnectorServiceError(
             f"The {self.system.title()} API returned an error response.",
             system=self.system,
             operation=path,
             status_code=status,
+            remote_message=remote,
         ) from exc

@@ -62,6 +62,39 @@ SEARCH_PAYLOAD: dict[str, Any] = {
 
 TOKEN_PAYLOAD: dict[str, Any] = {"access_token": "tok-abc123", "expires_in": 3600}
 
+CHILDREN_PAYLOAD: dict[str, Any] = {
+    "meta": {
+        "status": "OK",
+        "pageInfo": {"startIndex": 0, "resultCount": 2, "totalResults": 9},
+    },
+    "data": [
+        {
+            "id": 22001,
+            "documentKey": "SRS-101",
+            "globalId": "GID-22001",
+            "project": 7,
+            "itemType": 31,
+            "fields": {"name": "Cell voltage shall be sampled every 100 ms"},
+        },
+        {
+            "id": 22002,
+            "documentKey": "SRS-102",
+            "project": 7,
+            "itemType": 31,
+            "fields": {"name": "Pack current shall be sampled every 100 ms"},
+        },
+    ],
+}
+
+#: A folder that contains nothing. Jama returns an empty list, not a 404.
+EMPTY_CHILDREN_PAYLOAD: dict[str, Any] = {
+    "meta": {
+        "status": "OK",
+        "pageInfo": {"startIndex": 0, "resultCount": 0, "totalResults": 0},
+    },
+    "data": [],
+}
+
 
 # -- settings builders -------------------------------------------------------
 

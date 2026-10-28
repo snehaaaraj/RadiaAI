@@ -1,6 +1,7 @@
 """Unit tests for the Jama connector. All HTTP is mocked; nothing leaves the process."""
 
 import base64
+import json
 
 import httpx2
 import pytest
@@ -13,6 +14,8 @@ from mcp_radia.connectors.errors import (
 )
 from mcp_radia.connectors.jama import MAX_PAGE_SIZE, JamaSettings, strip_html
 from tests.jama_fixtures import (
+    CHILDREN_PAYLOAD,
+    EMPTY_CHILDREN_PAYLOAD,
     ITEM_PAYLOAD,
     SEARCH_PAYLOAD,
     TOKEN_PAYLOAD,
@@ -116,7 +119,42 @@ async def test_get_item_maps_payload_to_model() -> None:
     assert handler.last_request.url.path == "/rest/v1/items/12345"
 
 
-async def test_get_item_builds_a_web_url_a_human_can_open() -> None:
+async def test_get_item_omits_fields_already_surfaced_as_attributes() -> None:
+    """Jama repeats name/description/status inside 'fields'; the copy is dropped.
+
+    description in particular is raw HTML and dominated the payload, so this is
+    the difference between a usable response and one that blows a context window.
+    """
+    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+
+    item = await client.get_item(12345)
+
+    assert "description" not in item.fields
+    assert "name" not in item.fields
+    assert "status" not in item.fields
+    # The typed attributes still carry the same information.
+    assert item.name == "Battery shall report state of charge"
+    assert item.status == "Approved"
+    assert "state of charge" in item.description
+
+
+async def test_get_item_keeps_custom_fields() -> None:
+    """Dropping duplicates must not touch the custom fields, which nothing else exposes."""
+    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+
+    item = await client.get_item(12345)
+
+    assert item.fields["customField123"] == "traced-to-JIRA-451"
+
+
+async def test_get_item_drops_the_raw_html_copy_of_the_description() -> None:
+    """The HTML never reaches the caller - only the flattened text does."""
+    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+
+    item = await client.get_item(12345)
+
+    assert "<p>" not in json.dumps(item.model_dump())
+
     client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
 
     item = await client.get_item(12345)
@@ -255,6 +293,96 @@ async def test_search_rejects_a_non_list_data_field() -> None:
 
     with pytest.raises(ConnectorServiceError):
         await client.search()
+
+
+# -- children (containment hierarchy) ----------------------------------------
+
+
+async def test_get_children_maps_results_and_paging_metadata() -> None:
+    client, _ = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+
+    result = await client.get_children(12345)
+
+    assert result.parent_id == 12345
+    assert [r.id for r in result.results] == [22001, 22002]
+    assert result.results[0].document_key == "SRS-101"
+    assert result.results[0].name == "Cell voltage shall be sampled every 100 ms"
+    # totalResults, not this page's length: there are more children than returned.
+    assert result.total == 9
+    assert result.start_at == 0
+
+
+async def test_get_children_calls_the_children_endpoint() -> None:
+    client, handler = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+
+    await client.get_children(12345)
+
+    assert handler.last_request.url.path == "/rest/v1/items/12345/children"
+
+
+async def test_get_children_sends_paging_parameters() -> None:
+    client, handler = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+
+    await client.get_children(12345, start_at=50, max_results=10)
+
+    params = handler.last_request.url.params
+    assert params["startAt"] == "50"
+    assert params["maxResults"] == "10"
+
+
+@pytest.mark.parametrize(
+    ("requested", "expected"),
+    [(999, MAX_PAGE_SIZE), (0, 1), (-5, 1), (10, 10)],
+)
+async def test_get_children_clamps_page_size_like_search(requested: int, expected: int) -> None:
+    client, handler = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+
+    result = await client.get_children(12345, max_results=requested)
+
+    assert handler.last_request.url.params["maxResults"] == str(expected)
+    assert result.max_results == expected
+
+
+async def test_get_children_returns_empty_for_an_item_with_no_children() -> None:
+    """A leaf requirement is normal, not an error."""
+    client, _ = make_client(basic_settings(), json_responder(EMPTY_CHILDREN_PAYLOAD))
+
+    result = await client.get_children(12345)
+
+    assert result.results == []
+    assert result.total == 0
+
+
+async def test_get_children_reports_a_missing_parent_as_not_found() -> None:
+    client, _ = make_client(basic_settings(), json_responder({"meta": {}}, status_code=404))
+
+    with pytest.raises(ItemNotFoundError):
+        await client.get_children(999)
+
+
+async def test_get_children_falls_back_to_page_length_when_metadata_is_missing() -> None:
+    payload = {"data": CHILDREN_PAYLOAD["data"]}
+    client, _ = make_client(basic_settings(), json_responder(payload))
+
+    result = await client.get_children(12345)
+
+    assert result.total == 2
+
+
+async def test_get_children_rejects_a_non_list_data_field() -> None:
+    client, _ = make_client(basic_settings(), json_responder({"data": {"id": 1}}))
+
+    with pytest.raises(ConnectorServiceError):
+        await client.get_children(12345)
+
+
+async def test_get_children_does_not_recurse_into_grandchildren() -> None:
+    """One level, one page: a single call must make exactly one request."""
+    client, handler = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+
+    await client.get_children(12345)
+
+    assert len(handler.requests) == 1
 
 
 # -- authentication ----------------------------------------------------------

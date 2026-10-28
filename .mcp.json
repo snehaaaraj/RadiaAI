@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "radia-digital-thread": {
+      "type": "stdio",
+      "command": "C:\\Users\\SnehaNagaraju\\Projects\\RadiaAI Personal\\RadiaAI-2.0\\mcp-radia\\.venv\\Scripts\\mcp-radia.exe",
+      "args": ["stdio"]
+    }
+  }
+}

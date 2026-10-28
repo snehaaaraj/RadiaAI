@@ -201,7 +201,7 @@ mcp-radia/
 │   ├── logging.py          # structlog -> stderr
 │   ├── server.py           # build_server(): constructs the MCPServer
 │   ├── connectors/         # one module per external system
-│   │   ├── errors.py       # shared ConnectorError hierarchy
+│   │   ├── errors.py       # shared ConnectorError hierarchy + remote-message extraction
 │   │   ├── text.py         # HTML / ADF -> plain text
 │   │   ├── atlassian.py    # shared Cloud settings + HTTP base
 │   │   ├── jama.py         # Jama settings, models, async client
@@ -241,6 +241,7 @@ that lists the server's entire surface area. Each phase adds its registration ca
 | 2     | Jira + Confluence — `jira_get_issue`, `jira_search`, `confluence_*` | ✅ done |
 | 3     | GENESYS                                                             | ⏸️ placeholder |
 | 4     | `list_related_items(system, item_id)` cross-system linking          | ✅ done |
+| 5     | Jama hierarchy — `jama_get_children`; tool descriptions tuned for selection | ✅ done |
 
 ### Deliberate non-goals for this pass
 
@@ -259,8 +260,9 @@ All read-only, all annotated `readOnlyHint: true`.
 
 | Tool                   | Arguments                                                        | Returns                       |
 | ---------------------- | ---------------------------------------------------------------- | ----------------------------- |
-| `jama_get_item`        | `item_id` (required)                                             | Full item + raw custom fields |
+| `jama_get_item`        | `item_id` (required)                                             | Full item + custom fields     |
 | `jama_search`          | `query`, `project_id`, `item_type_id`, `start_at`, `max_results` | Summaries + total             |
+| `jama_get_children`    | `item_id` (required), `start_at`, `max_results`                  | Direct children + total       |
 | `jira_get_issue`       | `issue_key` (required)                                           | Full issue + issue links      |
 | `jira_search`          | `jql` (required), `next_page_token`, `max_results`               | Summaries + page token        |
 | `confluence_get_page`  | `page_id` (required)                                             | Page + body as text           |
@@ -269,8 +271,22 @@ All read-only, all annotated `readOnlyHint: true`.
 
 **Jama.** `jama_search` maps to `/abstractitems`; `query` becomes its `contains` parameter. Jama
 caps page size at 50, enforced in the schema and clamped again in the connector. Descriptions
-arrive as HTML and are flattened to text; the untouched Jama field map stays available under
-`fields`.
+arrive as HTML and are flattened to text.
+
+`fields` carries the item type's **custom fields**. `name`, `description` and `status` are
+deliberately omitted from it because each is already returned as its own attribute — Jama repeats
+the description there as raw HTML, which measured **~75% of a single item's payload** on a real
+instance (111 KB → 27 KB for one requirement). Nothing is lost: the flattened `description` holds
+the same text, and the linking layer scans that flattened copy, so cross-reference discovery is
+unaffected.
+
+`jama_get_children` maps to `/items/{id}/children` and returns the **containment hierarchy** — the
+items nested inside a folder or set in the document tree. This is a different axis from
+`list_related_items`, which walks **traceability** (upstream/downstream). Keeping them as separate
+tools is deliberate: "what is filed under this" and "what derives from this" are different
+questions, and one tool answering both makes the model's choice ambiguous. It returns one level
+and one page per call, so a single tool call cannot fan out into an unbounded crawl; recurse by
+calling it again with a child's id.
 
 **Jira.** Uses the Cloud platform API v3.
 
@@ -293,6 +309,25 @@ arrive as HTML and are flattened to text; the untouched Jama field map stays ava
   equivalent yet.
 - `query`/`space_key`/`content_type` are composed into CQL with quotes and backslashes escaped, so
   free text cannot alter the query's meaning. Pass `cql` directly for anything that cannot express.
+
+## Errors
+
+Tool failures carry the **remote API's own wording**, not just a status code. A model is shown, for
+example:
+
+```
+[jira] The Jira API returned an error response. operation=rest/api/3/search/jql status=400
+jira said: "Unbounded JQL queries are not allowed here. Please add a search restriction to your query."
+```
+
+That trailing sentence is the only actionable part — `status=400` alone tells a model nothing about
+what to change, so it cannot retry correctly. `extract_remote_message()` in
+[`connectors/errors.py`](mcp_radia/connectors/errors.py) pulls the wording out of the shapes these
+APIs actually use (Atlassian's `errorMessages`/`errors`, Confluence v2's list of error objects,
+Jama's `meta.message`, and the OAuth `error_description` convention).
+
+It is deliberately conservative: HTML error pages are ignored rather than dumped into the model's
+context, repeated wording is de-duplicated, and anything long is truncated to 400 characters.
 
 ## Cross-system linking
 

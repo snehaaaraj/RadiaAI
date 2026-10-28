@@ -30,10 +30,19 @@ def register_jira_tools(server: MCPServer, client: JiraClient) -> list[str]:
         name="jira_get_issue",
         title="Get Jira issue",
         description=(
-            "Fetch a single Jira issue by key (e.g. PROJ-123) or numeric id. Returns "
-            "the summary, description as plain text, status, type, assignee, reporter, "
-            "labels, parent, timestamps, a web URL, and the issue's links to other "
-            "issues."
+            "Read ONE Jira issue - a ticket of work such as a bug, story or task - by its "
+            "key (e.g. PROJ-123) or numeric id. Returns the summary, description as plain "
+            "text, status, issue type, assignee, reporter, labels, parent, timestamps, a "
+            "web URL, and its links to other issues.\n"
+            "\n"
+            "Use when asked things like: 'what's the status of PROJ-123?', 'who is working "
+            "on PROJ-123?', 'show me that bug ticket'.\n"
+            "\n"
+            "Covers work items (bugs/stories/tasks) ONLY - not requirements (Jama) and not "
+            "written documentation pages (Confluence). Requires a key you already have; to "
+            "find issues from a description use jira_search. A key like PROJ-123 may also "
+            "be a Jama document key, so if this reports the issue does not exist, try "
+            "jama_search for the same key."
         ),
         annotations=READ_ONLY,
     )
@@ -49,11 +58,24 @@ def register_jira_tools(server: MCPServer, client: JiraClient) -> list[str]:
         name="jira_search",
         title="Search Jira issues",
         description=(
-            'Search Jira issues with JQL, e.g. \'project = PROJ AND status = "In Progress" '
-            "ORDER BY updated DESC'. Returns a page of issue summaries. Jira's search API "
-            "is token-paginated and reports no total count: to get the next page, pass the "
-            "returned next_page_token back in. Call jira_get_issue for an issue's full "
-            "description and links."
+            "FIND Jira issues you cannot yet name, using a JQL query - filter by project, "
+            "status, assignee, label, sprint, dates and so on. Example JQL: 'project = PROJ "
+            'AND status = "In Progress" ORDER BY updated DESC\'. Returns a page of issue '
+            "summaries.\n"
+            "\n"
+            "Use when asked things like: 'what bugs are open on the battery project?', "
+            "'which tickets are assigned to Priya?', 'what was closed last sprint?'.\n"
+            "\n"
+            "The JQL must be BOUNDED - Jira rejects a query that is only an ORDER BY with "
+            "an error about unbounded queries. Always include at least one restriction: "
+            "write 'created >= -30d ORDER BY updated DESC' or 'project IS NOT EMPTY ORDER "
+            "BY updated DESC' rather than a bare 'ORDER BY updated DESC'.\n"
+            "\n"
+            "Searches WORK TICKETS only - not requirements (jama_search) and not "
+            "documentation pages (confluence_search). The 'jql' argument must be valid JQL, "
+            "not plain English: translate the question into JQL first. Paging is by token, "
+            "and no total count is returned - pass the returned next_page_token back in for "
+            "the next page. Returns summaries only; call jira_get_issue for full detail."
         ),
         annotations=READ_ONLY,
     )
