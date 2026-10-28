@@ -308,7 +308,9 @@ async def _generate_with_mcp(
     ``_GENERATION_TIMEOUT_SECONDS``, so this timeout stays the outer safety net.
     """
     system_prompt = get_chat_system_prompt(citation_style, mcp_enabled=True)
-    full_system = f"{system_prompt}\n\n## Retrieved Standards Context\n\n{context.format_for_prompt()}"
+    full_system = (
+        f"{system_prompt}\n\n## Retrieved Standards Context\n\n{context.format_for_prompt()}"
+    )
     jama_credentials = jama_account_service.credentials_for(user)
 
     try:

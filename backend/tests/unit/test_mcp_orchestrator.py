@@ -16,7 +16,10 @@ from app.services.mcp.transport import MCPToolCallResult, MCPToolDescriptor
 
 pytestmark = pytest.mark.unit
 
-_JAMA_ITEM_SOURCE = {"document_key": "SRS-42", "web_url": "https://example.jamacloud.com/perspective.req#/items/1"}
+_JAMA_ITEM_SOURCE = {
+    "document_key": "SRS-42",
+    "web_url": "https://example.jamacloud.com/perspective.req#/items/1",
+}
 
 
 def _settings(**overrides: object) -> MCPSettings:
@@ -38,7 +41,9 @@ def _tool_call(call_id: str, name: str, arguments: dict[str, Any]) -> SimpleName
     )
 
 
-def _message(*, content: str | None = None, tool_calls: list[SimpleNamespace] | None = None) -> SimpleNamespace:
+def _message(
+    *, content: str | None = None, tool_calls: list[SimpleNamespace] | None = None
+) -> SimpleNamespace:
     return SimpleNamespace(content=content, tool_calls=tool_calls)
 
 
@@ -50,7 +55,9 @@ class FakeOpenAIClient:
     final_answer: str = "Fallback answer."
     calls: int = 0
 
-    def chat_completion_with_tools(self, messages, tools, *, model=None, max_tokens=None, temperature=None):  # type: ignore[no-untyped-def]
+    def chat_completion_with_tools(
+        self, messages, tools, *, model=None, max_tokens=None, temperature=None
+    ):  # type: ignore[no-untyped-def]
         message = self.tool_turns[self.calls]
         self.calls += 1
         return message
@@ -103,7 +110,9 @@ async def test_executes_an_approved_tool_call_and_surfaces_a_validated_source() 
     settings = _settings()
     fake_transport = FakeTransport(
         tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema={})],
-        result=MCPToolCallResult(text="Battery item text", is_error=False, structured_content=_JAMA_ITEM_SOURCE),
+        result=MCPToolCallResult(
+            text="Battery item text", is_error=False, structured_content=_JAMA_ITEM_SOURCE
+        ),
     )
     mcp_client = _adapter_with_fake_transport(settings, fake_transport)
     openai_client = FakeOpenAIClient(

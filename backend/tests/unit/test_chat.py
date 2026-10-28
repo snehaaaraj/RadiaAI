@@ -488,7 +488,9 @@ def test_chat_stream_reports_search_service_failure(client: TestClient) -> None:
 class _FakeOpenAIToolClient:
     """Scripts one tool call then a final answer, for the MCP-enabled chat path."""
 
-    def chat_completion_with_tools(self, messages, tools, *, model=None, max_tokens=None, temperature=None):  # type: ignore[no-untyped-def]
+    def chat_completion_with_tools(
+        self, messages, tools, *, model=None, max_tokens=None, temperature=None
+    ):  # type: ignore[no-untyped-def]
         from types import SimpleNamespace
 
         if not any(m.get("role") == "tool" for m in messages):
@@ -501,7 +503,9 @@ class _FakeOpenAIToolClient:
                     )
                 ],
             )
-        return SimpleNamespace(content="SRS-42 requires battery state-of-charge reporting.", tool_calls=None)
+        return SimpleNamespace(
+            content="SRS-42 requires battery state-of-charge reporting.", tool_calls=None
+        )
 
     def chat_completion(self, messages, *, model=None, max_tokens=None, temperature=None) -> str:  # type: ignore[no-untyped-def]
         return "fallback"
@@ -553,7 +557,11 @@ def test_mcp_enabled_question_triggers_tool_call_and_returns_sources(
     # Source-URL validation only accepts a host matching the configured Jama
     # instance; point it at the fake item's host for this test.
     settings_with_jama = test_settings.model_copy(
-        update={"jama": test_settings.jama.model_copy(update={"base_url": "https://example.jamacloud.com"})}
+        update={
+            "jama": test_settings.jama.model_copy(
+                update={"base_url": "https://example.jamacloud.com"}
+            )
+        }
     )
     app.dependency_overrides[get_settings] = lambda: settings_with_jama
     try:
@@ -607,7 +615,9 @@ class _UnavailableMCPTransport:
 @pytest.mark.unit
 def test_mcp_tool_failure_produces_a_safe_answer_not_a_crash(client: TestClient) -> None:
     class _AlwaysCallsToolClient:
-        def chat_completion_with_tools(self, messages, tools, *, model=None, max_tokens=None, temperature=None):  # type: ignore[no-untyped-def]
+        def chat_completion_with_tools(
+            self, messages, tools, *, model=None, max_tokens=None, temperature=None
+        ):  # type: ignore[no-untyped-def]
             from types import SimpleNamespace
 
             if not any(m.get("role") == "tool" for m in messages):
@@ -616,13 +626,19 @@ def test_mcp_tool_failure_produces_a_safe_answer_not_a_crash(client: TestClient)
                     tool_calls=[
                         SimpleNamespace(
                             id="call-1",
-                            function=SimpleNamespace(name="jama_get_item", arguments='{"item_id": 1}'),
+                            function=SimpleNamespace(
+                                name="jama_get_item", arguments='{"item_id": 1}'
+                            ),
                         )
                     ],
                 )
-            return SimpleNamespace(content="I could not retrieve that item right now.", tool_calls=None)
+            return SimpleNamespace(
+                content="I could not retrieve that item right now.", tool_calls=None
+            )
 
-        def chat_completion(self, messages, *, model=None, max_tokens=None, temperature=None) -> str:  # type: ignore[no-untyped-def]
+        def chat_completion(
+            self, messages, *, model=None, max_tokens=None, temperature=None
+        ) -> str:  # type: ignore[no-untyped-def]
             return "fallback"
 
     dummy = DummyRAGService(chunks=[], openai_client=_AlwaysCallsToolClient())

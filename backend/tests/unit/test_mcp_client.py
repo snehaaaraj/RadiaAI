@@ -44,7 +44,11 @@ class FakeTransport:
         return self.tools
 
     async def call_tool(
-        self, name: str, arguments: dict[str, object], *, extra_headers: dict[str, str] | None = None
+        self,
+        name: str,
+        arguments: dict[str, object],
+        *,
+        extra_headers: dict[str, str] | None = None,
     ) -> MCPToolCallResult:
         self.calls.append((name, arguments, extra_headers))
         if self.raise_on_call:
@@ -86,7 +90,9 @@ async def test_disabled_adapter_rejects_tool_calls() -> None:
 async def test_discovers_tools_and_filters_to_allowlist() -> None:
     fake = FakeTransport(
         tools=[
-            MCPToolDescriptor(name="jama_get_item", description="", input_schema=_JAMA_GET_ITEM_SCHEMA),
+            MCPToolDescriptor(
+                name="jama_get_item", description="", input_schema=_JAMA_GET_ITEM_SCHEMA
+            ),
             MCPToolDescriptor(name="jama_search", description="", input_schema={}),
             MCPToolDescriptor(name="jira_get_issue", description="", input_schema={}),
         ]
@@ -120,7 +126,11 @@ async def test_rejects_an_unknown_tool_name() -> None:
 
 async def test_rejects_arguments_that_fail_the_tools_own_schema() -> None:
     fake = FakeTransport(
-        tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema=_JAMA_GET_ITEM_SCHEMA)]
+        tools=[
+            MCPToolDescriptor(
+                name="jama_get_item", description="", input_schema=_JAMA_GET_ITEM_SCHEMA
+            )
+        ]
     )
     adapter = _adapter_with_fake_transport(_enabled_settings(), fake)
 
@@ -131,7 +141,11 @@ async def test_rejects_arguments_that_fail_the_tools_own_schema() -> None:
 
 async def test_valid_call_reaches_the_transport_and_returns_its_result() -> None:
     fake = FakeTransport(
-        tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema=_JAMA_GET_ITEM_SCHEMA)],
+        tools=[
+            MCPToolDescriptor(
+                name="jama_get_item", description="", input_schema=_JAMA_GET_ITEM_SCHEMA
+            )
+        ],
         call_results={"jama_get_item": MCPToolCallResult(text="Battery item", is_error=False)},
     )
     adapter = _adapter_with_fake_transport(_enabled_settings(), fake)
@@ -143,7 +157,9 @@ async def test_valid_call_reaches_the_transport_and_returns_its_result() -> None
 
 
 async def test_jama_credentials_are_forwarded_only_for_jama_tools() -> None:
-    fake = FakeTransport(tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema={})])
+    fake = FakeTransport(
+        tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema={})]
+    )
     adapter = _adapter_with_fake_transport(_enabled_settings(), fake)
 
     await adapter.call_tool(
@@ -180,7 +196,9 @@ async def test_transport_failure_surfaces_as_mcp_unavailable() -> None:
 
 
 async def test_tool_discovery_is_cached_across_calls() -> None:
-    fake = FakeTransport(tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema={})])
+    fake = FakeTransport(
+        tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema={})]
+    )
     adapter = _adapter_with_fake_transport(_enabled_settings(), fake)
 
     await adapter.available_tools()

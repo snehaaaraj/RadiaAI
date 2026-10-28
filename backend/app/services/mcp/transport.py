@@ -98,7 +98,9 @@ class MCPTransport:
         self._service_token = service_token
         self._max_response_bytes = max_response_bytes
         self._client = httpx.AsyncClient(
-            timeout=httpx.Timeout(connect=connect_timeout, read=read_timeout, write=read_timeout, pool=connect_timeout)
+            timeout=httpx.Timeout(
+                connect=connect_timeout, read=read_timeout, write=read_timeout, pool=connect_timeout
+            )
         )
         self._session_id: str | None = None
         self._protocol_version: str = _PROPOSED_PROTOCOL_VERSION
@@ -130,7 +132,11 @@ class MCPTransport:
         return self._next_id
 
     async def _post(
-        self, method: str, params: dict[str, Any] | None, *, extra_headers: dict[str, str] | None = None
+        self,
+        method: str,
+        params: dict[str, Any] | None,
+        *,
+        extra_headers: dict[str, str] | None = None,
     ) -> dict[str, Any] | None:
         """POST one JSON-RPC request and return its ``result``, or ``None`` for a notification."""
         is_notification = method.startswith("notifications/")
@@ -186,7 +192,9 @@ class MCPTransport:
             raise MCPProtocolError("The MCP server sent an empty response.")
         if "error" in body:
             error = body["error"]
-            message = error.get("message", "unknown error") if isinstance(error, dict) else str(error)
+            message = (
+                error.get("message", "unknown error") if isinstance(error, dict) else str(error)
+            )
             raise MCPProtocolError(f"MCP {method} failed: {message}")
         return body.get("result")
 
@@ -231,7 +239,9 @@ class MCPTransport:
         result = result or {}
         content_blocks = result.get("content", [])
         text_parts = [
-            block.get("text", "") for block in content_blocks if isinstance(block, dict) and block.get("type") == "text"
+            block.get("text", "")
+            for block in content_blocks
+            if isinstance(block, dict) and block.get("type") == "text"
         ]
         return MCPToolCallResult(
             text="\n".join(p for p in text_parts if p),

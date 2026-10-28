@@ -84,10 +84,16 @@ def _validate_source_url(url: str, *, trusted_hosts: frozenset[str]) -> bool:
         parsed = urlparse(url)
     except ValueError:
         return False
-    return parsed.scheme == "https" and parsed.hostname is not None and parsed.hostname in trusted_hosts
+    return (
+        parsed.scheme == "https"
+        and parsed.hostname is not None
+        and parsed.hostname in trusted_hosts
+    )
 
 
-def _extract_source(name: str, structured: dict[str, Any] | None, *, trusted_hosts: frozenset[str]) -> ToolSource | None:
+def _extract_source(
+    name: str, structured: dict[str, Any] | None, *, trusted_hosts: frozenset[str]
+) -> ToolSource | None:
     if not structured:
         return None
     url = structured.get("web_url")
@@ -142,7 +148,9 @@ async def run_chat_with_tools(
                 tool_calls = getattr(message, "tool_calls", None) or []
                 if not tool_calls:
                     return ToolAugmentedAnswer(
-                        answer=message.content or "", used_mcp=used_mcp, sources=list(sources.values())
+                        answer=message.content or "",
+                        used_mcp=used_mcp,
+                        sources=list(sources.values()),
                     )
 
                 messages.append(
@@ -179,16 +187,24 @@ async def run_chat_with_tools(
                         {"role": "tool", "tool_call_id": call.id, "content": result_text}
                     )
 
-                logger.info("mcp_tool_iteration_complete", iteration=iteration + 1, tool_count=len(tool_calls))
+                logger.info(
+                    "mcp_tool_iteration_complete",
+                    iteration=iteration + 1,
+                    tool_count=len(tool_calls),
+                )
 
             # Iteration budget exhausted: ask once more, with tools withdrawn, so the
             # model must answer from what it already has instead of looping forever.
             final_answer = await to_thread.run_sync(
                 lambda: openai_client.chat_completion(messages, model=model, max_tokens=max_tokens)
             )
-            return ToolAugmentedAnswer(answer=final_answer, used_mcp=used_mcp, sources=list(sources.values()))
+            return ToolAugmentedAnswer(
+                answer=final_answer, used_mcp=used_mcp, sources=list(sources.values())
+            )
     except TimeoutError:
-        logger.warning("mcp_tool_loop_deadline_exceeded", max_total_seconds=settings.max_total_seconds)
+        logger.warning(
+            "mcp_tool_loop_deadline_exceeded", max_total_seconds=settings.max_total_seconds
+        )
         return ToolAugmentedAnswer(
             answer=(
                 "I was retrieving live engineering data for this but it took too long. "
@@ -231,5 +247,7 @@ async def _execute_one_tool_call(
         return f"error: {exc}", None, False
 
     source = _extract_source(name, result.structured_content, trusted_hosts=trusted_source_hosts)
-    text = result.text or (json.dumps(result.structured_content) if result.structured_content else "")
+    text = result.text or (
+        json.dumps(result.structured_content) if result.structured_content else ""
+    )
     return text[:_MAX_TOOL_RESULT_CHARS], source, True
