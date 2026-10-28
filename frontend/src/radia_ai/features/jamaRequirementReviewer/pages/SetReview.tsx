@@ -90,6 +90,7 @@ export default function SetReview() {
         requirement_id: req.id,
         text: normalizeRequirementText(prepareFlatTextForNormalization(req.rawText)),
         requirement_level: 'Aircraft',
+        source: 'set',
       },
     }),
     []

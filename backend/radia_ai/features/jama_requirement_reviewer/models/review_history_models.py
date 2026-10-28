@@ -28,6 +28,7 @@ class ReviewWorkflow(StrEnum):
 
     REQUIREMENT = "requirement"
     DELTA = "delta"
+    SET = "set"
 
 
 class FindingDispositionStatus(StrEnum):
@@ -122,11 +123,12 @@ def create_requirement_history_entry(
     created_at: str,
     subject_id: str | None,
     response: RequirementReviewResponse,
+    workflow: ReviewWorkflow = ReviewWorkflow.REQUIREMENT,
 ) -> ReviewHistoryEntry:
     """Create a normalized history entry from single requirement response."""
     return ReviewHistoryEntry(
         review_id=review_id,
-        workflow=ReviewWorkflow.REQUIREMENT,
+        workflow=workflow,
         subject_id=subject_id,
         created_at=created_at,
         overall=response.overall,

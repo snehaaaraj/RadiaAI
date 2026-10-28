@@ -21,6 +21,33 @@ def test_get_standards_returns_references(client: TestClient) -> None:
 
 
 @pytest.mark.unit
+def test_set_review_requests_are_recorded_with_set_workflow(client: TestClient) -> None:
+    review_response = client.post(
+        "/api/v1/review/requirement",
+        json={
+            "requirement_id": "REQ-SET-1",
+            "text": "The subsystem should respond fast.",
+            "source": "set",
+        },
+    )
+    assert review_response.status_code == 200
+    review_id = review_response.json()["data"]["review_id"]
+
+    history_response = client.get("/api/v1/review/history", params={"workflow": "set"})
+    assert history_response.status_code == 200
+    entries = history_response.json()["data"]["entries"]
+    assert any(entry["review_id"] == review_id for entry in entries)
+    assert all(entry["workflow"] == "set" for entry in entries)
+
+    # A set-review entry should not show up when filtering for individual reviews.
+    requirement_history_response = client.get(
+        "/api/v1/review/history", params={"workflow": "requirement"}
+    )
+    requirement_entries = requirement_history_response.json()["data"]["entries"]
+    assert all(entry["review_id"] != review_id for entry in requirement_entries)
+
+
+@pytest.mark.unit
 def test_review_history_and_disposition_flow(client: TestClient) -> None:
     review_response = client.post(
         "/api/v1/review/requirement",

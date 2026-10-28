@@ -215,64 +215,12 @@ export function TopBar({ mode = 'workspace' }: TopBarProps) {
           <>
             {isSettingsPage ? (
               <Stack direction="row" alignItems="center" spacing={1.25}>
-                <Link
-                  component="button"
-                  type="button"
-                  underline="none"
-                  color={brandWordmarkColor}
-                  variant="subtitle1"
-                  fontWeight={700}
-                  onClick={() => guardedNavigate(ROUTES.LANDING)}
-                  sx={{
-                    px: 0.35,
-                    py: 0.2,
-                    borderRadius: 1,
-                    fontSize: { xs: '0.86rem', md: '0.95rem' },
-                    transition: 'transform 160ms ease, background-color 160ms ease',
-                    '&:hover': {
-                      textDecoration: 'none',
-                      backgroundColor: hoverHighlight,
-                      transform: 'scale(1.03)',
-                    },
-                  }}
-                >
-                  Radia AI
-                </Link>
-                <Typography component="span" sx={{ color: headerForegroundColor, opacity: 0.65, fontWeight: 700 }}>
-                  |
-                </Typography>
                 <Typography component="span" variant="subtitle1" sx={{ color: brandWordmarkColor, fontWeight: 700 }}>
                   Settings
                 </Typography>
               </Stack>
             ) : (
               <Stack direction="row" alignItems="center" spacing={1.25}>
-                <Link
-                  component="button"
-                  type="button"
-                  underline="none"
-                  color={brandWordmarkColor}
-                  variant="subtitle1"
-                  fontWeight={700}
-                  onClick={() => guardedNavigate(ROUTES.LANDING)}
-                  sx={{
-                    px: 0.35,
-                    py: 0.2,
-                    borderRadius: 1,
-                    fontSize: { xs: '0.86rem', md: '0.95rem' },
-                    transition: 'transform 160ms ease, background-color 160ms ease',
-                    '&:hover': {
-                      textDecoration: 'none',
-                      backgroundColor: hoverHighlight,
-                      transform: 'scale(1.03)',
-                    },
-                  }}
-                >
-                  Radia AI
-                </Link>
-                <Typography component="span" sx={{ color: headerForegroundColor, opacity: 0.65, fontWeight: 700 }}>
-                  |
-                </Typography>
                 <Link
                   component="button"
                   type="button"

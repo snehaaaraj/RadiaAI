@@ -25,6 +25,7 @@ import { reviewHistoryStyles } from './ReviewHistory.styles';
 const WORKFLOW_OPTIONS: Array<{ label: string; value: ReviewWorkflow | 'all' }> = [
   { label: 'All workflows', value: 'all' },
   { label: 'Individual requirement', value: 'requirement' },
+  { label: 'Set review', value: 'set' },
   { label: 'Delta', value: 'delta' },
 ];
 

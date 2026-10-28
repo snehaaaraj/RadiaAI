@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import StrEnum
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -310,6 +311,14 @@ class RequirementReviewInput(BaseModel):
         description="Requirement hierarchy level (aircraft/system/subsystem/component).",
     )
     metadata: dict[str, str] = Field(default_factory=dict)
+    source: Literal["single", "set"] = Field(
+        default="single",
+        description=(
+            "Where this review was submitted from: an individual requirement review, "
+            "or one item in a multi-requirement set review. Recorded in history so "
+            "runs can be filtered by originating workflow."
+        ),
+    )
 
 
 class ReviewVersionEntry(BaseModel):

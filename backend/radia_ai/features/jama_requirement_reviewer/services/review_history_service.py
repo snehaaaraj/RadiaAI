@@ -40,6 +40,7 @@ class ReviewHistoryService:
         response: RequirementReviewResponse,
         owner_id: str | None = None,
         owner_name: str | None = None,
+        workflow: ReviewWorkflow = ReviewWorkflow.REQUIREMENT,
     ) -> str:
         review_id = self._new_review_id()
         entry = create_requirement_history_entry(
@@ -47,6 +48,7 @@ class ReviewHistoryService:
             created_at=self._utc_now(),
             subject_id=subject_id,
             response=response,
+            workflow=workflow,
         ).model_copy(update={"owner_id": owner_id, "owner_name": owner_name})
         self._repository.add_entry(entry)
         return review_id
