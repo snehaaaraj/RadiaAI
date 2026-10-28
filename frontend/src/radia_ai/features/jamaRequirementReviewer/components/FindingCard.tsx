@@ -43,8 +43,9 @@ interface FindingCardProps {
   isApplyingDisposition?: boolean;
   readOnly?: boolean;
   /**
-   * Render as supporting evidence for a final recommendation: the per-finding
-   * rewrite is labelled as an individual suggestion rather than a changeset.
+   * Render as supporting evidence for a final recommendation: labelled as an
+   * individual suggestion, and its per-finding rewrite is not shown because the
+   * final recommendation already combines every suggestion.
    */
   evidenceMode?: boolean;
 }
@@ -174,14 +175,15 @@ export function FindingCard({
                 </Typography>
               </Box>
 
-              {/* Changeset - AI-assisted rephrased requirement */}
-              {finding.suggested_rewrite && (
+              {/* Changeset - AI-assisted rephrased requirement. Hidden for evidence cards:
+                  the final recommendation already combines every suggestion. */}
+              {finding.suggested_rewrite && !evidenceMode && (
                 <>
                   <Divider />
                   <Box>
                     <Box sx={findingCardStyles.changesetHeaderRow}>
                       <Typography variant="overline" color="primary" fontWeight={700}>
-                        {evidenceMode ? 'Original suggestion' : 'Changeset'}
+                        Changeset
                       </Typography>
                       <Tooltip title={copied ? 'Copied!' : 'Copy to clipboard'} placement="top">
                         <Button
@@ -202,9 +204,7 @@ export function FindingCard({
                       </Typography>
                     </Box>
                     <Typography variant="caption" color="text.secondary" sx={findingCardStyles.changesetCaption}>
-                      {evidenceMode
-                        ? 'This individual suggestion fixes only this finding. The final recommendation combines every valid suggestion.'
-                        : 'Applying this suggestion and re-running the review should result in this finding passing.'}
+                      Applying this suggestion and re-running the review should result in this finding passing.
                     </Typography>
                   </Box>
                 </>

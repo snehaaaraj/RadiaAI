@@ -285,14 +285,18 @@ async def test_a_hanging_openai_call_still_times_out_within_the_configured_budge
     mcp_client = _adapter_with_fake_transport(settings, fake_transport)
 
     class HangingOpenAIClient:
-        def chat_completion_with_tools(self, messages, tools, *, model=None, max_tokens=None, temperature=None):  # type: ignore[no-untyped-def]
+        def chat_completion_with_tools(
+            self, messages, tools, *, model=None, max_tokens=None, temperature=None
+        ):  # type: ignore[no-untyped-def]
             # Simulates a genuinely blocking network call that outlives the
             # configured deadline - exactly what a slow/hung Azure OpenAI
             # request looks like from the caller's perspective.
             time.sleep(10)
             return _message(content="should never get here")
 
-        def chat_completion(self, messages, *, model=None, max_tokens=None, temperature=None) -> str:  # type: ignore[no-untyped-def]
+        def chat_completion(
+            self, messages, *, model=None, max_tokens=None, temperature=None
+        ) -> str:  # type: ignore[no-untyped-def]
             return "unused"
 
     started = time.monotonic()
