@@ -103,16 +103,18 @@ class MCPTransport:
             )
         )
         self._session_id: str | None = None
+        self._initialized = False
         self._protocol_version: str = _PROPOSED_PROTOCOL_VERSION
         self._next_id = 0
 
     async def aclose(self) -> None:
         await self._client.aclose()
         self._session_id = None
+        self._initialized = False
 
     @property
     def is_initialized(self) -> bool:
-        return self._session_id is not None
+        return self._initialized
 
     def _headers(self, *, extra: dict[str, str] | None = None) -> dict[str, str]:
         headers = {
@@ -199,7 +201,15 @@ class MCPTransport:
         return body.get("result")
 
     async def initialize(self) -> None:
-        """Perform the MCP handshake: ``initialize`` then ``notifications/initialized``."""
+        """Perform the MCP handshake: ``initialize`` then ``notifications/initialized``.
+
+        A session id in the response is used when the server offers one (stateful
+        deployments, e.g. a long-running ``mcp-radia http`` process), but is not
+        required: a server running in Streamable HTTP's stateless mode (e.g. a
+        serverless deployment, where no two requests are guaranteed to reach the
+        same process) legitimately never returns one and treats every request as
+        already negotiated - this client must work against both.
+        """
         if self.is_initialized:
             return
         result = await self._post(
@@ -210,11 +220,16 @@ class MCPTransport:
                 "clientInfo": {"name": _CLIENT_NAME, "version": _CLIENT_VERSION},
             },
         )
-        if not result or not self._session_id:
-            raise MCPProtocolError("The MCP server did not return a session during initialize.")
+        if result is None:
+            raise MCPProtocolError("The MCP server did not return a result for initialize.")
         self._protocol_version = str(result.get("protocolVersion", _PROPOSED_PROTOCOL_VERSION))
         await self._post("notifications/initialized", {})
-        logger.info("mcp_session_initialized", protocol_version=self._protocol_version)
+        self._initialized = True
+        logger.info(
+            "mcp_session_initialized",
+            protocol_version=self._protocol_version,
+            stateless=self._session_id is None,
+        )
 
     async def list_tools(self) -> list[MCPToolDescriptor]:
         await self.initialize()

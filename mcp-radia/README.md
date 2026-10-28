@@ -254,6 +254,25 @@ a hyphen is not legal in a Python package name.
 
 ## Deploy
 
+Two deployment shapes are supported, both documented end to end in
+[`docs/architecture.md`](../docs/architecture.md) section 11:
+
+### Vercel (demo)
+
+Mirrors how the RadiaAI backend itself deploys to Vercel: `api/index.py` and
+`vercel.json` in this directory build a **stateless** Streamable HTTP ASGI app
+(see [`mcp_radia/asgi.py`](mcp_radia/asgi.py)) as mcp-radia's own, separate
+Vercel project. Set `MCP_RADIA_SERVICE_TOKEN` and the `JAMA_*` variables as
+that project's environment variables (not `.env` — Vercel never sees it).
+
+**This path has no network isolation** — Vercel gives the deployment a public
+URL, and `MCP_RADIA_SERVICE_TOKEN` is the *only* access control in front of
+it. Accepted for a demo against a scoped Jama trial instance only; see
+`docs/architecture.md` section 10.1 for the explicit tradeoff. Do not point a
+Vercel deployment of this kind at a production Jama tenant.
+
+### Azure Container Apps (production posture)
+
 This server is meant to run as its own service, reachable only from the RadiaAI backend — never
 from the browser or the public internet.
 
@@ -262,11 +281,11 @@ docker build -t mcp-radia .
 docker run --rm -p 127.0.0.1:8081:8081 --env-file .env mcp-radia
 ```
 
-The [`Dockerfile`](Dockerfile) runs `mcp-radia http` and binds to `0.0.0.0:8081` *inside* the
-container; the container itself should only ever be reachable on a private network — map it to a
-loopback address locally (as above), and use internal-only ingress in Azure Container Apps (see
-[`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep) and
-[`docs/architecture.md`](../docs/architecture.md) for the full deployment and rollback procedure).
+The [`Dockerfile`](Dockerfile) runs `mcp-radia http` (stateful mode — a session persists in
+memory across requests, since this is a long-running process) and binds to `0.0.0.0:8081`
+*inside* the container; the container itself should only ever be reachable on a private
+network — map it to a loopback address locally (as above), and use internal-only ingress in
+Azure Container Apps (see [`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep)).
 
 Two things are required before the HTTP transport will start at all:
 
