@@ -44,6 +44,8 @@ from app.core.logging import get_logger
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
+    from openai.types.chat import ChatCompletionMessage
+
 logger = get_logger(__name__)
 
 _SEARCH_UPLOAD_BATCH_SIZE = 100
@@ -137,6 +139,54 @@ class OpenAIClient:
             )
             raise LLMError(
                 message=f"Chat completion failed with model {target_model}",
+                model=target_model,
+                original_error=str(e),
+                detail={"message_count": len(messages)},
+            ) from e
+
+    def chat_completion_with_tools(
+        self,
+        messages: list[dict[str, Any]],
+        tools: list[dict[str, Any]],
+        *,
+        temperature: float | None = None,
+        max_tokens: int | None = None,
+        model: str | None = None,
+    ) -> ChatCompletionMessage:
+        """
+        Run one chat completion with function-calling tools offered, returning the
+        raw assistant message (``.content`` and, when the model requests one or
+        more tools, ``.tool_calls``) rather than just the text.
+
+        Used only by the MCP tool-calling loop (``app.services.mcp.orchestrator``):
+        every other caller wants plain text and should keep using
+        ``chat_completion``/``stream_chat_completion``, which never see tool calls.
+        """
+        target_model = model or self._settings.chat_deployment
+        try:
+            kwargs: dict[str, Any] = {
+                "model": target_model,
+                "messages": messages,
+                "max_completion_tokens": max_tokens or self._settings.max_tokens,
+                "tools": tools,
+                "tool_choice": "auto",
+            }
+            temp = temperature if temperature is not None else self._settings.temperature
+            if temp > 0.0:
+                kwargs["temperature"] = temp
+
+            response = self._client.chat.completions.create(**kwargs)
+            return cast("ChatCompletionMessage", response.choices[0].message)
+        except Exception as e:
+            logger.error(
+                "chat_completion_with_tools_failed",
+                model=target_model,
+                message_count=len(messages),
+                tool_count=len(tools),
+                error=str(e),
+            )
+            raise LLMError(
+                message=f"Tool-augmented chat completion failed with model {target_model}",
                 model=target_model,
                 original_error=str(e),
                 detail={"message_count": len(messages)},

@@ -158,6 +158,23 @@ class JamaAccountService:
 
     # -- per-user Jama access -----------------------------------------------
 
+    def credentials_for(self, user: AuthenticatedUser) -> JamaApiCredentials | None:
+        """Return ``user``'s own linked Jama OAuth credentials, if any.
+
+        Used by the MCP chat integration to forward a user's own identity to
+        mcp-radia so Jama enforces that user's permissions, rather than the
+        permissions of a shared service account. Returns ``None`` when the
+        user has no personal link - callers should fall back to not
+        forwarding any identity (mcp-radia then uses its own configured
+        shared credential, if any) rather than substituting one here.
+        """
+        if not self.linking_enabled:
+            return None
+        _, credentials = self._repository.get_link_and_credentials(  # type: ignore[union-attr]
+            user.subject_key
+        )
+        return credentials
+
     def service_for(self, user: AuthenticatedUser) -> JamaService:
         """Return a Jama service acting as ``user``'s linked Jama account."""
         link = None

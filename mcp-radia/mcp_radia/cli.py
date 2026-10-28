@@ -10,9 +10,11 @@ Two transports are supported from one tool registry:
 """
 
 import argparse
+import sys
 from collections.abc import Sequence
 
 from mcp_radia import __version__
+from mcp_radia.auth import require_service_token
 from mcp_radia.config import ServerSettings, get_settings
 from mcp_radia.logging import configure_logging, get_logger
 from mcp_radia.server import build_server
@@ -65,13 +67,25 @@ def main(argv: Sequence[str] | None = None) -> int:
     server = build_server(settings)
 
     if transport == "http":
+        import uvicorn
+
+        try:
+            app = require_service_token(
+                server.streamable_http_app(
+                    streamable_http_path=settings.http_path, host=settings.host
+                ),
+                token=settings.service_token,
+            )
+        except ValueError as exc:
+            logger.error("mcp_server_misconfigured", error=str(exc))
+            print(f"error: {exc}", file=sys.stderr)
+            return 1
+
         logger.info("mcp_server_starting", transport="streamable-http", url=settings.http_url)
-        server.run(
-            "streamable-http",
-            host=settings.host,
-            port=settings.port,
-            streamable_http_path=settings.http_path,
+        uvicorn_config = uvicorn.Config(
+            app, host=settings.host, port=settings.port, log_level=settings.log_level.lower()
         )
+        uvicorn.Server(uvicorn_config).run()
     else:
         # No startup log before the handshake: the client is already listening
         # on stdout and stderr noise is the only thing that is safe here.

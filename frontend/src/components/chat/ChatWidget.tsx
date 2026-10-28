@@ -8,32 +8,44 @@
 import { useEffect, useRef, useState } from 'react';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
+import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Fab from '@mui/material/Fab';
 import IconButton from '@mui/material/IconButton';
+import Link from '@mui/material/Link';
 import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
 import Tooltip from '@mui/material/Tooltip';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
 import CloseIcon from '@mui/icons-material/Close';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ForumIcon from '@mui/icons-material/Forum';
+import HubIcon from '@mui/icons-material/Hub';
 import SendIcon from '@mui/icons-material/Send';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
 import { useAppContext } from '@/context/useAppContext';
-import type { ChatMessage } from '@/types/api';
+import type { ChatMessage, ChatSource } from '@/types/api';
 
 const WIDGET_WIDTH = 360;
 const WIDGET_HEIGHT = 500;
 const HISTORY_TURNS_SENT_TO_API = 10;
 
+/** Per-turn MCP metadata, kept separately from the persisted chat history so the
+ * localStorage schema (ChatMessage: role + content only) never changes shape. */
+interface McpTurnInfo {
+  usedMcp: boolean;
+  sources: ChatSource[];
+}
+
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [input, setInput] = useState('');
   const { history, setHistory, clearHistory } = useChatHistory();
+  const [mcpInfoByIndex, setMcpInfoByIndex] = useState<Record<number, McpTurnInfo>>({});
   const { motionPreference } = useAppContext();
   const { isStreaming, streamingText, sendMessage } = useChatStream();
   const endRef = useRef<HTMLDivElement>(null);
@@ -72,7 +84,17 @@ export function ChatWidget() {
       { question, conversation_history: apiHistory, citation_style: 'none' },
       {
         onDone: (data) => {
-          setHistory((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+          setHistory((prev) => {
+            const next = [...prev, { role: 'assistant' as const, content: data.answer }];
+            if (data.used_mcp) {
+              const index = next.length - 1;
+              setMcpInfoByIndex((info) => ({
+                ...info,
+                [index]: { usedMcp: true, sources: data.sources ?? [] },
+              }));
+            }
+            return next;
+          });
           scrollToEnd();
         },
         onError: (message) => {
@@ -208,6 +230,28 @@ export function ChatWidget() {
                         {turn.content}
                       </Typography>
                     </Paper>
+                    {mcpInfoByIndex[i]?.usedMcp && (
+                      <Stack direction="row" spacing={0.5} alignItems="center" flexWrap="wrap" mt={0.5}>
+                        <Chip
+                          icon={<HubIcon fontSize="small" />}
+                          label="Engineering data"
+                          size="small"
+                          color="info"
+                          variant="outlined"
+                        />
+                        {mcpInfoByIndex[i].sources.map((source) => (
+                          <Link
+                            key={source.url}
+                            href={source.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            variant="caption"
+                          >
+                            {source.label}
+                          </Link>
+                        ))}
+                      </Stack>
+                    )}
                   </Box>
                 ))}
 

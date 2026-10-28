@@ -22,6 +22,7 @@ from __future__ import annotations
 import contextlib
 import json
 from typing import TYPE_CHECKING, Any
+from urllib.parse import urlparse
 
 import anyio
 from anyio import to_thread
@@ -31,13 +32,21 @@ from fastapi.responses import StreamingResponse
 from app.core.config import AppSettings
 from app.core.exceptions import ChatTimeoutError
 from app.core.logging import get_logger
+from app.core.security import AuthenticatedUser, RadiaUserDep
 from app.prompts.chat_prompts import NO_ANSWER_MESSAGE, CitationStyle, get_chat_system_prompt
 from app.rag.service import RAGService, RetrievedContext
-from app.schemas.chat import ChatRequest, ChatResponse, CitedChunk
+from app.schemas.chat import ChatRequest, ChatResponse, ChatSource, CitedChunk
 from app.schemas.common import APIResponse
+from app.services.mcp.client import MCPClientAdapter
+from app.services.mcp.orchestrator import ToolAugmentedAnswer, run_chat_with_tools
 from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
+    JamaAccountServiceDep,
+    MCPClientDep,
     RAGServiceDep,
     SettingsDep,
+)
+from radia_ai.features.jama_requirement_reviewer.services.jama_account_service import (
+    JamaAccountService,
 )
 
 if TYPE_CHECKING:
@@ -48,7 +57,9 @@ logger = get_logger(__name__)
 
 # Retrieval and generation each go through Azure SDKs (sync), and the chat
 # pipeline is user-facing, so both stages get their own bounded timeout rather
-# than inheriting the platform's default request timeout.
+# than inheriting the platform's default request timeout. This also bounds the
+# MCP tool-calling path below it: MCPSettings.max_total_seconds defaults well
+# under this, so the existing generation timeout stays the outer safety net.
 _RETRIEVAL_TIMEOUT_SECONDS = 15.0
 _GENERATION_TIMEOUT_SECONDS = 45.0
 _SNIPPET_LENGTH = 300
@@ -72,8 +83,12 @@ async def chat(
     request: Request,
     rag_service: RAGServiceDep,
     settings: SettingsDep,
+    user: RadiaUserDep,
+    mcp_client: MCPClientDep,
+    jama_account_service: JamaAccountServiceDep,
 ) -> APIResponse[ChatResponse]:
-    """RAG chat endpoint - document Q&A grounded in the indexed knowledge base."""
+    """RAG chat endpoint - document Q&A grounded in the indexed knowledge base, optionally
+    augmented with live engineering-data tool calls (e.g. Jama) when MCP is enabled."""
     logger.info(
         "chat_request",
         question_length=len(body.question),
@@ -82,10 +97,14 @@ async def chat(
     )
 
     chat_model = settings.azure_openai.rag_chat_deployment or settings.azure_openai.chat_deployment
+    mcp_enabled = mcp_client.enabled
 
     context = await _retrieve(rag_service, body.question, body.top_k)
 
-    if not context.has_context:
+    # With MCP disabled this is unchanged: no document context means an
+    # immediate refusal. With MCP enabled, a tool call may still ground an
+    # answer even when nothing in the document index matched the question.
+    if not context.has_context and not mcp_enabled:
         logger.info("chat_no_relevant_chunks", question_length=len(body.question))
         return APIResponse(
             data=_no_answer_response(chat_model),
@@ -95,9 +114,25 @@ async def chat(
     history = [
         {"role": message.role, "content": message.content} for message in body.conversation_history
     ]
-    answer = await _generate(
-        rag_service, body.question, context, history, body.citation_style, chat_model, settings
-    )
+    if mcp_enabled:
+        tool_result = await _generate_with_mcp(
+            rag_service,
+            mcp_client,
+            jama_account_service,
+            user,
+            body.question,
+            context,
+            history,
+            body.citation_style,
+            chat_model,
+            settings,
+        )
+        answer, used_mcp, sources = tool_result.answer, tool_result.used_mcp, tool_result.sources
+    else:
+        answer = await _generate(
+            rag_service, body.question, context, history, body.citation_style, chat_model, settings
+        )
+        used_mcp, sources = False, []
 
     # The model can still refuse per the system prompt (e.g. retrieved chunks
     # matched the query but don't actually answer it). Treat that refusal the
@@ -113,6 +148,8 @@ async def chat(
         citations=[_to_cited_chunk(chunk) for chunk in context.chunks],
         model=chat_model,
         retrieval_count=len(context.chunks),
+        used_mcp=used_mcp,
+        sources=[ChatSource(label=s.label, url=s.url) for s in sources],
     )
     return APIResponse(data=response, request_id=request.state.request_id)
 
@@ -137,6 +174,9 @@ async def chat_stream(
     request: Request,
     rag_service: RAGServiceDep,
     settings: SettingsDep,
+    user: RadiaUserDep,
+    mcp_client: MCPClientDep,
+    jama_account_service: JamaAccountServiceDep,
 ) -> StreamingResponse:
     """Streaming counterpart to ``chat()`` - see the route description for the SSE event protocol."""
     logger.info(
@@ -147,6 +187,7 @@ async def chat_stream(
     )
 
     chat_model = settings.azure_openai.rag_chat_deployment or settings.azure_openai.chat_deployment
+    mcp_enabled = mcp_client.enabled
 
     # Retrieval hasn't started streaming yet, so a timeout here is allowed to
     # propagate normally and be handled by the app's standard JSON error
@@ -154,7 +195,7 @@ async def chat_stream(
     # needs its own in-band 'error' event.
     context = await _retrieve(rag_service, body.question, body.top_k)
 
-    if not context.has_context:
+    if not context.has_context and not mcp_enabled:
         logger.info("chat_stream_no_relevant_chunks", question_length=len(body.question))
         return StreamingResponse(
             _single_sse_event("no_answer", _no_answer_payload(chat_model)),
@@ -164,10 +205,25 @@ async def chat_stream(
     history = [
         {"role": message.role, "content": message.content} for message in body.conversation_history
     ]
-    return StreamingResponse(
-        _stream_answer_events(
+    if mcp_enabled:
+        events = _stream_answer_events_with_mcp(
+            rag_service,
+            mcp_client,
+            jama_account_service,
+            user,
+            body.question,
+            context,
+            history,
+            body.citation_style,
+            chat_model,
+            settings,
+        )
+    else:
+        events = _stream_answer_events(
             rag_service, body.question, context, history, body.citation_style, chat_model, settings
-        ),
+        )
+    return StreamingResponse(
+        events,
         media_type="text/event-stream",
         headers={
             # Disable response buffering on common reverse proxies (e.g. nginx)
@@ -220,6 +276,58 @@ async def _generate(
             )
     except TimeoutError as e:
         logger.error("chat_generation_timeout", timeout_seconds=_GENERATION_TIMEOUT_SECONDS)
+        raise ChatTimeoutError(
+            "Answer generation timed out. Please try again.",
+            detail={"stage": "generation", "timeout_seconds": _GENERATION_TIMEOUT_SECONDS},
+        ) from e
+
+
+def _trusted_source_hosts(settings: AppSettings) -> frozenset[str]:
+    """Hostnames a tool-supplied source URL must match to be rendered to the user."""
+    host = urlparse(settings.jama.base_url).hostname if settings.jama.base_url else None
+    return frozenset({host}) if host else frozenset()
+
+
+async def _generate_with_mcp(
+    rag_service: RAGService,
+    mcp_client: MCPClientAdapter,
+    jama_account_service: JamaAccountService,
+    user: AuthenticatedUser,
+    question: str,
+    context: RetrievedContext,
+    history: list[dict[str, str]],
+    citation_style: CitationStyle,
+    model: str,
+    settings: AppSettings,
+) -> ToolAugmentedAnswer:
+    """Run the bounded MCP tool-calling loop, falling back to plain generation if it fails.
+
+    Reuses the same worker-thread offload and outer timeout as ``_generate``:
+    ``run_chat_with_tools`` bounds itself internally to
+    ``MCPSettings.max_total_seconds``, which is configured well under
+    ``_GENERATION_TIMEOUT_SECONDS``, so this timeout stays the outer safety net.
+    """
+    system_prompt = get_chat_system_prompt(citation_style, mcp_enabled=True)
+    full_system = f"{system_prompt}\n\n## Retrieved Standards Context\n\n{context.format_for_prompt()}"
+    jama_credentials = jama_account_service.credentials_for(user)
+
+    try:
+        with anyio.fail_after(_GENERATION_TIMEOUT_SECONDS):
+            return await run_chat_with_tools(
+                openai_client=rag_service.openai_client,
+                mcp_client=mcp_client,
+                settings=settings.mcp,
+                system_prompt=full_system,
+                question=question,
+                conversation_history=history,
+                model=model,
+                max_tokens=settings.azure_openai.rag_chat_max_tokens,
+                trusted_source_hosts=_trusted_source_hosts(settings),
+                jama_client_id=jama_credentials.client_id if jama_credentials else None,
+                jama_client_secret=jama_credentials.client_secret if jama_credentials else None,
+            )
+    except TimeoutError as e:
+        logger.error("chat_mcp_generation_timeout", timeout_seconds=_GENERATION_TIMEOUT_SECONDS)
         raise ChatTimeoutError(
             "Answer generation timed out. Please try again.",
             detail={"stage": "generation", "timeout_seconds": _GENERATION_TIMEOUT_SECONDS},
@@ -319,6 +427,64 @@ async def _stream_answer_events(
             "citations": [_to_cited_chunk(chunk).model_dump() for chunk in context.chunks],
             "model": model,
             "retrieval_count": len(context.chunks),
+        },
+    )
+
+
+async def _stream_answer_events_with_mcp(
+    rag_service: RAGService,
+    mcp_client: MCPClientAdapter,
+    jama_account_service: JamaAccountService,
+    user: AuthenticatedUser,
+    question: str,
+    context: RetrievedContext,
+    history: list[dict[str, str]],
+    citation_style: CitationStyle,
+    model: str,
+    settings: AppSettings,
+) -> AsyncIterator[str]:
+    """MCP-augmented counterpart to ``_stream_answer_events``.
+
+    The tool-calling loop needs to see the model's full response before
+    deciding whether to execute a tool and continue, so it cannot be
+    token-streamed the way a plain completion can. This still honors the SSE
+    contract - exactly one 'delta' (the whole answer at once, rather than
+    many small ones), then one terminal event - so the UI's event handling is
+    unchanged; only the granularity of the 'delta' event differs when MCP is
+    in use for this turn.
+    """
+    try:
+        result = await _generate_with_mcp(
+            rag_service,
+            mcp_client,
+            jama_account_service,
+            user,
+            question,
+            context,
+            history,
+            citation_style,
+            model,
+            settings,
+        )
+    except ChatTimeoutError:
+        yield _sse("error", {"message": "Answer generation timed out. Please try again."})
+        return
+
+    answer = result.answer
+    if answer.strip().lower() == NO_ANSWER_MESSAGE.lower():
+        yield _sse("no_answer", _no_answer_payload(model))
+        return
+
+    yield _sse("delta", {"text": answer})
+    yield _sse(
+        "done",
+        {
+            "answer": answer,
+            "citations": [_to_cited_chunk(chunk).model_dump() for chunk in context.chunks],
+            "model": model,
+            "retrieval_count": len(context.chunks),
+            "used_mcp": result.used_mcp,
+            "sources": [{"label": s.label, "url": s.url} for s in result.sources],
         },
     )
 

@@ -58,6 +58,13 @@ class CitedChunk(BaseModel):
     content_snippet: str = Field(description="First 300 chars of chunk content")
 
 
+class ChatSource(BaseModel):
+    """A live-data source (e.g. a Jama item) used to ground part of the answer."""
+
+    label: str = Field(description="Human-readable identifier, e.g. a Jama document key")
+    url: str = Field(description="Validated https URL to the source item")
+
+
 class ChatResponse(BaseModel):
     """Response body for POST /api/v1/chat."""
 
@@ -68,3 +75,11 @@ class ChatResponse(BaseModel):
     )
     model: str = Field(description="Azure OpenAI deployment used for generation")
     retrieval_count: int = Field(description="Number of chunks retrieved")
+    used_mcp: bool = Field(
+        default=False,
+        description="True when the answer used a live engineering-data tool call (e.g. Jama)",
+    )
+    sources: list[ChatSource] = Field(
+        default_factory=list,
+        description="Live-data sources used to ground the answer, when used_mcp is true",
+    )

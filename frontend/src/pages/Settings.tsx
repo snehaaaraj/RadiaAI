@@ -151,6 +151,36 @@ export default function Settings() {
         <motion.div
           initial={reduceMotion ? false : { opacity: 0, y: 12 }}
           animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
+          transition={{ duration: 0.28, ease: 'easeOut', delay: 0.04 }}
+        >
+          <Card id={SETTINGS_SECTION_IDS.ATLASSIAN_ACCOUNT} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>
+            <CardContent>
+              <Box sx={settingsStyles.sectionHeader}>
+                <LinkIcon color="disabled" />
+                <Typography variant="h6" fontWeight={700}>
+                  Atlassian account (Jira &amp; Confluence)
+                </Typography>
+              </Box>
+              <Stack spacing={1.5} alignItems="flex-start">
+                <Typography variant="body2" color="text.secondary">
+                  Link your own Jira and Confluence account so Radia AI chat can look up your
+                  issues and pages using your own permissions, the same way Jama account linking
+                  works today.
+                </Typography>
+                <Button variant="outlined" disabled>
+                  Link Atlassian account
+                </Button>
+                <Typography variant="caption" color="text.secondary">
+                  Coming soon - this capability is not yet enabled.
+                </Typography>
+              </Stack>
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 12 }}
+          animate={reduceMotion ? {} : { opacity: 1, y: 0 }}
           transition={{ duration: 0.28, ease: 'easeOut', delay: 0.05 }}
         >
           <Card id={SETTINGS_SECTION_IDS.DOCUMENT_INGESTION} sx={getSettingsSectionCardSx(HEADER_HEIGHT)}>

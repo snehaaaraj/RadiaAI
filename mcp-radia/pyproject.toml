@@ -12,6 +12,7 @@ dependencies = [
     "pydantic>=2.10,<3",
     "pydantic-settings>=2.7,<3",
     "structlog>=24.4",
+    "uvicorn>=0.30",
 ]
 
 [project.optional-dependencies]

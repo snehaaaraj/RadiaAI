@@ -36,6 +36,7 @@ from mcp_radia.connectors.errors import (
     ItemNotFoundError,
     extract_remote_message,
 )
+from mcp_radia.connectors.retry import get_with_retry
 from mcp_radia.connectors.text import strip_html
 from mcp_radia.logging import get_logger
 
@@ -295,7 +296,9 @@ class JamaClient:
             auth = httpx2.BasicAuth(self._settings.username, self._settings.password)
 
         try:
-            response = await client.get(url, params=params, headers=headers, auth=auth)
+            response = await get_with_retry(
+                client, url, system=SYSTEM, operation=path, params=params, headers=headers, auth=auth
+            )
             response.raise_for_status()
         except httpx2.HTTPStatusError as exc:
             self._raise_for_status(exc, path)

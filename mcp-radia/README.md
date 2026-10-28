@@ -17,8 +17,9 @@ read-only MCP surface, as a digital-thread integration layer.
 - It reads only `mcp-radia/.env` — never `backend/.env` or the repo-root `.env`.
 
 The backend's existing Jama connector was read for inspiration, but the connector here is a fresh
-implementation. Wiring the RadiaAI backend up as a *client* of this server is explicitly **not**
-part of this work.
+implementation. The RadiaAI backend talks to this server as an MCP client over Streamable HTTP —
+see [`docs/architecture.md`](../docs/architecture.md) for how that integration is wired end to end,
+and [Deploy](#deploy) below for running this server itself.
 
 ## Requirements
 
@@ -57,8 +58,15 @@ to set. Server settings are prefixed `MCP_RADIA_`:
 | `MCP_RADIA_HOST`        | `127.0.0.1` | HTTP transport bind address                    |
 | `MCP_RADIA_PORT`        | `8081`      | HTTP transport bind port                       |
 | `MCP_RADIA_HTTP_PATH`   | `/mcp`      | Path the HTTP transport is mounted at           |
+| `MCP_RADIA_SERVICE_TOKEN` | *empty*   | Bearer token the HTTP transport requires on every request — **required** to start `http` |
 
 Port `8081` is the default specifically so it does not collide with the RadiaAI backend on `8000`.
+
+`MCP_RADIA_SERVICE_TOKEN` is a shared secret between this server and its one legitimate caller,
+the RadiaAI backend — not a per-user credential. Generate one with `openssl rand -hex 32` and
+configure the identical value as the backend's `MCP_SERVICE_TOKEN` (see
+[`docs/architecture.md`](../docs/architecture.md)). The `http` subcommand refuses to start without
+it: an empty token almost always means it was forgotten, not that auth should be skipped.
 
 ### Jama (`JAMA_*`)
 
@@ -82,6 +90,14 @@ These use the plain `JAMA_*` prefix, the same names the backend uses. The two se
 independent because this server only ever reads `mcp-radia/.env` — but if you deploy both into one
 container with shared process environment, they will see the same variables. Give mcp-radia its own
 Jama service account if you want the access separated.
+
+**Per-user access (used by the chat integration).** When a caller sends the
+`X-Radia-Jama-Client-Id` and `X-Radia-Jama-Client-Secret` headers on an HTTP request, every
+`jama_*` tool call in that request acts as *that* OAuth client instead of the credentials above —
+so Jama itself enforces what the signed-in user can read. The RadiaAI backend sets these from each
+user's own linked Jama account (the same link used by the Jama Requirement Reviewer feature); a
+caller that omits them falls back to the shared credentials configured here. See
+[`mcp_radia/tools/_identity.py`](mcp_radia/tools/_identity.py).
 
 ### Atlassian Cloud — Jira + Confluence (`ATLASSIAN_*`)
 
@@ -163,6 +179,10 @@ mcp-radia http                              # http://127.0.0.1:8081/mcp
 mcp-radia http --host 0.0.0.0 --port 9000   # CLI flags override the environment
 ```
 
+`MCP_RADIA_SERVICE_TOKEN` must be set before this starts — see the table above. Every request must
+carry it as `Authorization: Bearer <token>`; anything else gets a `401`, logged as
+`mcp_service_auth_rejected`.
+
 ### Inspect it
 
 ```bash
@@ -196,12 +216,14 @@ this directory. Run the commands above locally before committing.
 ```
 mcp-radia/
 ├── mcp_radia/
+│   ├── auth.py              # bearer service-token check for the HTTP transport
 │   ├── cli.py              # argparse entrypoint; stdio + http subcommands
 │   ├── config.py           # pydantic-settings, MCP_RADIA_* prefix
 │   ├── logging.py          # structlog -> stderr
 │   ├── server.py           # build_server(): constructs the MCPServer
 │   ├── connectors/         # one module per external system
 │   │   ├── errors.py       # shared ConnectorError hierarchy + remote-message extraction
+│   │   ├── retry.py        # bounded 429 backoff with jitter
 │   │   ├── text.py         # HTML / ADF -> plain text
 │   │   ├── atlassian.py    # shared Cloud settings + HTTP base
 │   │   ├── jama.py         # Jama settings, models, async client
@@ -214,6 +236,7 @@ mcp-radia/
 │   │   └── service.py      # queries every connector live
 │   └── tools/              # single registration point for every MCP tool
 │       ├── _guard.py       # ConnectorError -> ToolError, READ_ONLY annotation
+│       ├── _identity.py    # per-user Jama credential passthrough from request headers
 │       ├── jama.py
 │       ├── jira.py
 │       ├── confluence.py
@@ -228,6 +251,30 @@ crossing that line is the `ConnectorError` hierarchy, which `tools/jama.py` tran
 
 The importable package is `mcp_radia` (underscore) inside the `mcp-radia` project directory, since
 a hyphen is not legal in a Python package name.
+
+## Deploy
+
+This server is meant to run as its own service, reachable only from the RadiaAI backend — never
+from the browser or the public internet.
+
+```bash
+docker build -t mcp-radia .
+docker run --rm -p 127.0.0.1:8081:8081 --env-file .env mcp-radia
+```
+
+The [`Dockerfile`](Dockerfile) runs `mcp-radia http` and binds to `0.0.0.0:8081` *inside* the
+container; the container itself should only ever be reachable on a private network — map it to a
+loopback address locally (as above), and use internal-only ingress in Azure Container Apps (see
+[`infra/mcp-radia.bicep`](../infra/mcp-radia.bicep) and
+[`docs/architecture.md`](../docs/architecture.md) for the full deployment and rollback procedure).
+
+Two things are required before the HTTP transport will start at all:
+
+1. `MCP_RADIA_SERVICE_TOKEN` — the shared bearer token described above.
+2. A network that the backend can reach but the public internet cannot.
+
+Neither TLS termination nor certificate handling lives in this server; terminate TLS at the
+platform (Container Apps ingress) in front of it.
 
 `register_tools()` in [`mcp_radia/tools/__init__.py`](mcp_radia/tools/__init__.py) is the one place
 that lists the server's entire surface area. Each phase adds its registration call there.

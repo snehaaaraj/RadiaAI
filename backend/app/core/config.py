@@ -77,6 +77,10 @@ def _skillz_settings_factory() -> "SkillzSettings":
     return cast(SkillzSettings, cast(Any, SkillzSettings)())
 
 
+def _mcp_settings_factory() -> "MCPSettings":
+    return cast(MCPSettings, cast(Any, MCPSettings)())
+
+
 class AzureOpenAISettings(BaseSettings):
     """Azure OpenAI service configuration."""
 
@@ -351,6 +355,82 @@ class JamaSettings(BaseSettings):
         return bool(self.username and self.password)
 
 
+class MCPSettings(BaseSettings):
+    """
+    Configuration for the Model Context Protocol (MCP) chat integration.
+
+    Lets the chat pipeline call read-only tools on the ``mcp-radia`` server
+    (Jama today; Jira/Confluence remain on hold). Disabled by default: the
+    feature only activates once an operator has verified the deployment's
+    authentication and network isolation, per docs/architecture.md.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="MCP_", env_file=_ENV_FILE, extra="ignore")
+
+    enabled: bool = Field(
+        default=False,
+        description="Master switch. Chat behaves exactly as before when false.",
+    )
+    server_url: str = Field(
+        default="",
+        description="mcp-radia Streamable HTTP endpoint, e.g. https://mcp-radia.internal/mcp",
+    )
+    service_token: str = Field(
+        default="",
+        description="Shared bearer token presented to mcp-radia on every request.",
+    )
+    connect_timeout_seconds: float = Field(
+        default=10.0, gt=0, description="Timeout for establishing the MCP session."
+    )
+    read_timeout_seconds: float = Field(default=20.0, gt=0, description="Per-tool-call timeout.")
+    max_tool_iterations: int = Field(
+        default=3,
+        ge=1,
+        le=10,
+        description="Upper bound on sequential tool calls within a single chat turn.",
+    )
+    max_total_seconds: float = Field(
+        default=25.0,
+        gt=0,
+        description="Overall deadline for the whole tool-calling loop in one chat turn.",
+    )
+    max_response_bytes: int = Field(
+        default=32_000,
+        gt=0,
+        description="Tool results larger than this are truncated before reaching the model.",
+    )
+    allowed_tools: list[str] = Field(
+        default=["jama_get_item", "jama_search", "jama_get_children"],
+        description=(
+            "Server-side allowlist. A tool mcp-radia advertises but that is not listed here "
+            "is never offered to the model and never executed, regardless of what the model "
+            "requests. Jira/Confluence/linking tools are intentionally excluded while "
+            "per-user Atlassian linking remains on hold."
+        ),
+    )
+
+    @field_validator("allowed_tools", mode="before")
+    @classmethod
+    def parse_allowed_tools(cls, value: str | list[str]) -> list[str]:
+        """Accept a list, a JSON list string, or a comma-separated string."""
+        if isinstance(value, list):
+            return value
+        import json
+
+        try:
+            parsed = json.loads(value)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, list):
+            return [str(name) for name in parsed]
+        return [name.strip() for name in value.split(",") if name.strip()]
+
+    @property
+    def is_configured(self) -> bool:
+        """True only when enabled with both a server URL and a service token."""
+        return self.enabled and bool(self.server_url.strip()) and bool(self.service_token.strip())
+
+
 class EntraIDSettings(BaseSettings):
     """
     Microsoft Entra ID (Azure AD) configuration for validating API access tokens.
@@ -555,6 +635,7 @@ class AppSettings(BaseSettings):
     sharepoint: SharePointSettings = Field(default_factory=_sharepoint_settings_factory)
     jama: JamaSettings = Field(default_factory=_jama_settings_factory)
     skillz: SkillzSettings = Field(default_factory=_skillz_settings_factory)
+    mcp: MCPSettings = Field(default_factory=_mcp_settings_factory)
 
     @field_validator("debug")
     @classmethod

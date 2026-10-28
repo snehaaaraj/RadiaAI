@@ -85,11 +85,20 @@ export interface CitedChunk {
   content_snippet: string;
 }
 
+export interface ChatSource {
+  label: string;
+  url: string;
+}
+
 export interface ChatData {
   answer: string;
   citations: CitedChunk[];
   model: string;
   retrieval_count: number;
+  /** True when the answer used a live engineering-data tool call (e.g. Jama). */
+  used_mcp?: boolean;
+  /** Live-data sources used to ground the answer, when used_mcp is true. */
+  sources?: ChatSource[];
 }
 
 // ---------------------------------------------------------------------------

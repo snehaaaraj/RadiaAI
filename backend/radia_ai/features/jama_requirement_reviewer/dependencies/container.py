@@ -10,7 +10,7 @@ Wires the LLM review enhancer into all reviewers for LLM-based review.
 """
 
 from collections.abc import AsyncGenerator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, suppress
 from typing import Annotated, cast
 
 import anyio
@@ -28,6 +28,7 @@ from app.ingestion.sharepoint_webhook import SharePointWebhookService
 from app.ingestion.status_store import IngestionStatusStore
 from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
+from app.services.mcp.client import MCPClientAdapter
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
     JamaClient,
     JamaTokenCache,
@@ -163,6 +164,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         user_linking_enabled=settings.jama.is_linking_configured,
     )
 
+    # MCP (Model Context Protocol) chat tool integration - disabled by default.
+    # The adapter is always constructed so dependants can check `.enabled`
+    # without a None check; it never makes a network call unless configured.
+    app.state.mcp_client = MCPClientAdapter(settings.mcp)
+    logger.info("mcp_client_ready", enabled=settings.mcp.is_configured)
+
     # Ingestion service
     ingestion_service = IngestionService(
         settings=settings,
@@ -227,6 +234,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     )
 
     yield  # application runs
+
+    with suppress(Exception):
+        await app.state.mcp_client.aclose()
 
     logger.info("application_shutdown")
 
@@ -544,6 +554,18 @@ def get_rag_service(request: Request) -> RAGService:
 
 
 RAGServiceDep = Annotated[RAGService, Depends(get_rag_service)]
+
+
+def get_mcp_client(request: Request) -> MCPClientAdapter:
+    """Resolve the MCP chat tool client from application state.
+
+    Always returns an adapter instance, even when MCP is disabled - callers
+    check ``.enabled`` rather than handling a missing dependency.
+    """
+    return cast(MCPClientAdapter, request.app.state.mcp_client)
+
+
+MCPClientDep = Annotated[MCPClientAdapter, Depends(get_mcp_client)]
 
 
 def get_ingestion_service(request: Request) -> IngestionService:
