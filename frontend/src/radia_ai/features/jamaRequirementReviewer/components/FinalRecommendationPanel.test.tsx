@@ -112,7 +112,7 @@ describe('FinalRecommendationPanel', () => {
         />
       );
 
-      fireEvent.click(screen.getByRole('button', { name: 'Ready to replace' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Ready to replace', pressed: false }));
       fireEvent.click(screen.getByRole('button', { name: 'Save & write to Jama' }));
 
       const dialog = screen.getByRole('dialog');
@@ -166,6 +166,43 @@ describe('FinalRecommendationPanel', () => {
       );
     });
 
+    it('lets the Ready to replace status chip accept and open the Jama confirmation', () => {
+      const onApplyDecision = vi.fn();
+      render(
+        <FinalRecommendationPanel
+          recommendation={buildRecommendation()}
+          findings={[buildFinding()]}
+          reviewId="rev-1"
+          onApplyDecision={onApplyDecision}
+          jamaTarget={jamaTarget}
+        />
+      );
+
+      fireEvent.click(screen.getByTestId('quick-accept-chip'));
+
+      const dialog = screen.getByRole('dialog');
+      expect(within(dialog).getByTestId('jama-write-preview')).toHaveTextContent(
+        /^The system shall respond within 2 s\.$/
+      );
+      expect(
+        screen.getByRole('button', { name: 'Ready to replace', pressed: true, hidden: true })
+      ).toBeInTheDocument();
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Write to Jama' }));
+
+      expect(onApplyDecision).toHaveBeenCalledWith(
+        'rev-1',
+        { decision: 'ready_to_replace', reason: '', modified_description: null },
+        { writeToJama: true }
+      );
+    });
+
+    it('keeps the status chip a plain label when no decision can be made', () => {
+      render(
+        <FinalRecommendationPanel recommendation={buildRecommendation()} findings={[buildFinding()]} readOnly />
+      );
+      expect(screen.queryByTestId('quick-accept-chip')).not.toBeInTheDocument();
+    });
+
     it('never offers a Jama write for a rejection or a review not pulled from Jama', () => {
       const onApplyDecision = vi.fn();
       const { rerender } = render(
@@ -189,7 +226,7 @@ describe('FinalRecommendationPanel', () => {
           onApplyDecision={onApplyDecision}
         />
       );
-      fireEvent.click(screen.getByRole('button', { name: 'Ready to replace' }));
+      fireEvent.click(screen.getByRole('button', { name: 'Ready to replace', pressed: false }));
       fireEvent.click(screen.getByRole('button', { name: 'Save decision' }));
 
       expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

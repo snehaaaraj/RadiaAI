@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import type { Ref } from 'react';
 import Alert from '@mui/material/Alert';
 import AlertTitle from '@mui/material/AlertTitle';
 import Box from '@mui/material/Box';
@@ -144,6 +145,22 @@ export function FinalRecommendationPanel({
   );
   const status = STATUS_CHIP[recommendation.status];
   const skillz = skillzChip(recommendation);
+  const [selectedDecision, setSelectedDecision] = useState<RecommendationDecisionStatus | ''>(
+    decision?.decision ?? ''
+  );
+  const [confirmJamaOpen, setConfirmJamaOpen] = useState(false);
+  const decisionPanelRef = useRef<HTMLDivElement | null>(null);
+  // The "Ready to replace" status chip doubles as a shortcut to accept the recommendation.
+  const canQuickAccept =
+    !readOnly && Boolean(onApplyDecision && reviewId) && recommendation.status === 'ready';
+  const handleQuickAccept = () => {
+    setSelectedDecision('ready_to_replace');
+    if (jamaTarget) {
+      setConfirmJamaOpen(true);
+    } else {
+      decisionPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  };
 
   if (recommendation.status === 'failed') {
     return (
@@ -184,7 +201,26 @@ export function FinalRecommendationPanel({
               </Typography>
             </Box>
             <Stack direction="row" spacing={1} flexWrap="wrap">
-              <Chip label={status.label} color={status.color} />
+              {canQuickAccept ? (
+                <Tooltip
+                  title={
+                    jamaTarget
+                      ? 'Accept this recommendation and write it to Jama'
+                      : 'Accept this recommendation as ready to replace the original'
+                  }
+                >
+                  <Chip
+                    label={status.label}
+                    color={status.color}
+                    icon={<CheckCircleIcon />}
+                    clickable
+                    onClick={handleQuickAccept}
+                    data-testid="quick-accept-chip"
+                  />
+                </Tooltip>
+              ) : (
+                <Chip label={status.label} color={status.color} />
+              )}
               <Tooltip title={recommendation.skillz_status_message}>
                 <Chip label={skillz.label} color={skillz.color} variant="outlined" />
               </Tooltip>
@@ -212,6 +248,11 @@ export function FinalRecommendationPanel({
           />
 
           <RecommendationDecisionPanel
+            containerRef={decisionPanelRef}
+            selectedDecision={selectedDecision}
+            onSelectDecision={setSelectedDecision}
+            confirmJamaOpen={confirmJamaOpen}
+            onConfirmJamaOpenChange={setConfirmJamaOpen}
             reviewId={reviewId}
             decision={decision}
             recommendedDescription={recommended}
@@ -342,6 +383,11 @@ export function FinalRecommendationPanel({
 }
 
 interface RecommendationDecisionPanelProps {
+  containerRef?: Ref<HTMLDivElement>;
+  selectedDecision: RecommendationDecisionStatus | '';
+  onSelectDecision: (value: RecommendationDecisionStatus | '') => void;
+  confirmJamaOpen: boolean;
+  onConfirmJamaOpenChange: (open: boolean) => void;
   reviewId?: string | null;
   decision?: RecommendationDecision | null;
   recommendedDescription: string;
@@ -355,6 +401,11 @@ interface RecommendationDecisionPanelProps {
 }
 
 function RecommendationDecisionPanel({
+  containerRef,
+  selectedDecision,
+  onSelectDecision: setSelectedDecision,
+  confirmJamaOpen,
+  onConfirmJamaOpenChange: setConfirmJamaOpen,
   reviewId,
   decision,
   recommendedDescription,
@@ -366,15 +417,11 @@ function RecommendationDecisionPanel({
   jamaWriteError,
   readOnly = false,
 }: RecommendationDecisionPanelProps) {
-  const [selectedDecision, setSelectedDecision] = useState<RecommendationDecisionStatus | ''>(
-    decision?.decision ?? ''
-  );
   const [reason, setReason] = useState(decision?.reason ?? '');
   const [modifiedDescription, setModifiedDescription] = useState(
     decision?.modified_description ?? recommendedDescription
   );
   const [saved, setSaved] = useState(false);
-  const [confirmJamaOpen, setConfirmJamaOpen] = useState(false);
 
   if (readOnly) {
     if (!decision) return null;
@@ -442,7 +489,7 @@ function RecommendationDecisionPanel({
   };
 
   return (
-    <Box sx={styles.sectionBox}>
+    <Box sx={styles.sectionBox} ref={containerRef}>
       <Stack spacing={1.5}>
         <Typography variant="subtitle2" fontWeight={700}>
           Reviewer decision
