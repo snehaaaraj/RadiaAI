@@ -40,7 +40,9 @@ def test_set_review_requests_are_recorded_with_set_workflow(client: TestClient) 
     assert all(entry["workflow"] == "set" for entry in entries)
 
     # A set-review entry should not show up when filtering for individual reviews.
-    requirement_history_response = client.get("/api/v1/review/history", params={"workflow": "requirement"})
+    requirement_history_response = client.get(
+        "/api/v1/review/history", params={"workflow": "requirement"}
+    )
     requirement_entries = requirement_history_response.json()["data"]["entries"]
     assert all(entry["review_id"] != review_id for entry in requirement_entries)
 
