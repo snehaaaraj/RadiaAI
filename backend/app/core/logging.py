@@ -43,11 +43,26 @@ def configure_logging(settings: AppSettings) -> None:
     ]
 
     if settings.environment in ("local", "development"):
-        # Human-friendly coloured output during local development
+        # Human-friendly coloured output during local development. ConsoleRenderer
+        # already pretty-prints exc_info itself, so no extra processor is needed.
         renderer: structlog.types.Processor = structlog.dev.ConsoleRenderer(colors=True)
+        final_processors: list[structlog.types.Processor] = [
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            renderer,
+        ]
     else:
-        # Machine-readable JSON for log aggregation (e.g. Azure Monitor)
+        # Machine-readable JSON for log aggregation (e.g. Azure Monitor, Vercel logs).
+        # Unlike ConsoleRenderer, JSONRenderer does not know how to turn exc_info=True
+        # (or a raised exception) into readable text on its own - without
+        # format_exc_info here, a logger.warning(..., exc_info=True) call renders as
+        # the literal, useless field {"exc_info": true} instead of the traceback,
+        # which is exactly what made a real production failure undiagnosable.
         renderer = structlog.processors.JSONRenderer()
+        final_processors = [
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.format_exc_info,
+            renderer,
+        ]
 
     structlog.configure(
         processors=[
@@ -62,10 +77,7 @@ def configure_logging(settings: AppSettings) -> None:
     # Attach structlog formatter to the root stdlib handler
     formatter = structlog.stdlib.ProcessorFormatter(
         foreign_pre_chain=shared_processors,
-        processors=[
-            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
-            renderer,
-        ],
+        processors=final_processors,
     )
 
     root_handler = logging.StreamHandler(sys.stdout)
