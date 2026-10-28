@@ -129,7 +129,8 @@ async def run_chat_with_tools(
 
     if not tools:
         answer = await to_thread.run_sync(
-            lambda: openai_client.chat_completion(messages, model=model, max_tokens=max_tokens)
+            lambda: openai_client.chat_completion(messages, model=model, max_tokens=max_tokens),
+            abandon_on_cancel=True,
         )
         return ToolAugmentedAnswer(answer=answer, used_mcp=False)
 
@@ -143,7 +144,8 @@ async def run_chat_with_tools(
                 message = await to_thread.run_sync(
                     lambda: openai_client.chat_completion_with_tools(
                         messages, tool_schemas, model=model, max_tokens=max_tokens
-                    )
+                    ),
+                    abandon_on_cancel=True,
                 )
                 tool_calls = getattr(message, "tool_calls", None) or []
                 if not tool_calls:
@@ -196,7 +198,8 @@ async def run_chat_with_tools(
             # Iteration budget exhausted: ask once more, with tools withdrawn, so the
             # model must answer from what it already has instead of looping forever.
             final_answer = await to_thread.run_sync(
-                lambda: openai_client.chat_completion(messages, model=model, max_tokens=max_tokens)
+                lambda: openai_client.chat_completion(messages, model=model, max_tokens=max_tokens),
+                abandon_on_cancel=True,
             )
             return ToolAugmentedAnswer(
                 answer=final_answer, used_mcp=used_mcp, sources=list(sources.values())

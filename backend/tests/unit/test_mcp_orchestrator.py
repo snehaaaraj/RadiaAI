@@ -265,3 +265,51 @@ async def test_malformed_tool_arguments_do_not_crash_the_loop() -> None:
 
     assert result.answer == "handled gracefully"
     assert result.used_mcp is False
+
+
+async def test_a_hanging_openai_call_still_times_out_within_the_configured_budget() -> None:
+    """Regression test for a real bug: without `abandon_on_cancel=True` on the
+    `to_thread.run_sync` calls wrapping the (blocking) OpenAI SDK call,
+    `anyio.fail_after` does not actually interrupt a hung synchronous call -
+    it waits for the thread to finish naturally no matter how long that
+    takes, so the user-visible chat request would hang indefinitely instead
+    of getting the bounded "took too long" fallback answer.
+    """
+    import time
+
+    settings = _settings(max_total_seconds=1)
+    fake_transport = FakeTransport(
+        tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema={})],
+        result=MCPToolCallResult(text="unused", is_error=False),
+    )
+    mcp_client = _adapter_with_fake_transport(settings, fake_transport)
+
+    class HangingOpenAIClient:
+        def chat_completion_with_tools(self, messages, tools, *, model=None, max_tokens=None, temperature=None):  # type: ignore[no-untyped-def]
+            # Simulates a genuinely blocking network call that outlives the
+            # configured deadline - exactly what a slow/hung Azure OpenAI
+            # request looks like from the caller's perspective.
+            time.sleep(10)
+            return _message(content="should never get here")
+
+        def chat_completion(self, messages, *, model=None, max_tokens=None, temperature=None) -> str:  # type: ignore[no-untyped-def]
+            return "unused"
+
+    started = time.monotonic()
+    result = await run_chat_with_tools(
+        openai_client=HangingOpenAIClient(),  # type: ignore[arg-type]
+        mcp_client=mcp_client,
+        settings=settings,
+        system_prompt="system",
+        question="q",
+        conversation_history=[],
+        model="gpt",
+        max_tokens=100,
+        trusted_source_hosts=frozenset(),
+    )
+    elapsed = time.monotonic() - started
+
+    # Must return well before the 10-second hang completes - bounded by
+    # max_total_seconds (1s here), not by however long the blocking call takes.
+    assert elapsed < 5
+    assert "took too long" in result.answer.lower()
