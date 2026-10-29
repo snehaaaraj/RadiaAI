@@ -23,7 +23,6 @@ const unlinked: JamaAccountStatus = {
   linking_enabled: true,
   linked: false,
   relink_required: false,
-  using_shared_account: false,
   jama_base_url: 'https://jama.example',
   jama_user_id: null,
   jama_username: null,

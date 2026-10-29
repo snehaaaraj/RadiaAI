@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import JamaSettings
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
+    JamaApiCredentials,
     JamaClient,
     _strip_html,
 )
@@ -18,9 +19,6 @@ from radia_ai.features.jama_requirement_reviewer.services.jama_service import Ja
 def _configured_settings() -> JamaSettings:
     return JamaSettings(
         base_url="https://example.jamacloud.com",
-        auth_type="basic",
-        username="api-id",
-        password="api-key",
     )
 
 
@@ -28,7 +26,7 @@ class _StubJamaClient(JamaClient):
     """JamaClient whose HTTP layer is replaced with canned Jama payloads."""
 
     def __init__(self, responses: dict[str, Any]) -> None:
-        super().__init__(_configured_settings())
+        super().__init__(_configured_settings(), JamaApiCredentials("cid", "secret"))
         self._responses = responses
 
     def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:  # type: ignore[override]

@@ -8,7 +8,7 @@ Credentials"). The user submits them once; they are verified against Jama
 then used for every Jama call that user makes - so Jama itself enforces which
 projects they can read and write.
 
-Outside local development there is no fallback to a shared service account.
+There is no shared service account to fall back to, in any environment.
 """
 
 from __future__ import annotations
@@ -55,13 +55,11 @@ class JamaAccountService:
         settings: AppSettings,
         repository: JamaCredentialRepository | None,
         token_cache: JamaTokenCache,
-        shared_service: JamaService | None = None,
         client_factory: JamaClientFactory | None = None,
     ) -> None:
         self._settings = settings
         self._repository = repository
         self._token_cache = token_cache
-        self._shared_service = shared_service
         self._client_factory = client_factory or (
             lambda credentials: JamaClient(settings.jama, credentials, token_cache)
         )
@@ -69,9 +67,6 @@ class JamaAccountService:
     @property
     def linking_enabled(self) -> bool:
         return self._repository is not None and self._settings.jama.has_base_url
-
-    def _shared_allowed(self) -> bool:
-        return self._settings.allows_shared_jama_account and self._shared_service is not None
 
     def _require_linking(self) -> JamaCredentialRepository:
         if not self._settings.jama.has_base_url:
@@ -109,7 +104,6 @@ class JamaAccountService:
             linking_enabled=self.linking_enabled,
             linked=False,
             relink_required=link is not None,
-            using_shared_account=self._shared_allowed(),
             jama_base_url=base_url,
         )
 
@@ -162,11 +156,9 @@ class JamaAccountService:
         """Return ``user``'s own linked Jama OAuth credentials, if any.
 
         Used by the MCP chat integration to forward a user's own identity to
-        mcp-radia so Jama enforces that user's permissions, rather than the
-        permissions of a shared service account. Returns ``None`` when the
-        user has no personal link - callers should fall back to not
-        forwarding any identity (mcp-radia then uses its own configured
-        shared credential, if any) rather than substituting one here.
+        mcp-radia so Jama enforces that user's permissions. Returns ``None``
+        when the user has no personal link; callers then forward no identity
+        and mcp-radia answers that the user must link their Jama account.
         """
         if not self.linking_enabled:
             return None
@@ -184,9 +176,6 @@ class JamaAccountService:
             )
             if credentials is not None:
                 return JamaService(self._client_factory(credentials))
-
-        if self._shared_allowed():
-            return self._shared_service  # type: ignore[return-value]
 
         self._require_linking()
         if link is not None:

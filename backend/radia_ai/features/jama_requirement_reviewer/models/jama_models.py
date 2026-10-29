@@ -94,9 +94,6 @@ class JamaAccountStatus(BaseModel):
         default=False,
         description="A saved link exists but can no longer be used; the user must re-link",
     )
-    using_shared_account: bool = Field(
-        default=False, description="Local development only: requests use the shared account"
-    )
     jama_base_url: str | None = None
     jama_user_id: int | None = None
     jama_username: str | None = None

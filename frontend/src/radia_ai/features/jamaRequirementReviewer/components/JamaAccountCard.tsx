@@ -59,11 +59,7 @@ export function JamaAccountCard() {
   }
 
   if (!account.linking_enabled) {
-    return account.using_shared_account ? (
-      <Alert severity="info" variant="outlined">
-        Local development: Jama requests use the shared service account configured on the server.
-      </Alert>
-    ) : (
+    return (
       <Alert severity="info" variant="outlined">
         Jama account linking is not enabled on this server. Ask an administrator to configure Jama.
       </Alert>

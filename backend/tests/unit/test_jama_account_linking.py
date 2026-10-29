@@ -5,7 +5,7 @@ A fake Jama Connect server (``httpx.MockTransport``) stands in for Jama so the
 real client code path runs: OAuth client-credentials token exchange, bearer
 header, token caching, ``/users/current`` identity lookup, and error mapping.
 Each fake Jama user sees a different set of projects, which proves calls are
-made *as the signed-in user* rather than as a shared service account.
+made *as the signed-in user*; there is no shared service account.
 """
 
 from __future__ import annotations
@@ -24,7 +24,6 @@ from app.core.security import AuthenticatedUser
 from radia_ai.features.jama_requirement_reviewer.connectors import jama_client as jama_client_module
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
     JamaApiCredentials,
-    JamaClient,
     JamaTokenCache,
 )
 from radia_ai.features.jama_requirement_reviewer.models.jama_models import JamaUserProfile
@@ -34,7 +33,6 @@ from radia_ai.features.jama_requirement_reviewer.repositories.jama_credential_re
 from radia_ai.features.jama_requirement_reviewer.services.jama_account_service import (
     JamaAccountService,
 )
-from radia_ai.features.jama_requirement_reviewer.services.jama_service import JamaService
 
 if TYPE_CHECKING:
     from fastapi.testclient import TestClient
@@ -152,16 +150,11 @@ def encryption_key() -> str:
 
 @pytest.fixture
 def jama_app(secured_app, fake_jama: FakeJama, encryption_key: str):
-    """Secured app with per-user Jama linking enabled and no shared Jama account."""
+    """Secured app with per-user Jama linking enabled."""
     settings = secured_app.state.settings.model_copy(
         update={
             "jama": JamaSettings(
                 base_url=JAMA_URL,
-                auth_type="basic",
-                username="",
-                password="",
-                client_id="",
-                client_secret="",
                 credential_encryption_key=encryption_key,
             )
         }
@@ -213,7 +206,6 @@ def test_unlinked_user_is_told_to_link_before_using_jama(jama_client, entra_toke
     assert status.status_code == 200
     assert status.json()["data"]["linked"] is False
     assert status.json()["data"]["linking_enabled"] is True
-    assert status.json()["data"]["using_shared_account"] is False
     assert projects.status_code == 403
     assert projects.json()["error"]["code"] == "JAMA_ACCOUNT_NOT_LINKED"
 
@@ -417,23 +409,15 @@ def test_credentials_repr_hides_the_secret() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Shared service account is local-only
+# There is no shared service account to fall back to
 # ---------------------------------------------------------------------------
 
 
-def _shared_settings(test_settings, environment: str):
+def _settings_for(test_settings, environment: str, encryption_key: str = ""):
     return test_settings.model_copy(
         update={
             "environment": environment,
-            "jama": JamaSettings(
-                base_url=JAMA_URL,
-                auth_type="oauth",
-                username="",
-                password="",
-                client_id="svc",
-                client_secret="svc-secret",
-                credential_encryption_key="",
-            ),
+            "jama": JamaSettings(base_url=JAMA_URL, credential_encryption_key=encryption_key),
         }
     )
 
@@ -442,49 +426,31 @@ _USER = AuthenticatedUser(user_id="u", tenant_id="t", email="u@x", roles=frozens
 
 
 @pytest.mark.unit
-@pytest.mark.parametrize("environment", ["development", "staging", "production"])
-def test_shared_jama_account_is_never_used_in_deployed_environments(
+@pytest.mark.parametrize("environment", ["local", "test", "development", "staging", "production"])
+def test_jama_is_unavailable_without_linking_in_every_environment(
     test_settings, environment: str
 ) -> None:
-    settings = _shared_settings(test_settings, environment)
-    shared = JamaService(JamaClient(settings.jama))
-    service = JamaAccountService(settings, None, JamaTokenCache(), shared_service=shared)
+    service = JamaAccountService(_settings_for(test_settings, environment), None, JamaTokenCache())
 
-    assert settings.allows_shared_jama_account is False
     with pytest.raises(JamaNotConfiguredError, match="linking is not enabled"):
         service.service_for(_USER)
-    assert service.status(_USER).using_shared_account is False
 
 
 @pytest.mark.unit
-def test_shared_jama_account_is_allowed_for_local_development(test_settings) -> None:
-    settings = _shared_settings(test_settings, "local")
-    shared = JamaService(JamaClient(settings.jama))
-    service = JamaAccountService(settings, None, JamaTokenCache(), shared_service=shared)
-
-    assert service.service_for(_USER) is shared
-    assert service.status(_USER).using_shared_account is True
-
-
-@pytest.mark.unit
-def test_shared_jama_account_is_not_used_once_sign_in_is_configured(test_settings) -> None:
-    from app.core.config import EntraIDSettings
-
-    settings = _shared_settings(test_settings, "local").model_copy(
-        update={"entra": EntraIDSettings(tenant_id="t", client_id="c")}
-    )
-
-    assert settings.allows_shared_jama_account is False
-
-
-@pytest.mark.unit
-def test_unlinked_user_in_deployed_environment_gets_not_linked(
-    test_settings, encryption_key: str
+@pytest.mark.parametrize("environment", ["local", "production"])
+def test_unlinked_user_gets_not_linked_in_every_environment(
+    test_settings, encryption_key: str, environment: str
 ) -> None:
-    settings = _shared_settings(test_settings, "production")
+    settings = _settings_for(test_settings, environment, encryption_key)
     repository = JamaCredentialRepository(MemoryBlobStore(), encryption_key)
-    shared = JamaService(JamaClient(settings.jama))
-    service = JamaAccountService(settings, repository, JamaTokenCache(), shared_service=shared)
+    service = JamaAccountService(settings, repository, JamaTokenCache())
 
     with pytest.raises(JamaAccountNotLinkedError):
         service.service_for(_USER)
+
+
+@pytest.mark.unit
+def test_jama_settings_have_no_shared_account_fields() -> None:
+    fields = set(JamaSettings.model_fields)
+
+    assert not fields & {"auth_type", "username", "password", "client_id", "client_secret"}

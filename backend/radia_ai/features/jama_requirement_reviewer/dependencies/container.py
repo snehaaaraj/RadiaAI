@@ -30,7 +30,6 @@ from app.rag.llm_review_enhancer_v2 import LLMReviewEnhancer
 from app.rag.service import RAGService
 from app.services.mcp.client import MCPClientAdapter
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
-    JamaClient,
     JamaTokenCache,
 )
 from radia_ai.features.jama_requirement_reviewer.connectors.sharepoint_client import (
@@ -151,18 +150,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # SharePoint + Standards
     sharepoint_client = SharePointStandardsClient(settings.sharepoint)
 
-    # Jama Connect integration. Production requests act as each user's linked Jama
-    # account; the shared service-account client below is used only in local/test.
-    jama_token_cache = JamaTokenCache()
-    app.state.jama_token_cache = jama_token_cache
-    jama_client = JamaClient(settings.jama, token_cache=jama_token_cache)
-    app.state.jama_client = jama_client
-    app.state.jama_service = JamaService(jama_client)
-    logger.info(
-        "jama_service_ready",
-        shared_account_configured=jama_client.is_configured,
-        user_linking_enabled=settings.jama.is_linking_configured,
-    )
+    # Jama Connect integration. Every request acts as the signed-in user's own
+    # linked Jama account; there is no shared service account.
+    app.state.jama_token_cache = JamaTokenCache()
+    logger.info("jama_service_ready", user_linking_enabled=settings.jama.is_linking_configured)
 
     # MCP (Model Context Protocol) chat tool integration - disabled by default.
     # The adapter is always constructed so dependants can check `.enabled`
@@ -459,18 +450,6 @@ def get_standards_service(request: Request) -> StandardsService:
 StandardsServiceDep = Annotated[StandardsService, Depends(get_standards_service)]
 
 
-def _get_shared_jama_service(request: Request) -> JamaService:
-    """Resolve the shared service-account Jama service (local development only)."""
-    service = getattr(request.app.state, "jama_service", None)
-    if service is None:
-        settings = _resolve_settings(request.app)
-        client = JamaClient(settings.jama, token_cache=get_jama_token_cache(request))
-        service = JamaService(client)
-        request.app.state.jama_client = client
-        request.app.state.jama_service = service
-    return cast(JamaService, service)
-
-
 def get_jama_token_cache(request: Request) -> JamaTokenCache:
     """Process-wide cache of Jama bearer tokens so each request need not re-authenticate."""
     cache = getattr(request.app.state, "jama_token_cache", None)
@@ -504,13 +483,10 @@ def get_jama_credential_repository(request: Request) -> JamaCredentialRepository
 
 def get_jama_account_service(request: Request) -> JamaAccountService:
     """Resolve the service that links users to their own Jama accounts."""
-    settings = _resolve_settings(request.app)
-    shared = _get_shared_jama_service(request) if settings.allows_shared_jama_account else None
     return JamaAccountService(
-        settings=settings,
+        settings=_resolve_settings(request.app),
         repository=get_jama_credential_repository(request),
         token_cache=get_jama_token_cache(request),
-        shared_service=shared,
     )
 
 

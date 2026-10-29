@@ -117,7 +117,6 @@ async def _build_readiness(settings: AppSettings, app_state: State) -> HealthRes
             settings.sharepoint.is_configured,
             getattr(app_state, "sharepoint_client", None),
         ),
-        ("jama", settings.jama.is_configured, getattr(app_state, "jama_client", None)),
     ]
 
     dependencies: list[DependencyHealth] = []

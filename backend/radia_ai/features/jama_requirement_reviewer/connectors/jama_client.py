@@ -1,15 +1,11 @@
 """Jama Connect REST API client.
 
 Talks to a Jama instance over HTTPS using ``httpx``. Credentials never leave the
-backend. Two credential sources are supported:
-
-  - **Per-user** (production): the signed-in user's own Jama API credentials
-    (client ID / secret created under their Jama profile -> "Set API Credentials").
-    Tokens are obtained with the OAuth 2.0 client-credentials grant and Jama
-    enforces *that user's* project permissions on every call.
-  - **Shared service account** (local development only), from ``JamaSettings``:
-      - ``basic``  -> HTTP Basic auth (username/password or Jama API ID/key).
-      - ``oauth``  -> OAuth 2.0 client-credentials.
+backend. Every client acts as one individual: the signed-in user's own Jama API
+credentials (client ID / secret created under their Jama profile -> "Set API
+Credentials"). Tokens are obtained with the OAuth 2.0 client-credentials grant and
+Jama enforces *that user's* project permissions on every call. There is no shared
+service account.
 
 Bearer tokens are fetched from ``/rest/oauth/token`` and cached until shortly
 before expiry in a :class:`JamaTokenCache` that can be shared across requests.
@@ -141,12 +137,12 @@ def plain_text_to_jama_html(text: str) -> str:
 
 
 class JamaClient:
-    """Thin client over the Jama Connect REST API, scoped to one credential set."""
+    """Thin client over the Jama Connect REST API, acting as one user's linked Jama account."""
 
     def __init__(
         self,
         settings: JamaSettings,
-        credentials: JamaApiCredentials | None = None,
+        credentials: JamaApiCredentials,
         token_cache: JamaTokenCache | None = None,
     ) -> None:
         self._settings = settings
@@ -154,15 +150,8 @@ class JamaClient:
         self._token_cache = token_cache or JamaTokenCache(max_entries=4)
 
     @property
-    def is_user_scoped(self) -> bool:
-        """True when calls run as an individual user's linked Jama account."""
-        return self._credentials is not None
-
-    @property
     def is_configured(self) -> bool:
-        if self._credentials is not None:
-            return self._settings.has_base_url
-        return self._settings.is_configured
+        return self._settings.has_base_url
 
     def probe(self) -> None:
         """Verify authenticated access without retrieving the full project catalog."""
@@ -173,25 +162,12 @@ class JamaClient:
     def _ensure_configured(self) -> None:
         if not self.is_configured:
             raise JamaNotConfiguredError(
-                "Jama integration is not configured. Set JAMA_BASE_URL and credentials."
+                "Jama integration is not configured. Set JAMA_BASE_URL on the server."
             )
-
-    def _uses_oauth(self) -> bool:
-        return self._credentials is not None or self._settings.auth_type == "oauth"
-
-    def _oauth_credentials(self) -> JamaApiCredentials:
-        if self._credentials is not None:
-            return self._credentials
-        return JamaApiCredentials(self._settings.client_id, self._settings.client_secret)
-
-    def _basic_auth(self) -> httpx.BasicAuth | None:
-        if self._uses_oauth():
-            return None
-        return httpx.BasicAuth(self._settings.username, self._settings.password)
 
     def _fetch_oauth_token(self, client: httpx.Client, cache_key: str) -> str:
         """Exchange client credentials for a bearer token via the OAuth endpoint."""
-        credentials = self._oauth_credentials()
+        credentials = self._credentials
         try:
             resp = client.post(
                 self._settings.token_url,
@@ -203,7 +179,7 @@ class JamaClient:
             resp.raise_for_status()
         except httpx.HTTPStatusError as exc:
             status_code = exc.response.status_code
-            if self.is_user_scoped and status_code in (400, 401, 403):
+            if status_code in (400, 401, 403):
                 raise JamaCredentialsInvalidError(
                     "Jama rejected your linked API credentials. They may have been revoked or "
                     "deleted - re-link your Jama account in Settings.",
@@ -235,12 +211,10 @@ class JamaClient:
         return cast(str, token)
 
     def _token_cache_key(self) -> str:
-        return JamaTokenCache.key_for(self._settings.token_url, self._oauth_credentials())
+        return JamaTokenCache.key_for(self._settings.token_url, self._credentials)
 
     def _auth_headers(self, client: httpx.Client) -> dict[str, str]:
-        """Return Authorization headers for OAuth mode (empty for basic auth)."""
-        if not self._uses_oauth():
-            return {}
+        """Return the bearer Authorization header for this user's OAuth token."""
         cache_key = self._token_cache_key()
         token = self._token_cache.get(cache_key) or self._fetch_oauth_token(client, cache_key)
         return {"Authorization": "Bearer " + token}
@@ -267,9 +241,8 @@ class JamaClient:
         """
         self._ensure_configured()
         url = f"{self._settings.rest_base}/{path.lstrip('/')}"
-        auth = self._basic_auth()
         try:
-            with httpx.Client(verify=self._settings.verify_ssl, auth=auth) as client:
+            with httpx.Client(verify=self._settings.verify_ssl) as client:
                 headers = self._auth_headers(client)
                 resp = client.request(
                     method,
@@ -289,19 +262,11 @@ class JamaClient:
                     detail={"path": path},
                 ) from exc
             if status_code == 401:
-                if self._uses_oauth():
-                    self._token_cache.discard(self._token_cache_key())
-                if self.is_user_scoped:
-                    raise JamaCredentialsInvalidError(
-                        "Jama rejected your linked API credentials. Re-link your Jama account "
-                        "in Settings.",
-                        detail={"jama_status_code": status_code},
-                    ) from exc
-                raise JamaServiceError(
-                    "Jama rejected the request. Check the configured credentials and permissions.",
-                    operation=path,
-                    status_code=status_code,
-                    original_error=str(exc),
+                self._token_cache.discard(self._token_cache_key())
+                raise JamaCredentialsInvalidError(
+                    "Jama rejected your linked API credentials. Re-link your Jama account "
+                    "in Settings.",
+                    detail={"jama_status_code": status_code},
                 ) from exc
             if status_code == 403:
                 raise JamaPermissionDeniedError(

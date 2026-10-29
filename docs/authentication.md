@@ -45,9 +45,10 @@ projects they can read or write, and Jama's audit trail shows the real person.
 If the user revokes the credentials in Jama, Radia returns
 `JAMA_CREDENTIALS_INVALID` and the UI asks them to re-link.
 
-The shared service account (`JAMA_USERNAME`/`JAMA_PASSWORD` or
-`JAMA_CLIENT_ID`/`JAMA_CLIENT_SECRET`) is used **only** when `ENVIRONMENT` is
-`local` or `test`. It is never used in a deployed environment.
+There is **no shared Jama service account** in any environment, including
+local development. A user who has not linked an account gets
+`JAMA_ACCOUNT_NOT_LINKED`; if linking is not configured
+(`JAMA_CREDENTIAL_ENCRYPTION_KEY` unset), Jama returns `JAMA_NOT_CONFIGURED`.
 
 ### Credential storage
 
@@ -177,11 +178,11 @@ backend accepts that only with `ENVIRONMENT=local` or `test`.
 
 ## Behaviour by environment
 
-| `ENVIRONMENT` | Entra not configured | Shared Jama service account |
-|---------------|----------------------|-----------------------------|
-| `local`, `test` | Synthetic local user with `LOCAL_DEV_USER_ROLES` (default `Radia.Admin`) | Allowed when an unlinked user calls Jama and Entra is not configured |
-| `development` | Every protected request returns `503 AUTH_NOT_CONFIGURED` | Never |
-| `staging`, `production`, or **unset** | **Startup fails** | Never |
+| `ENVIRONMENT` | Entra not configured |
+|---------------|----------------------|
+| `local`, `test` | Synthetic local user with `LOCAL_DEV_USER_ROLES` (default `Radia.Admin`) |
+| `development` | Every protected request returns `503 AUTH_NOT_CONFIGURED` |
+| `staging`, `production`, or **unset** | **Startup fails** |
 
 `ENVIRONMENT` defaults to `production`, so a deployment that forgets to set it
 fails closed instead of enabling the local bypass. Set `ENVIRONMENT=local` in

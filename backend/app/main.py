@@ -98,11 +98,6 @@ def _default_settings() -> AppSettings:
         ),
         jama=JamaSettings.model_construct(
             base_url="",
-            auth_type="basic",
-            username="",
-            password="",
-            client_id="",
-            client_secret="",
             api_version="v1",
             timeout_seconds=20.0,
             verify_ssl=True,

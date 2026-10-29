@@ -273,11 +273,6 @@ def _test_settings() -> AppSettings:
         },
         jama={
             "base_url": "",
-            "auth_type": "basic",
-            "username": "",
-            "password": "",
-            "client_id": "",
-            "client_secret": "",
             "credential_encryption_key": "",
         },
         # Explicit so a developer's .env can never switch tests to real Entra auth.

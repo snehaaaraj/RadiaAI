@@ -32,7 +32,6 @@ _TRACKED_STATE_ATTRS = (
     "openai_client",
     "search_service",
     "sharepoint_client",
-    "jama_client",
 )
 
 
@@ -106,7 +105,6 @@ def test_readiness_returns_200_when_all_dependencies_reachable(client: TestClien
                 _dep("azure_search", ServiceStatus.OK, latency_ms=8.0, message="Reachable"),
                 _dep("blob_storage", ServiceStatus.OK, latency_ms=5.0, message="Reachable"),
                 _dep("sharepoint", ServiceStatus.NOT_CONFIGURED, message="Not configured"),
-                _dep("jama", ServiceStatus.NOT_CONFIGURED, message="Not configured"),
             ],
         ),
     )
@@ -117,7 +115,7 @@ def test_readiness_returns_200_when_all_dependencies_reachable(client: TestClien
     body = response.json()["data"]
     assert body["status"] == "ok"
     names = {dep["name"] for dep in body["dependencies"]}
-    assert names == {"azure_openai", "azure_search", "blob_storage", "sharepoint", "jama"}
+    assert names == {"azure_openai", "azure_search", "blob_storage", "sharepoint"}
 
 
 @pytest.mark.unit
@@ -209,7 +207,7 @@ def test_readiness_reports_down_when_required_clients_are_not_wired(client: Test
     # The autouse blob stub (InMemoryBlobClient) reports healthy.
     assert by_name["blob_storage"]["status"] == "ok"
     assert by_name["sharepoint"]["status"] == "not_configured"
-    assert by_name["jama"]["status"] == "not_configured"
+    assert "jama" not in by_name
 
 
 @pytest.mark.unit

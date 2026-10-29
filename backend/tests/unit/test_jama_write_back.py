@@ -8,6 +8,7 @@ from fastapi.testclient import TestClient
 
 from app.core.config import JamaSettings
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
+    JamaApiCredentials,
     JamaClient,
     plain_text_to_jama_html,
 )
@@ -26,10 +27,8 @@ class _FakeJamaClient(JamaClient):
         super().__init__(
             JamaSettings(
                 base_url="https://example.jamacloud.com",
-                auth_type="basic",
-                username="api-id",
-                password="test-value",
-            )
+            ),
+            JamaApiCredentials("cid", "secret"),
         )
         self.patches: list[Any] = []
         self.item: dict[str, Any] = {
