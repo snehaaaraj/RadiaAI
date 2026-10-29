@@ -14,7 +14,7 @@ import logging
 
 import pytest
 
-from app.core.config import get_settings
+from app.core.config import AppSettings, get_settings
 from app.core.logging import configure_logging, get_logger
 
 pytestmark = pytest.mark.unit
@@ -29,8 +29,10 @@ def _restore_logging_config():
     logging.getLogger().handlers.clear()
 
 
-def test_json_renderer_includes_the_real_exception_text(capsys: pytest.CaptureFixture[str]) -> None:
-    settings = get_settings().model_copy(update={"environment": "production"})
+def test_json_renderer_includes_the_real_exception_text(
+    capsys: pytest.CaptureFixture[str], test_settings: AppSettings
+) -> None:
+    settings = test_settings.model_copy(update={"environment": "production"})
     configure_logging(settings)
     logger = get_logger("test.exc_info")
 
@@ -53,9 +55,10 @@ def test_json_renderer_includes_the_real_exception_text(capsys: pytest.CaptureFi
 
 def test_json_renderer_output_is_still_valid_json_when_there_is_no_exception(
     capsys: pytest.CaptureFixture[str],
+    test_settings: AppSettings,
 ) -> None:
     """format_exc_info must be a no-op when there is nothing to format."""
-    settings = get_settings().model_copy(update={"environment": "production"})
+    settings = test_settings.model_copy(update={"environment": "production"})
     configure_logging(settings)
     logger = get_logger("test.exc_info")
 
@@ -71,9 +74,10 @@ def test_json_renderer_output_is_still_valid_json_when_there_is_no_exception(
 
 def test_console_renderer_still_handles_exceptions_in_local_environment(
     capsys: pytest.CaptureFixture[str],
+    test_settings: AppSettings,
 ) -> None:
     """The dev console path renders exceptions itself; must keep working unchanged."""
-    settings = get_settings().model_copy(update={"environment": "local"})
+    settings = test_settings.model_copy(update={"environment": "local"})
     configure_logging(settings)
     logger = get_logger("test.exc_info")
 
