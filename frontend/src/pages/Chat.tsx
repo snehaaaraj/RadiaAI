@@ -15,6 +15,7 @@ import HubIcon from '@mui/icons-material/Hub';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
 import type { ChatSource } from '@/types/api';
+import { MessageText } from '@/components/chat/MessageText';
 import { deriveChatMode, planChatSend } from '@/utils/chatMode';
 
 const HISTORY_TURNS_SENT_TO_API = 10;
@@ -141,7 +142,7 @@ export default function Chat() {
               }}
             >
               <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                {turn.content}
+                <MessageText content={turn.content} />
               </Typography>
             </Paper>
             {mcpInfoByIndex[i]?.usedMcp && (
@@ -176,7 +177,7 @@ export default function Chat() {
               sx={{ p: 2, maxWidth: '75%', border: '1px solid', borderColor: 'divider' }}
             >
               <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                {streamingText}
+                <MessageText content={streamingText} />
               </Typography>
             </Paper>
           </Box>

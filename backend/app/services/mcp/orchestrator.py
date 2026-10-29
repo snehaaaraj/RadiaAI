@@ -18,6 +18,7 @@ prompt passed in must already tell the model to treat them that way (see
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlparse
@@ -91,6 +92,26 @@ def _validate_source_url(url: str, *, trusted_hosts: frozenset[str]) -> bool:
     )
 
 
+#: A Markdown inline link: ``[label](url)``. Labels may not contain brackets.
+_MARKDOWN_LINK = re.compile(r"\[([^\[\]\n]+)\]\(([^()\s]+)\)")
+
+
+def _sanitize_answer_links(answer: str, *, trusted_hosts: frozenset[str]) -> str:
+    """Keep Markdown links only when they point at a trusted host; otherwise keep just the label.
+
+    The chat UI renders ``[label](url)`` as a clickable link. The model can
+    copy a URL out of an untrusted tool result into its answer, so the same
+    exact-host https rule used for source chips is applied here before the
+    answer leaves the backend.
+    """
+
+    def replace(match: re.Match[str]) -> str:
+        label, url = match.group(1), match.group(2)
+        return match.group(0) if _validate_source_url(url, trusted_hosts=trusted_hosts) else label
+
+    return _MARKDOWN_LINK.sub(replace, answer)
+
+
 def _extract_source(
     name: str, structured: dict[str, Any] | None, *, trusted_hosts: frozenset[str]
 ) -> ToolSource | None:
@@ -160,7 +181,9 @@ async def run_chat_with_tools(
                 tool_calls = getattr(message, "tool_calls", None) or []
                 if not tool_calls:
                     return ToolAugmentedAnswer(
-                        answer=message.content or "",
+                        answer=_sanitize_answer_links(
+                            message.content or "", trusted_hosts=trusted_source_hosts
+                        ),
                         used_mcp=used_mcp,
                         sources=list(sources.values()),
                     )
@@ -212,7 +235,9 @@ async def run_chat_with_tools(
                 abandon_on_cancel=True,
             )
             return ToolAugmentedAnswer(
-                answer=final_answer, used_mcp=used_mcp, sources=list(sources.values())
+                answer=_sanitize_answer_links(final_answer, trusted_hosts=trusted_source_hosts),
+                used_mcp=used_mcp,
+                sources=list(sources.values()),
             )
     except TimeoutError:
         logger.warning(

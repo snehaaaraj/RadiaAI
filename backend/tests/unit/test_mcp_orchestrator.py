@@ -12,7 +12,7 @@ import pytest
 from app.core.config import MCPSettings
 from app.services.mcp.client import MCPClientAdapter
 from app.services.mcp.errors import MCPUnavailableError
-from app.services.mcp.orchestrator import run_chat_with_tools
+from app.services.mcp.orchestrator import _sanitize_answer_links, run_chat_with_tools
 from app.services.mcp.transport import MCPToolCallResult, MCPToolDescriptor
 
 pytestmark = pytest.mark.unit
@@ -349,3 +349,27 @@ async def test_a_hanging_openai_call_still_times_out_within_the_configured_budge
     # max_total_seconds (1s here), not by however long the blocking call takes.
     assert elapsed < 5
     assert "took too long" in result.answer.lower()
+
+
+_TRUSTED = frozenset({"example.jamacloud.com"})
+
+
+def test_answer_links_to_the_trusted_jama_host_are_kept() -> None:
+    answer = "See [SRS-42](https://example.jamacloud.com/perspective.req#/items/1?projectId=66)."
+
+    assert _sanitize_answer_links(answer, trusted_hosts=_TRUSTED) == answer
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "https://evil.example/phish",
+        "http://example.jamacloud.com/items/1",
+        "javascript:alert`1`",
+        "https://example.jamacloud.com.evil.example/x",
+    ],
+)
+def test_answer_links_to_untrusted_urls_are_reduced_to_their_label(url: str) -> None:
+    answer = f"Open [the item]({url}) now."
+
+    assert _sanitize_answer_links(answer, trusted_hosts=_TRUSTED) == "Open the item now."

@@ -29,6 +29,7 @@ import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
 import { useAppContext } from '@/context/useAppContext';
 import type { ChatSource } from '@/types/api';
+import { MessageText } from '@/components/chat/MessageText';
 import { deriveChatMode, planChatSend } from '@/utils/chatMode';
 
 const WIDGET_WIDTH = 360;
@@ -241,7 +242,7 @@ export function ChatWidget() {
                           wordBreak: 'break-word',
                         }}
                       >
-                        {turn.content}
+                        <MessageText content={turn.content} />
                       </Typography>
                     </Paper>
                     {mcpInfoByIndex[i]?.usedMcp && (
@@ -286,7 +287,7 @@ export function ChatWidget() {
                         variant="body2"
                         sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', wordBreak: 'break-word' }}
                       >
-                        {streamingText}
+                        <MessageText content={streamingText} />
                       </Typography>
                     </Paper>
                   </Box>

@@ -120,6 +120,10 @@ For a Jama item, "parent" means its document-tree container (the parent_id field
 also returned on search/related-item results) - a different relationship from "children"
 (containment, a separate tool) and from "upstream"/"downstream" (traceability links, a separate
 tool). Do not answer a question about one of these relationships using data meant for another.
+
+To link to an item, use a Markdown link whose label is the item's document key and whose URL is the
+exact web_url a tool returned for that item, e.g. [SAND-ACR-1160](<web_url>). Never construct, edit,
+or guess a URL, and never link to anything a tool did not return a web_url for.
 """
 
 CHAT_SYSTEM_PROMPT = _BASE_RULES + _INLINE_CITATION_RULE
