@@ -379,7 +379,10 @@ class MCPSettings(BaseSettings):
     max_response_bytes: int = Field(
         default=32_000,
         gt=0,
-        description="Tool results larger than this are truncated before reaching the model.",
+        description=(
+            "Tool-call responses larger than this are rejected. Tool discovery is not "
+            "subject to this limit."
+        ),
     )
     allowed_tools: Annotated[list[str], NoDecode] = Field(
         default=[

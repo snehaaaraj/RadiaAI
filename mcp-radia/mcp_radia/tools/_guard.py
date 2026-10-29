@@ -24,7 +24,10 @@ async def guard[T](operation: str, call: Callable[[], Awaitable[T]]) -> T:
 
     ``ToolError`` messages are shown to the model, so they carry the
     remediation hint the connector produced (which variable is missing, no
-    permission, rate-limited) rather than a generic failure.
+    permission, rate-limited) rather than a generic failure. A ``ValueError``
+    is an invalid argument (e.g. a Jama document key where a numeric id is
+    required); its message tells the model how to retry, so it is passed on
+    too instead of being masked as a generic "Error executing tool".
     """
     try:
         return await call()
@@ -36,4 +39,7 @@ async def guard[T](operation: str, call: Callable[[], Awaitable[T]]) -> T:
             error_type=type(exc).__name__,
             status_code=exc.status_code,
         )
+        raise ToolError(str(exc)) from exc
+    except ValueError as exc:
+        logger.info("tool_call_invalid_argument", operation=operation)
         raise ToolError(str(exc)) from exc

@@ -40,6 +40,11 @@ _PROTOCOL_VERSION_HEADER = "MCP-Protocol-Version"
 #: next to an interpolated secret in the same string (keeps it out of basic
 #: credential-pattern scanners that only look at `f"Bearer {...}"`-shaped text).
 _AUTH_SCHEME = "Bearer"
+#: Size cap for protocol responses (``initialize``, ``tools/list``). Kept separate
+#: from the per-tool-result limit: the tool catalogue grows with every tool and
+#: description mcp-radia adds, and exceeding a result-sized limit here would
+#: silently disable every tool.
+_MAX_PROTOCOL_RESPONSE_BYTES = 1_000_000
 
 
 @dataclass
@@ -174,7 +179,16 @@ class MCPTransport:
         if session_id:
             self._session_id = session_id
 
-        if len(response.content) > self._max_response_bytes:
+        size_limit = (
+            self._max_response_bytes if method == "tools/call" else _MAX_PROTOCOL_RESPONSE_BYTES
+        )
+        if len(response.content) > size_limit:
+            logger.warning(
+                "mcp_response_too_large",
+                method=method,
+                size=len(response.content),
+                limit=size_limit,
+            )
             raise MCPProtocolError("The MCP server response exceeded the configured size limit.")
 
         content_type = response.headers.get("content-type", "")

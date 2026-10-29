@@ -125,7 +125,9 @@ tool). Do not answer a question about one of these relationships using data mean
 CHAT_SYSTEM_PROMPT = _BASE_RULES + _INLINE_CITATION_RULE
 CHAT_SYSTEM_PROMPT_NO_CITATIONS = _BASE_RULES + _NO_CITATION_RULE
 RADIAAI_SYSTEM_PROMPT = _RADIAAI_BASE_RULES + _RADIAAI_INLINE_RULE + _MCP_TOOL_RULE
-RADIAAI_SYSTEM_PROMPT_NO_CITATIONS = _RADIAAI_BASE_RULES + _RADIAAI_NO_CITATION_RULE + _MCP_TOOL_RULE
+RADIAAI_SYSTEM_PROMPT_NO_CITATIONS = (
+    _RADIAAI_BASE_RULES + _RADIAAI_NO_CITATION_RULE + _MCP_TOOL_RULE
+)
 
 CitationStyle = Literal["inline", "none"]
 
@@ -143,6 +145,4 @@ def get_radiaai_system_prompt(citation_style: CitationStyle) -> str:
     to answer "only from the retrieved standards context" (which previously
     pushed it to refuse or improvise on Jama questions).
     """
-    return (
-        RADIAAI_SYSTEM_PROMPT_NO_CITATIONS if citation_style == "none" else RADIAAI_SYSTEM_PROMPT
-    )
+    return RADIAAI_SYSTEM_PROMPT_NO_CITATIONS if citation_style == "none" else RADIAAI_SYSTEM_PROMPT
