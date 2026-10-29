@@ -12,19 +12,25 @@ from mcp_radia.connectors.errors import (
     ConnectorServiceError,
     ItemNotFoundError,
 )
-from mcp_radia.connectors.jama import MAX_PAGE_SIZE, JamaSettings, strip_html
+from mcp_radia.connectors.jama import (
+    MAX_PAGE_SIZE,
+    JamaClient,
+    JamaCredentials,
+    JamaLocalCredentials,
+    strip_html,
+)
 from tests.jama_fixtures import (
     CHILDREN_PAYLOAD,
+    CREDENTIALS,
     EMPTY_CHILDREN_PAYLOAD,
     ITEM_PAYLOAD,
     PROJECTS_PAYLOAD,
     SEARCH_PAYLOAD,
     TOKEN_PAYLOAD,
     TOP_LEVEL_ITEM_PAYLOAD,
-    basic_settings,
+    jama_settings,
     json_responder,
     make_client,
-    oauth_settings,
     routed_responder,
 )
 
@@ -35,52 +41,61 @@ pytestmark = pytest.mark.unit
 
 
 def test_rest_base_and_token_url_are_built_from_base_url() -> None:
-    settings = basic_settings(base_url="https://example.jamacloud.com/", api_version="v1")
+    settings = jama_settings(base_url="https://example.jamacloud.com/", api_version="v1")
 
     assert settings.rest_base == "https://example.jamacloud.com/rest/v1"
     assert settings.token_url == "https://example.jamacloud.com/rest/oauth/token"
 
 
-@pytest.mark.parametrize(
-    ("overrides", "expected"),
-    [
-        ({}, True),
-        ({"base_url": ""}, False),
-        ({"username": ""}, False),
-        ({"password": ""}, False),
-    ],
-)
-def test_is_configured_requires_base_url_and_basic_credentials(
-    overrides: dict[str, str], expected: bool
-) -> None:
-    assert basic_settings(**overrides).is_configured is expected
+def test_settings_are_configured_by_base_url_alone() -> None:
+    assert jama_settings().is_configured is True
+    assert jama_settings(base_url="").is_configured is False
+
+
+def test_settings_carry_no_credentials() -> None:
+    """There is no shared server account: identity is never a server setting."""
+    fields = set(jama_settings().model_dump().keys())
+
+    assert fields == {"base_url", "api_version", "timeout_seconds", "verify_ssl"}
 
 
 @pytest.mark.parametrize(
-    ("overrides", "expected"),
+    ("credentials", "expected"),
     [
-        ({}, True),
-        ({"client_id": ""}, False),
-        ({"client_secret": ""}, False),
+        (CREDENTIALS, True),
+        (None, False),
+        (JamaCredentials(client_id="", client_secret="csecret"), False),
+        (JamaCredentials(client_id="cid", client_secret="  "), False),
     ],
 )
-def test_is_configured_requires_oauth_credentials_in_oauth_mode(
-    overrides: dict[str, str], expected: bool
+def test_client_is_configured_only_with_base_url_and_an_account(
+    credentials: JamaCredentials | None, expected: bool
 ) -> None:
-    assert oauth_settings(**overrides).is_configured is expected
+    assert JamaClient(jama_settings(), credentials).is_configured is expected
+    assert JamaClient(jama_settings(base_url=""), credentials).is_configured is False
 
 
-def test_basic_credentials_do_not_satisfy_oauth_mode() -> None:
-    """A half-migrated .env must not look configured."""
-    settings = JamaSettings(
-        _env_file=None,
-        base_url="https://example.jamacloud.com",
-        auth_type="oauth",
-        username="u",
-        password="p",
+def test_with_credentials_keeps_connection_settings_and_swaps_identity() -> None:
+    base = JamaClient(jama_settings(api_version="v2", timeout_seconds=5.0))
+    other = JamaCredentials(client_id="user-cid", client_secret="user-secret")
+
+    scoped = base.with_credentials(other)
+
+    assert scoped is not base
+    assert scoped.settings is base.settings
+    assert scoped.credentials == other
+    assert base.credentials is None
+
+
+def test_secret_is_not_in_repr() -> None:
+    assert "csecret" not in repr(CREDENTIALS)
+
+
+def test_local_credentials_need_both_halves() -> None:
+    assert JamaLocalCredentials(_env_file=None, client_id="a", client_secret="b").to_credentials() == (
+        JamaCredentials(client_id="a", client_secret="b")
     )
-
-    assert settings.is_configured is False
+    assert JamaLocalCredentials(_env_file=None, client_id="a", client_secret="").to_credentials() is None
 
 
 # -- html stripping ----------------------------------------------------------
@@ -102,7 +117,7 @@ def test_strip_html_handles_breaks_and_empty_values() -> None:
 
 
 async def test_get_item_maps_payload_to_model() -> None:
-    client, handler = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(ITEM_PAYLOAD))
 
     item = await client.get_item(12345)
 
@@ -127,7 +142,7 @@ async def test_get_item_omits_fields_already_surfaced_as_attributes() -> None:
     description in particular is raw HTML and dominated the payload, so this is
     the difference between a usable response and one that blows a context window.
     """
-    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(ITEM_PAYLOAD))
 
     item = await client.get_item(12345)
 
@@ -142,7 +157,7 @@ async def test_get_item_omits_fields_already_surfaced_as_attributes() -> None:
 
 async def test_get_item_keeps_custom_fields() -> None:
     """Dropping duplicates must not touch the custom fields, which nothing else exposes."""
-    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(ITEM_PAYLOAD))
 
     item = await client.get_item(12345)
 
@@ -151,13 +166,13 @@ async def test_get_item_keeps_custom_fields() -> None:
 
 async def test_get_item_drops_the_raw_html_copy_of_the_description() -> None:
     """The HTML never reaches the caller - only the flattened text does."""
-    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(ITEM_PAYLOAD))
 
     item = await client.get_item(12345)
 
     assert "<p>" not in json.dumps(item.model_dump())
 
-    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(ITEM_PAYLOAD))
 
     item = await client.get_item(12345)
 
@@ -165,7 +180,7 @@ async def test_get_item_drops_the_raw_html_copy_of_the_description() -> None:
 
 
 async def test_get_item_raises_not_found_on_404() -> None:
-    client, _ = make_client(basic_settings(), json_responder({"meta": {}}, status_code=404))
+    client, _ = make_client(jama_settings(), json_responder({"meta": {}}, status_code=404))
 
     with pytest.raises(ItemNotFoundError):
         await client.get_item(999)
@@ -175,7 +190,7 @@ async def test_get_item_maps_the_document_tree_parent_id() -> None:
     """Jama's location.parent.item is the real containment parent, distinct from
     both children (jama_get_children) and traceability relationships
     (list_related_items) - this must be parsed and exposed, not silently dropped."""
-    client, _ = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(ITEM_PAYLOAD))
 
     item = await client.get_item(12345)
 
@@ -185,7 +200,7 @@ async def test_get_item_maps_the_document_tree_parent_id() -> None:
 async def test_get_item_parent_id_is_none_for_a_top_level_item() -> None:
     """Jama omits location.parent entirely for a top-level item - that is 'no parent',
     not an error, and must not be confused with the item itself being unreachable."""
-    client, _ = make_client(basic_settings(), json_responder(TOP_LEVEL_ITEM_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(TOP_LEVEL_ITEM_PAYLOAD))
 
     item = await client.get_item(99999)
 
@@ -199,7 +214,7 @@ async def test_search_results_also_carry_parent_id() -> None:
         "meta": {"status": "OK", "pageInfo": {"startIndex": 0, "resultCount": 1, "totalResults": 1}},
         "data": [ITEM_PAYLOAD["data"]],
     }
-    client, _ = make_client(basic_settings(), json_responder(payload))
+    client, _ = make_client(jama_settings(), json_responder(payload))
 
     result = await client.search(query="battery")
 
@@ -208,7 +223,7 @@ async def test_search_results_also_carry_parent_id() -> None:
 
 async def test_get_item_raises_not_found_when_payload_has_no_data() -> None:
     """A 200 with an empty body is still 'not there' from the caller's view."""
-    client, _ = make_client(basic_settings(), json_responder({"meta": {"status": "OK"}}))
+    client, _ = make_client(jama_settings(), json_responder({"meta": {"status": "OK"}}))
 
     with pytest.raises(ItemNotFoundError):
         await client.get_item(999)
@@ -216,7 +231,7 @@ async def test_get_item_raises_not_found_when_payload_has_no_data() -> None:
 
 @pytest.mark.parametrize("status", [401, 403])
 async def test_auth_failures_are_reported_as_auth_errors(status: int) -> None:
-    client, _ = make_client(basic_settings(), json_responder({}, status_code=status))
+    client, _ = make_client(jama_settings(), json_responder({}, status_code=status))
 
     with pytest.raises(ConnectorAuthError) as exc_info:
         await client.get_item(1)
@@ -225,7 +240,7 @@ async def test_auth_failures_are_reported_as_auth_errors(status: int) -> None:
 
 
 async def test_server_errors_are_reported_as_service_errors() -> None:
-    client, _ = make_client(basic_settings(), json_responder({}, status_code=500))
+    client, _ = make_client(jama_settings(), json_responder({}, status_code=500))
 
     with pytest.raises(ConnectorServiceError) as exc_info:
         await client.get_item(1)
@@ -237,7 +252,7 @@ async def test_transport_failures_are_reported_as_service_errors() -> None:
     def _boom(request: httpx2.Request) -> httpx2.Response:
         raise httpx2.ConnectError("no route to host", request=request)
 
-    client, _ = make_client(basic_settings(), _boom)
+    client, _ = make_client(jama_settings(), _boom)
 
     with pytest.raises(ConnectorServiceError):
         await client.get_item(1)
@@ -247,26 +262,39 @@ async def test_non_json_response_is_reported_as_a_service_error() -> None:
     def _html(request: httpx2.Request) -> httpx2.Response:
         return httpx2.Response(200, text="<html>maintenance</html>", request=request)
 
-    client, _ = make_client(basic_settings(), _html)
+    client, _ = make_client(jama_settings(), _html)
 
     with pytest.raises(ConnectorServiceError):
         await client.get_item(1)
 
 
 async def test_unconfigured_client_fails_without_making_a_request() -> None:
-    client, handler = make_client(basic_settings(base_url=""), json_responder(ITEM_PAYLOAD))
+    client, handler = make_client(
+        jama_settings(base_url=""), json_responder(ITEM_PAYLOAD), auto_token=False
+    )
 
-    with pytest.raises(ConnectorNotConfiguredError):
+    with pytest.raises(ConnectorNotConfiguredError, match="JAMA_BASE_URL"):
         await client.get_item(1)
 
-    assert handler.requests == [], "must not call out with no credentials"
+    assert handler.requests == [], "must not call out with no base URL"
+
+
+async def test_client_without_an_account_asks_the_user_to_link_one() -> None:
+    client, handler = make_client(
+        jama_settings(), json_responder(ITEM_PAYLOAD), credentials=None, auto_token=False
+    )
+
+    with pytest.raises(ConnectorNotConfiguredError, match="Link your Jama account"):
+        await client.get_item(1)
+
+    assert handler.requests == [], "must not call out with no account"
 
 
 # -- search ------------------------------------------------------------------
 
 
 async def test_search_maps_results_and_paging_metadata() -> None:
-    client, _ = make_client(basic_settings(), json_responder(SEARCH_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(SEARCH_PAYLOAD))
 
     result = await client.search(query="battery")
 
@@ -279,7 +307,7 @@ async def test_search_maps_results_and_paging_metadata() -> None:
 
 
 async def test_search_sends_filters_as_query_parameters() -> None:
-    client, handler = make_client(basic_settings(), json_responder(SEARCH_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(SEARCH_PAYLOAD))
 
     await client.search(query="battery", project_id=7, item_type_id=31, start_at=50)
 
@@ -292,7 +320,7 @@ async def test_search_sends_filters_as_query_parameters() -> None:
 
 
 async def test_search_omits_filters_that_were_not_supplied() -> None:
-    client, handler = make_client(basic_settings(), json_responder(SEARCH_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(SEARCH_PAYLOAD))
 
     await client.search()
 
@@ -308,7 +336,7 @@ async def test_search_omits_filters_that_were_not_supplied() -> None:
 )
 async def test_search_clamps_page_size_to_what_jama_accepts(requested: int, expected: int) -> None:
     """Jama rejects maxResults above 50, so the connector clamps rather than erroring."""
-    client, handler = make_client(basic_settings(), json_responder(SEARCH_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(SEARCH_PAYLOAD))
 
     result = await client.search(max_results=requested)
 
@@ -318,7 +346,7 @@ async def test_search_clamps_page_size_to_what_jama_accepts(requested: int, expe
 
 async def test_search_falls_back_to_page_length_when_metadata_is_missing() -> None:
     payload = {"data": SEARCH_PAYLOAD["data"]}
-    client, _ = make_client(basic_settings(), json_responder(payload))
+    client, _ = make_client(jama_settings(), json_responder(payload))
 
     result = await client.search()
 
@@ -326,7 +354,7 @@ async def test_search_falls_back_to_page_length_when_metadata_is_missing() -> No
 
 
 async def test_search_rejects_a_non_list_data_field() -> None:
-    client, _ = make_client(basic_settings(), json_responder({"data": {"id": 1}}))
+    client, _ = make_client(jama_settings(), json_responder({"data": {"id": 1}}))
 
     with pytest.raises(ConnectorServiceError):
         await client.search()
@@ -336,7 +364,7 @@ async def test_search_rejects_a_non_list_data_field() -> None:
 
 
 async def test_list_projects_maps_results() -> None:
-    client, handler = make_client(basic_settings(), json_responder(PROJECTS_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(PROJECTS_PAYLOAD))
 
     projects = await client.list_projects()
 
@@ -347,14 +375,14 @@ async def test_list_projects_maps_results() -> None:
 
 
 async def test_list_projects_rejects_a_non_list_data_field() -> None:
-    client, _ = make_client(basic_settings(), json_responder({"data": {"id": 1}}))
+    client, _ = make_client(jama_settings(), json_responder({"data": {"id": 1}}))
 
     with pytest.raises(ConnectorServiceError):
         await client.list_projects()
 
 
 async def test_list_projects_clamps_page_size_to_what_jama_accepts() -> None:
-    client, handler = make_client(basic_settings(), json_responder(PROJECTS_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(PROJECTS_PAYLOAD))
 
     await client.list_projects(max_results=500)
 
@@ -365,7 +393,7 @@ async def test_list_projects_clamps_page_size_to_what_jama_accepts() -> None:
 
 
 async def test_get_children_maps_results_and_paging_metadata() -> None:
-    client, _ = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(CHILDREN_PAYLOAD))
 
     result = await client.get_children(12345)
 
@@ -379,7 +407,7 @@ async def test_get_children_maps_results_and_paging_metadata() -> None:
 
 
 async def test_get_children_calls_the_children_endpoint() -> None:
-    client, handler = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(CHILDREN_PAYLOAD))
 
     await client.get_children(12345)
 
@@ -387,7 +415,7 @@ async def test_get_children_calls_the_children_endpoint() -> None:
 
 
 async def test_get_children_sends_paging_parameters() -> None:
-    client, handler = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(CHILDREN_PAYLOAD))
 
     await client.get_children(12345, start_at=50, max_results=10)
 
@@ -401,7 +429,7 @@ async def test_get_children_sends_paging_parameters() -> None:
     [(999, MAX_PAGE_SIZE), (0, 1), (-5, 1), (10, 10)],
 )
 async def test_get_children_clamps_page_size_like_search(requested: int, expected: int) -> None:
-    client, handler = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(CHILDREN_PAYLOAD))
 
     result = await client.get_children(12345, max_results=requested)
 
@@ -411,7 +439,7 @@ async def test_get_children_clamps_page_size_like_search(requested: int, expecte
 
 async def test_get_children_returns_empty_for_an_item_with_no_children() -> None:
     """A leaf requirement is normal, not an error."""
-    client, _ = make_client(basic_settings(), json_responder(EMPTY_CHILDREN_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(EMPTY_CHILDREN_PAYLOAD))
 
     result = await client.get_children(12345)
 
@@ -420,7 +448,7 @@ async def test_get_children_returns_empty_for_an_item_with_no_children() -> None
 
 
 async def test_get_children_reports_a_missing_parent_as_not_found() -> None:
-    client, _ = make_client(basic_settings(), json_responder({"meta": {}}, status_code=404))
+    client, _ = make_client(jama_settings(), json_responder({"meta": {}}, status_code=404))
 
     with pytest.raises(ItemNotFoundError):
         await client.get_children(999)
@@ -428,7 +456,7 @@ async def test_get_children_reports_a_missing_parent_as_not_found() -> None:
 
 async def test_get_children_falls_back_to_page_length_when_metadata_is_missing() -> None:
     payload = {"data": CHILDREN_PAYLOAD["data"]}
-    client, _ = make_client(basic_settings(), json_responder(payload))
+    client, _ = make_client(jama_settings(), json_responder(payload))
 
     result = await client.get_children(12345)
 
@@ -436,7 +464,7 @@ async def test_get_children_falls_back_to_page_length_when_metadata_is_missing()
 
 
 async def test_get_children_rejects_a_non_list_data_field() -> None:
-    client, _ = make_client(basic_settings(), json_responder({"data": {"id": 1}}))
+    client, _ = make_client(jama_settings(), json_responder({"data": {"id": 1}}))
 
     with pytest.raises(ConnectorServiceError):
         await client.get_children(12345)
@@ -444,7 +472,7 @@ async def test_get_children_rejects_a_non_list_data_field() -> None:
 
 async def test_get_children_does_not_recurse_into_grandchildren() -> None:
     """One level, one page: a single call must make exactly one request."""
-    client, handler = make_client(basic_settings(), json_responder(CHILDREN_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(CHILDREN_PAYLOAD))
 
     await client.get_children(12345)
 
@@ -454,18 +482,13 @@ async def test_get_children_does_not_recurse_into_grandchildren() -> None:
 # -- authentication ----------------------------------------------------------
 
 
-async def test_basic_auth_sends_an_authorization_header() -> None:
-    client, handler = make_client(basic_settings(), json_responder(ITEM_PAYLOAD))
-
-    await client.get_item(12345)
-
-    expected = base64.b64encode(b"api-id:api-key").decode()
-    assert handler.last_request.headers["Authorization"] == f"Basic {expected}"
+def _token_client(responder):  # type: ignore[no-untyped-def]
+    """A client whose token exchange is visible to the test, not auto-answered."""
+    return make_client(jama_settings(), responder, auto_token=False)
 
 
 async def test_oauth_fetches_a_token_then_uses_it_as_a_bearer() -> None:
-    client, handler = make_client(
-        oauth_settings(),
+    client, handler = _token_client(
         routed_responder(
             {"/rest/oauth/token": (200, TOKEN_PAYLOAD), "/items/": (200, ITEM_PAYLOAD)}
         ),
@@ -479,10 +502,22 @@ async def test_oauth_fetches_a_token_then_uses_it_as_a_bearer() -> None:
     assert item_request.headers["Authorization"] == "Bearer tok-abc123"
 
 
+async def test_token_request_authenticates_as_the_individual_account() -> None:
+    client, handler = _token_client(
+        routed_responder(
+            {"/rest/oauth/token": (200, TOKEN_PAYLOAD), "/items/": (200, ITEM_PAYLOAD)}
+        ),
+    )
+
+    await client.get_item(12345)
+
+    expected = base64.b64encode(b"cid:csecret").decode()
+    assert handler.requests[0].headers["Authorization"] == f"Basic {expected}"
+
+
 async def test_oauth_token_is_reused_across_calls() -> None:
     """A second call must not re-authenticate; the token is cached until expiry."""
-    client, handler = make_client(
-        oauth_settings(),
+    client, handler = _token_client(
         routed_responder(
             {"/rest/oauth/token": (200, TOKEN_PAYLOAD), "/items/": (200, ITEM_PAYLOAD)}
         ),
@@ -496,8 +531,7 @@ async def test_oauth_token_is_reused_across_calls() -> None:
 
 
 async def test_oauth_token_rejection_is_an_auth_error() -> None:
-    client, _ = make_client(
-        oauth_settings(),
+    client, _ = _token_client(
         routed_responder({"/rest/oauth/token": (401, {"error": "invalid_client"})}),
     )
 
@@ -508,8 +542,7 @@ async def test_oauth_token_rejection_is_an_auth_error() -> None:
 
 
 async def test_oauth_response_without_a_token_is_a_service_error() -> None:
-    client, _ = make_client(
-        oauth_settings(),
+    client, _ = _token_client(
         routed_responder({"/rest/oauth/token": (200, {"expires_in": 3600})}),
     )
 
@@ -521,8 +554,7 @@ async def test_concurrent_calls_share_a_single_token_request() -> None:
     """The refresh lock must stop a thundering herd of token requests at startup."""
     import asyncio
 
-    client, handler = make_client(
-        oauth_settings(),
+    client, handler = _token_client(
         routed_responder(
             {"/rest/oauth/token": (200, TOKEN_PAYLOAD), "/items/": (200, ITEM_PAYLOAD)}
         ),
@@ -542,7 +574,7 @@ RELATED_PAYLOAD = {
 
 
 async def test_get_related_items_queries_both_directions() -> None:
-    client, handler = make_client(basic_settings(), json_responder(RELATED_PAYLOAD))
+    client, handler = make_client(jama_settings(), json_responder(RELATED_PAYLOAD))
 
     related = await client.get_related_items(12345)
 
@@ -553,7 +585,7 @@ async def test_get_related_items_queries_both_directions() -> None:
 
 
 async def test_get_related_items_maps_the_far_end() -> None:
-    client, _ = make_client(basic_settings(), json_responder(RELATED_PAYLOAD))
+    client, _ = make_client(jama_settings(), json_responder(RELATED_PAYLOAD))
 
     related = await client.get_related_items(12345)
 
@@ -563,7 +595,7 @@ async def test_get_related_items_maps_the_far_end() -> None:
 
 
 async def test_get_related_items_is_empty_when_nothing_is_linked() -> None:
-    client, _ = make_client(basic_settings(), json_responder({"data": []}))
+    client, _ = make_client(jama_settings(), json_responder({"data": []}))
 
     assert await client.get_related_items(12345) == []
 
@@ -576,7 +608,7 @@ async def test_get_related_items_tolerates_a_malformed_direction() -> None:
             return httpx2.Response(200, json={"data": "nonsense"}, request=request)
         return httpx2.Response(200, json=RELATED_PAYLOAD, request=request)
 
-    client, _ = make_client(basic_settings(), _respond)
+    client, _ = make_client(jama_settings(), _respond)
 
     related = await client.get_related_items(12345)
 

@@ -6,7 +6,7 @@ from mcp_radia import __version__
 from mcp_radia.config import ServerSettings
 from mcp_radia.connectors.confluence import ConfluenceClient
 from mcp_radia.connectors.genesys import GenesysClient
-from mcp_radia.connectors.jama import JamaClient
+from mcp_radia.connectors.jama import JamaClient, JamaCredentials
 from mcp_radia.connectors.jira import JiraClient
 from mcp_radia.linking.service import LinkingService
 from mcp_radia.logging import get_logger
@@ -31,6 +31,7 @@ deletes data in the underlying systems.
 def build_server(
     settings: ServerSettings,
     *,
+    jama_credentials: JamaCredentials | None = None,
     jama_client: JamaClient | None = None,
     jira_client: JiraClient | None = None,
     confluence_client: ConfluenceClient | None = None,
@@ -44,6 +45,8 @@ def build_server(
 
     Args:
         settings: Server runtime settings.
+        jama_credentials: The local user's own Jama account, for stdio only.
+            Leave ``None`` for HTTP, where each request supplies its own.
         jama_client: Override the Jama connector, for tests.
         jira_client: Override the Jira connector, for tests.
         confluence_client: Override the Confluence connector, for tests.
@@ -60,6 +63,7 @@ def build_server(
     registered = register_tools(
         server,
         settings,
+        jama_credentials=jama_credentials,
         jama_client=jama_client,
         jira_client=jira_client,
         confluence_client=confluence_client,

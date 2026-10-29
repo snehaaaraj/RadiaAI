@@ -2,13 +2,14 @@
 
 from typing import Annotated
 
-from mcp.server.mcpserver import MCPServer
+from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
 
 from mcp_radia.linking.models import LinkableSystem, RelatedItemsResult
 from mcp_radia.linking.service import LinkingService
 from mcp_radia.logging import get_logger
 from mcp_radia.tools._guard import READ_ONLY, guard
+from mcp_radia.tools._identity import jama_client_for_request
 
 logger = get_logger(__name__)
 
@@ -48,6 +49,7 @@ def register_linking_tools(server: MCPServer, service: LinkingService) -> list[s
         annotations=READ_ONLY,
     )
     async def list_related_items(
+        ctx: Context,
         system: Annotated[
             LinkableSystem,
             Field(description="System the item lives in."),
@@ -73,12 +75,20 @@ def register_linking_tools(server: MCPServer, service: LinkingService) -> list[s
             ),
         ] = False,
     ) -> RelatedItemsResult:
-        return await guard(
-            "list_related_items",
-            lambda: service.list_related_items(
-                system, item_id, include_text_references=include_text_references
-            ),
-        )
+        # Jama reads (native links and text-reference resolution) run as the
+        # caller's linked Jama account when the backend forwards one.
+        scoped, owned = jama_client_for_request(ctx, service.jama)
+        scoped_service = service.with_jama(scoped) if owned else service
+        try:
+            return await guard(
+                "list_related_items",
+                lambda: scoped_service.list_related_items(
+                    system, item_id, include_text_references=include_text_references
+                ),
+            )
+        finally:
+            if owned:
+                await scoped.aclose()
 
     names = ["list_related_items"]
     logger.info("linking_tools_registered", tools=names)

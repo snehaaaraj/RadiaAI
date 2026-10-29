@@ -73,6 +73,12 @@ export interface ChatRequest {
    * structured `citations` array on the response is always returned either way.
    */
   citation_style?: 'inline' | 'none';
+  /**
+   * 'standards' (default) answers from indexed standards documents only;
+   * 'radiaai' (the `/radiaai` ... `/exit` chat mode) answers only from
+   * mcp-radia live engineering data.
+   */
+  mode?: 'standards' | 'radiaai';
 }
 
 export interface CitedChunk {

@@ -6,12 +6,19 @@ deliberately shares no code with the RadiaAI backend's
 but importing across the two packages would couple services that are meant to
 deploy independently.
 
-Two authentication modes are supported, matching how Jama is actually reached:
+Authentication is OAuth 2.0 client-credentials against ``/rest/oauth/token``
+only, and always as an individual user: there is no shared server account.
+Connection settings (:class:`JamaSettings`) and identity
+(:class:`JamaCredentials`) are kept apart so the server can own the former
+while each caller supplies the latter:
 
-  - ``basic`` - HTTP Basic auth with a username/password or a Jama Cloud
-    API ID / API key pair.
-  - ``oauth`` - OAuth 2.0 client-credentials against ``/rest/oauth/token``;
-    the bearer token is cached until shortly before it expires.
+  - Streamable HTTP: the RadiaAI backend forwards the signed-in user's linked
+    Jama OAuth client on every request (see :mod:`mcp_radia.tools._identity`).
+  - stdio: a person running the server locally (GitHub Copilot, Claude
+    Desktop) sets their *own* Jama OAuth client in ``JAMA_CLIENT_ID`` /
+    ``JAMA_CLIENT_SECRET``, read by :class:`JamaLocalCredentials`.
+
+The bearer token is cached until shortly before it expires.
 
 Read operations only:
 
@@ -23,7 +30,7 @@ Read operations only:
 
 import asyncio
 import time
-from typing import Any, Literal
+from typing import Any
 
 import httpx2
 from pydantic import BaseModel, Field
@@ -63,7 +70,9 @@ __all__ = [
     "MAX_PAGE_SIZE",
     "JamaChildrenResult",
     "JamaClient",
+    "JamaCredentials",
     "JamaItem",
+    "JamaLocalCredentials",
     "JamaProjectSummary",
     "JamaSearchResult",
     "JamaSettings",
@@ -72,7 +81,11 @@ __all__ = [
 
 
 class JamaSettings(BaseSettings):
-    """Jama Connect connection settings, read from ``JAMA_*`` environment variables."""
+    """Jama Connect connection settings, read from ``JAMA_*`` environment variables.
+
+    Deliberately carries no credentials: who the call runs as is supplied
+    separately, per caller, as :class:`JamaCredentials`.
+    """
 
     model_config = SettingsConfigDict(env_prefix="JAMA_", env_file=ENV_FILE, extra="ignore")
 
@@ -80,13 +93,6 @@ class JamaSettings(BaseSettings):
         default="",
         description="Instance root URL, e.g. https://yourorg.jamacloud.com (no /rest suffix).",
     )
-    auth_type: Literal["basic", "oauth"] = Field(
-        default="basic", description="Authentication mode."
-    )
-    username: str = Field(default="", description="Username or API ID (basic auth).")
-    password: str = Field(default="", description="Password or API key (basic auth).")
-    client_id: str = Field(default="", description="OAuth client ID (client-credentials).")
-    client_secret: str = Field(default="", description="OAuth client secret (client-credentials).")
     api_version: str = Field(default="v1", description="REST API version path segment.")
     timeout_seconds: float = Field(default=20.0, gt=0, description="Per-request timeout.")
     verify_ssl: bool = Field(
@@ -105,12 +111,38 @@ class JamaSettings(BaseSettings):
 
     @property
     def is_configured(self) -> bool:
-        """True only with a base URL *and* a complete credential set for the chosen mode."""
-        if not self.base_url:
-            return False
-        if self.auth_type == "oauth":
-            return bool(self.client_id and self.client_secret)
-        return bool(self.username and self.password)
+        """True when the server knows which Jama instance to reach."""
+        return bool(self.base_url)
+
+
+class JamaCredentials(BaseModel):
+    """One individual's Jama OAuth client-credentials pair."""
+
+    client_id: str = Field(description="OAuth client ID (client-credentials).")
+    client_secret: str = Field(repr=False, description="OAuth client secret (client-credentials).")
+
+    @property
+    def is_complete(self) -> bool:
+        return bool(self.client_id.strip() and self.client_secret.strip())
+
+
+class JamaLocalCredentials(BaseSettings):
+    """The local user's *own* Jama OAuth client, for stdio use only.
+
+    Read from ``JAMA_CLIENT_ID`` / ``JAMA_CLIENT_SECRET``. Only the stdio
+    entry point loads this; the HTTP transport never does, so a deployed
+    server cannot act as anyone other than the user whose headers arrive.
+    """
+
+    model_config = SettingsConfigDict(env_prefix="JAMA_", env_file=ENV_FILE, extra="ignore")
+
+    client_id: str = Field(default="", description="Your Jama OAuth client ID.")
+    client_secret: str = Field(default="", repr=False, description="Your Jama OAuth client secret.")
+
+    def to_credentials(self) -> JamaCredentials | None:
+        """The credentials, or ``None`` when either half is unset."""
+        credentials = JamaCredentials(client_id=self.client_id, client_secret=self.client_secret)
+        return credentials if credentials.is_complete else None
 
 
 class JamaItemSummary(BaseModel):
@@ -220,16 +252,26 @@ class JamaSearchResult(BaseModel):
 class JamaClient:
     """Async, read-only client over the Jama Connect REST API."""
 
-    def __init__(self, settings: JamaSettings, *, client: httpx2.AsyncClient | None = None) -> None:
+    def __init__(
+        self,
+        settings: JamaSettings,
+        credentials: JamaCredentials | None = None,
+        *,
+        client: httpx2.AsyncClient | None = None,
+    ) -> None:
         """Create a client.
 
         Args:
             settings: Connection settings.
+            credentials: The individual Jama account to act as. ``None`` leaves
+                the client without an identity: every call then fails asking
+                the caller to link their Jama account.
             client: An HTTP client to use instead of one of our own. Tests pass
                 an ``AsyncClient`` backed by ``httpx2.MockTransport``; when
                 omitted the connector creates and owns a client lazily.
         """
         self._settings = settings
+        self._credentials = credentials if credentials and credentials.is_complete else None
         self._client = client
         self._owns_client = client is None
         self._token: str | None = None
@@ -243,8 +285,20 @@ class JamaClient:
         return self._settings
 
     @property
+    def credentials(self) -> JamaCredentials | None:
+        return self._credentials
+
+    @property
     def is_configured(self) -> bool:
-        return self._settings.is_configured
+        """True with both a Jama instance to reach and an account to act as."""
+        return self._settings.is_configured and self._credentials is not None
+
+    def with_credentials(self, credentials: JamaCredentials) -> "JamaClient":
+        """A new client on the same instance, acting as ``credentials``.
+
+        The new client owns its own HTTP client; the caller must ``aclose()`` it.
+        """
+        return JamaClient(self._settings, credentials)
 
     async def aclose(self) -> None:
         """Close the underlying HTTP client, if this connector owns it."""
@@ -254,13 +308,20 @@ class JamaClient:
 
     # -- plumbing -----------------------------------------------------------
 
-    def _ensure_configured(self) -> None:
+    def _ensure_configured(self) -> JamaCredentials:
         if not self._settings.is_configured:
             raise ConnectorNotConfiguredError(
-                "Jama is not configured. Set JAMA_BASE_URL and the credentials for the "
-                f"{self._settings.auth_type} auth mode in mcp-radia/.env.",
+                "Jama is not configured on this server. Set JAMA_BASE_URL in mcp-radia/.env.",
                 system=SYSTEM,
             )
+        if self._credentials is None:
+            raise ConnectorNotConfiguredError(
+                "No Jama account is linked for this request. Link your Jama account in "
+                "RadiaAI Settings and try again. (Running mcp-radia locally over stdio? Set "
+                "JAMA_CLIENT_ID and JAMA_CLIENT_SECRET to your own Jama OAuth client.)",
+                system=SYSTEM,
+            )
+        return self._credentials
 
     def _get_client(self) -> httpx2.AsyncClient:
         if self._client is None:
@@ -270,20 +331,23 @@ class JamaClient:
             )
         return self._client
 
-    async def _fetch_token(self, client: httpx2.AsyncClient) -> str:
+    async def _fetch_token(
+        self, client: httpx2.AsyncClient, credentials: JamaCredentials
+    ) -> str:
         """Exchange client credentials for a bearer token."""
         try:
             response = await client.post(
                 self._settings.token_url,
                 data={"grant_type": "client_credentials"},
-                auth=httpx2.BasicAuth(self._settings.client_id, self._settings.client_secret),
+                auth=httpx2.BasicAuth(credentials.client_id, credentials.client_secret),
                 headers={"Content-Type": "application/x-www-form-urlencoded"},
             )
             response.raise_for_status()
         except httpx2.HTTPStatusError as exc:
             raise ConnectorAuthError(
-                "Jama rejected the OAuth token request. Check JAMA_CLIENT_ID and "
-                "JAMA_CLIENT_SECRET.",
+                "Jama rejected the OAuth token request for the linked Jama account. Its client "
+                "id or secret may be wrong or revoked - re-link your Jama account in RadiaAI "
+                "Settings.",
                 system=SYSTEM,
                 operation="oauth_token",
                 status_code=exc.response.status_code,
@@ -310,28 +374,26 @@ class JamaClient:
         logger.debug("jama_oauth_token_refreshed", expires_in=expires_in)
         return self._token
 
-    async def _bearer_token(self, client: httpx2.AsyncClient) -> str:
+    async def _bearer_token(self, client: httpx2.AsyncClient, credentials: JamaCredentials) -> str:
         async with self._token_lock:
             if self._token is None or time.monotonic() >= self._token_expires_at:
-                return await self._fetch_token(client)
+                return await self._fetch_token(client, credentials)
             return self._token
 
     async def _get(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
         """Perform an authenticated GET against the REST base and return parsed JSON."""
-        self._ensure_configured()
+        credentials = self._ensure_configured()
         client = self._get_client()
         url = f"{self._settings.rest_base}/{path.lstrip('/')}"
 
-        headers = {"Accept": "application/json"}
-        auth: httpx2.BasicAuth | None = None
-        if self._settings.auth_type == "oauth":
-            headers["Authorization"] = f"Bearer {await self._bearer_token(client)}"
-        else:
-            auth = httpx2.BasicAuth(self._settings.username, self._settings.password)
+        headers = {
+            "Accept": "application/json",
+            "Authorization": "Bearer " + await self._bearer_token(client, credentials),
+        }
 
         try:
             response = await get_with_retry(
-                client, url, system=SYSTEM, operation=path, params=params, headers=headers, auth=auth
+                client, url, system=SYSTEM, operation=path, params=params, headers=headers
             )
             response.raise_for_status()
         except httpx2.HTTPStatusError as exc:
@@ -381,8 +443,8 @@ class JamaClient:
             ) from exc
         if status in (401, 403):
             raise ConnectorAuthError(
-                "Jama rejected the request. Check the configured credentials and that the "
-                "account has permission to read this item.",
+                "Jama rejected the request. The linked Jama account may not have permission to "
+                "read this item, or its credentials may have been revoked.",
                 system=SYSTEM,
                 operation=path,
                 status_code=status,

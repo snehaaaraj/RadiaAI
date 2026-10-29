@@ -446,18 +446,31 @@ deployed [`mcp-radia`](../mcp-radia/README.md) server, instead of relying only o
 the indexed-document RAG pipeline above. **Disabled by default** (`MCP_ENABLED=false`);
 when disabled, chat behaves exactly as described in section 10.
 
+The two pipelines are never mixed. Users opt in per conversation: a chat message
+starting with `/radiaai` switches the conversation to **RadiaAI mode**
+(`ChatRequest.mode="radiaai"`), where document retrieval is skipped and answers come
+only from mcp-radia tools; `/exit` returns to the standards checker (the default
+`mode="standards"`, which never calls tools). `/radiaai <question>` switches and asks
+in one step. The mode is derived from the command turns in the persisted conversation
+([`frontend/src/utils/chatMode.ts`](../frontend/src/utils/chatMode.ts)), and only turns
+since the last command are sent as history, so standards answers never leak into a
+live-data question (or vice versa). In RadiaAI mode, if MCP is disabled or unreachable,
+a fixed "unavailable" message is returned instead of an ungrounded model answer.
+
 ### Request flow
 
 ```
 Browser (signed-in user)
   -> POST /api/v1/chat[/stream]  (Entra ID token, enforced as today)
-  -> RAG retrieval (unchanged)
-  -> if MCP enabled: bounded tool-calling loop
+  -> mode="standards" (default): RAG retrieval + grounded answer, no tools
+  -> mode="radiaai" (/radiaai ... /exit): no retrieval; bounded tool-calling loop
        -> MCPClientAdapter discovers tools via mcp-radia's tools/list
        -> intersects with the server-side allowlist (MCP_ALLOWED_TOOLS)
        -> validates the model's requested arguments against the tool's own JSON Schema
+          (list_related_items is narrowed to system="jama" for chat)
        -> calls mcp-radia over Streamable HTTP (service bearer token + internal network)
        -> mcp-radia calls Jama as the signed-in user's own linked account, if linked
+          (jama_* tools and list_related_items alike)
   -> grounded answer (+ sources, used_mcp) returned to the chat UI, unchanged SSE/JSON shape
 ```
 
@@ -474,9 +487,12 @@ overall deadline, never executes a tool outside the allowlist regardless of what
   authorization are unchanged and still enforced on every request.
 - A signed-in user's own linked Jama OAuth credentials (the same link used by the
   Jama Requirement Reviewer, `JamaAccountService`) are forwarded to mcp-radia as
-  per-request headers, so Jama itself enforces that user's permissions. A user who
-  has not linked Jama simply does not get Jama-backed answers; mcp-radia never
-  falls back to a shared credential on the backend's behalf.
+  per-request headers, so Jama itself enforces that user's permissions. mcp-radia
+  has no shared Jama account at all: over HTTP it holds only the Jama base URL, and
+  a call without the per-user headers fails asking the user to link their Jama
+  account in RadiaAI Settings. (Run locally over stdio, mcp-radia instead uses the
+  developer's own `JAMA_CLIENT_ID`/`JAMA_CLIENT_SECRET`; those are never read over
+  HTTP.)
 - mcp-radia itself requires a shared service-to-service bearer token
   (`MCP_SERVICE_TOKEN` / mcp-radia's `MCP_RADIA_SERVICE_TOKEN`) on every request.
   **Deployment-dependent network exposure:** the Azure Container Apps template
@@ -560,10 +576,9 @@ Steps:
    MCP_RADIA_SERVICE_TOKEN=<generate: openssl rand -hex 32>
    MCP_RADIA_ENVIRONMENT=production
    JAMA_BASE_URL=https://yourorg.jamacloud.com      # your Jama trial instance
-   JAMA_AUTH_TYPE=basic                              # or oauth
-   JAMA_USERNAME=...                                 # shared-account fallback
-   JAMA_PASSWORD=...
    ```
+   No Jama credentials go here: each chat user links their own Jama account in
+   RadiaAI Settings, and the backend forwards it on every MCP request.
    Deploy. Note the resulting URL, e.g. `https://mcp-radia-yourname.vercel.app`.
 2. **Configure the backend's MCP client** in the backend's own Vercel project
    environment variables (or `backend/.env` for local testing):
@@ -571,11 +586,11 @@ Steps:
    MCP_ENABLED=true
    MCP_SERVER_URL=https://mcp-radia-yourname.vercel.app/mcp
    MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
-   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children
+   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_list_projects,list_related_items
    ```
    Redeploy the backend (or restart it locally) so the new variables take effect.
-3. **Verify the handshake and tool discovery**: ask the chat a Jama-shaped
-   question (e.g. "What does Jama item 12345 say?"). A `mcp_tools_discovered`
+3. **Verify the handshake and tool discovery**: type `/radiaai` in the chat, then ask a
+   Jama-shaped question (e.g. "What does Jama item 12345 say?"). A `mcp_tools_discovered`
    log line confirms the handshake; `mcp_tool_iteration_complete` confirms a
    tool call executed.
 4. **Test an authenticated read-only request** end-to-end: sign in to Radia AI
@@ -607,10 +622,10 @@ Steps:
    MCP_ENABLED=true
    MCP_SERVER_URL=http://127.0.0.1:8081/mcp
    MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
-   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children
+   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_list_projects,list_related_items
    ```
-4. **Verify the handshake and tool discovery**: start the backend, then ask the
-   chat a Jama-shaped question (e.g. "What does Jama item 12345 say?"). A
+4. **Verify the handshake and tool discovery**: start the backend, then type
+   `/radiaai` in the chat, then ask a Jama-shaped question (e.g. "What does Jama item 12345 say?"). A
    `mcp_tools_discovered` log line confirms the handshake; `mcp_tool_iteration_complete`
    confirms a tool call executed.
 5. **Test an authenticated read-only request** end-to-end: sign in, link a Jama

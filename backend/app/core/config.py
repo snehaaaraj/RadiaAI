@@ -388,7 +388,7 @@ class MCPSettings(BaseSettings):
     )
     read_timeout_seconds: float = Field(default=20.0, gt=0, description="Per-tool-call timeout.")
     max_tool_iterations: int = Field(
-        default=3,
+        default=5,
         ge=1,
         le=10,
         description="Upper bound on sequential tool calls within a single chat turn.",
@@ -404,7 +404,13 @@ class MCPSettings(BaseSettings):
         description="Tool results larger than this are truncated before reaching the model.",
     )
     allowed_tools: Annotated[list[str], NoDecode] = Field(
-        default=["jama_get_item", "jama_search", "jama_get_children", "jama_list_projects"],
+        default=[
+            "jama_get_item",
+            "jama_search",
+            "jama_get_children",
+            "jama_list_projects",
+            "list_related_items",
+        ],
         description=(
             "Server-side allowlist. A tool mcp-radia advertises but that is not listed here "
             "is never offered to the model and never executed, regardless of what the model "

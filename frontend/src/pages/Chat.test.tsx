@@ -60,3 +60,44 @@ describe('Chat page - MCP engineering-data indicator', () => {
     expect(screen.queryByText('Engineering data')).not.toBeInTheDocument();
   });
 });
+
+describe('Chat page - /radiaai and /exit routing', () => {
+  it('switches into RadiaAI mode locally without calling the API', () => {
+    mocks.sendMessage.mockReset();
+    mocks.history = [];
+    mocks.setHistory.mockImplementation((update) => {
+      mocks.history = typeof update === 'function' ? update(mocks.history) : update;
+    });
+
+    const { rerender } = render(<Chat />);
+    fireEvent.change(screen.getByPlaceholderText('Ask a question about your documents…'), {
+      target: { value: '/radiaai' },
+    });
+    screen.getByRole('button').click();
+    rerender(<Chat />);
+
+    expect(mocks.sendMessage).not.toHaveBeenCalled();
+    expect(screen.getByText('RadiaAI mode · type /exit to leave')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('Ask about engineering data…')).toBeInTheDocument();
+  });
+
+  it('sends questions in RadiaAI mode with only that mode\u2019s history', () => {
+    mocks.sendMessage.mockReset();
+    mocks.history = [
+      { role: 'user', content: 'What is a good requirement?' },
+      { role: 'assistant', content: 'A standards answer.' },
+      { role: 'user', content: '/radiaai' },
+    ];
+
+    render(<Chat />);
+    fireEvent.change(screen.getByPlaceholderText('Ask about engineering data…'), {
+      target: { value: 'Parent of SRS-42?' },
+    });
+    screen.getByRole('button').click();
+
+    expect(mocks.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ question: 'Parent of SRS-42?', mode: 'radiaai', conversation_history: [] }),
+      expect.anything()
+    );
+  });
+});

@@ -15,7 +15,7 @@ from tests.jama_fixtures import (
     ITEM_PAYLOAD,
     PROJECTS_PAYLOAD,
     SEARCH_PAYLOAD,
-    basic_settings,
+    jama_settings,
     json_responder,
     make_client,
 )
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.unit
 
 def _server_with(responder, settings=None):  # type: ignore[no-untyped-def]
     """Build a server whose Jama connector is backed by a mock transport."""
-    jama_client, handler = make_client(settings or basic_settings(), responder)
+    jama_client, handler = make_client(settings or jama_settings(), responder)
     server = build_server(
         ServerSettings(_env_file=None, environment="test"), jama_client=jama_client
     )
@@ -144,7 +144,7 @@ async def test_a_missing_item_becomes_a_tool_error_not_a_crash() -> None:
 
 async def test_unconfigured_jama_reports_what_to_set() -> None:
     """The failure has to tell the operator which variable is missing."""
-    server, _ = _server_with(json_responder(ITEM_PAYLOAD), settings=basic_settings(base_url=""))
+    server, _ = _server_with(json_responder(ITEM_PAYLOAD), settings=jama_settings(base_url=""))
 
     async with connected_client(server) as session:
         result = await session.call_tool("jama_get_item", {"item_id": 1})
@@ -154,9 +154,26 @@ async def test_unconfigured_jama_reports_what_to_set() -> None:
     assert "JAMA_BASE_URL" in message
 
 
+
+async def test_call_without_a_linked_account_asks_the_user_to_link_one() -> None:
+    """Over HTTP with no per-user headers there is no account to fall back to."""
+    jama_client, handler = make_client(
+        jama_settings(), json_responder(ITEM_PAYLOAD), credentials=None
+    )
+    server = build_server(
+        ServerSettings(_env_file=None, environment="test"), jama_client=jama_client
+    )
+
+    async with connected_client(server) as session:
+        result = await session.call_tool("jama_get_item", {"item_id": 1})
+
+    assert result.is_error
+    assert "Link your Jama account" in str(result.content)
+    assert handler.requests == [], "must not call Jama without an account"
+
 async def test_tools_are_still_listed_when_jama_is_unconfigured() -> None:
     """Discovery must not depend on credentials being present."""
-    server, _ = _server_with(json_responder(ITEM_PAYLOAD), settings=basic_settings(base_url=""))
+    server, _ = _server_with(json_responder(ITEM_PAYLOAD), settings=jama_settings(base_url=""))
 
     async with connected_client(server) as session:
         tools = {t.name for t in (await session.list_tools()).tools}

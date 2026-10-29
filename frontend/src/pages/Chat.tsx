@@ -14,7 +14,10 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import HubIcon from '@mui/icons-material/Hub';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
-import type { ChatMessage, ChatSource } from '@/types/api';
+import type { ChatSource } from '@/types/api';
+import { deriveChatMode, planChatSend } from '@/utils/chatMode';
+
+const HISTORY_TURNS_SENT_TO_API = 10;
 
 interface ConversationTurn {
   role: 'user' | 'assistant';
@@ -34,6 +37,7 @@ export default function Chat() {
   const [mcpInfoByIndex, setMcpInfoByIndex] = useState<Record<number, McpTurnInfo>>({});
   const endRef = useRef<HTMLDivElement>(null);
   const { isStreaming, streamingText, sendMessage } = useChatStream();
+  const isRadiaMode = deriveChatMode(history) === 'radiaai';
 
   const scrollToEnd = () => setTimeout(() => endRef.current?.scrollIntoView({ behavior: 'smooth' }), 50);
 
@@ -43,20 +47,29 @@ export default function Chat() {
   }, [streamingText]);
 
   const handleSend = () => {
-    const question = input.trim();
-    if (!question || isStreaming) return;
+    const text = input.trim();
+    if (!text || isStreaming) return;
 
-    const userTurn: ConversationTurn = { role: 'user', content: question };
+    const plan = planChatSend(history, text, HISTORY_TURNS_SENT_TO_API);
+    const userTurn: ConversationTurn = { role: 'user', content: text };
     const updatedHistory = [...history, userTurn];
-    setHistory(updatedHistory);
     setInput('');
 
-    const apiHistory: ChatMessage[] = updatedHistory
-      .slice(-10)
-      .map((t) => ({ role: t.role, content: t.content }));
+    if (plan.kind === 'local') {
+      setHistory([...updatedHistory, { role: 'assistant', content: plan.notice }]);
+      scrollToEnd();
+      return;
+    }
+
+    setHistory(updatedHistory);
 
     sendMessage(
-      { question, conversation_history: apiHistory, citation_style: 'none' },
+      {
+        question: plan.question,
+        conversation_history: plan.history,
+        citation_style: 'none',
+        mode: plan.mode,
+      },
       {
         onDone: (data) => {
           setHistory((prev) => {
@@ -102,6 +115,9 @@ export default function Chat() {
           >
             <BoltIcon fontSize="large" />
             <Typography>Ask a question about your documents</Typography>
+            <Typography variant="body2">
+              Type /radiaai to ask about live engineering data, /exit to return.
+            </Typography>
           </Box>
         )}
 
@@ -178,13 +194,26 @@ export default function Chat() {
 
       <Divider sx={{ flexShrink: 0 }} />
 
+      {isRadiaMode && (
+        <Box pt={1} flexShrink={0}>
+          <Chip
+            icon={<HubIcon />}
+            label="RadiaAI mode · type /exit to leave"
+            size="small"
+            color="info"
+          />
+        </Box>
+      )}
+
       {/* Input area */}
       <Box display="flex" gap={1} pt={2} flexShrink={0}>
         <TextField
           fullWidth
           multiline
           maxRows={4}
-          placeholder="Ask a question about your documents…"
+          placeholder={
+            isRadiaMode ? 'Ask about engineering data…' : 'Ask a question about your documents…'
+          }
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => {

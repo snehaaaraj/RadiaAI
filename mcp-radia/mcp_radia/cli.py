@@ -16,6 +16,7 @@ from collections.abc import Sequence
 from mcp_radia import __version__
 from mcp_radia.asgi import build_http_app
 from mcp_radia.config import ServerSettings, get_settings
+from mcp_radia.connectors.jama import JamaLocalCredentials
 from mcp_radia.logging import configure_logging, get_logger
 from mcp_radia.server import build_server
 
@@ -64,7 +65,6 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     settings = _resolve_settings(args)
     configure_logging(settings)
-    server = build_server(settings)
 
     if transport == "http":
         import uvicorn
@@ -85,6 +85,9 @@ def main(argv: Sequence[str] | None = None) -> int:
         # No startup log before the handshake: the client is already listening
         # on stdout and stderr noise is the only thing that is safe here.
         logger.info("mcp_server_starting", transport="stdio")
+        # stdio is a single local user, so Jama acts as that person's own
+        # account. HTTP never loads these: every request brings its own.
+        server = build_server(settings, jama_credentials=JamaLocalCredentials().to_credentials())
         server.run("stdio")
 
     return 0

@@ -73,31 +73,24 @@ it: an empty token almost always means it was forgotten, not that auth should be
 | Variable               | Default | Purpose                                          |
 | ---------------------- | ------- | ------------------------------------------------ |
 | `JAMA_BASE_URL`        | *empty* | Instance root, e.g. `https://org.jamacloud.com`  |
-| `JAMA_AUTH_TYPE`       | `basic` | `basic` or `oauth`                               |
-| `JAMA_USERNAME`        | *empty* | Username or API ID — `basic` only                |
-| `JAMA_PASSWORD`        | *empty* | Password or API key — `basic` only               |
-| `JAMA_CLIENT_ID`       | *empty* | OAuth client id — `oauth` only                   |
-| `JAMA_CLIENT_SECRET`   | *empty* | OAuth client secret — `oauth` only               |
 | `JAMA_API_VERSION`     | `v1`    | REST version path segment                        |
 | `JAMA_TIMEOUT_SECONDS` | `20`    | Per-request timeout                              |
 | `JAMA_VERIFY_SSL`      | `true`  | Only disable for a self-signed test instance     |
+| `JAMA_CLIENT_ID`       | *empty* | **stdio only** - *your own* Jama OAuth client id |
+| `JAMA_CLIENT_SECRET`   | *empty* | **stdio only** - *your own* Jama OAuth secret    |
 
-Only the credential pair matching `JAMA_AUTH_TYPE` is required. A half-migrated `.env` (basic
-credentials while `JAMA_AUTH_TYPE=oauth`) counts as **not configured** rather than silently
-authenticating the wrong way.
+**There is no shared Jama account.** Every Jama call - the `jama_*` tools and the Jama side of
+`list_related_items` - runs as an individual user via OAuth client-credentials, so Jama itself
+enforces what that person can read:
 
-These use the plain `JAMA_*` prefix, the same names the backend uses. The two services still stay
-independent because this server only ever reads `mcp-radia/.env` — but if you deploy both into one
-container with shared process environment, they will see the same variables. Give mcp-radia its own
-Jama service account if you want the access separated.
-
-**Per-user access (used by the chat integration).** When a caller sends the
-`X-Radia-Jama-Client-Id` and `X-Radia-Jama-Client-Secret` headers on an HTTP request, every
-`jama_*` tool call in that request acts as *that* OAuth client instead of the credentials above —
-so Jama itself enforces what the signed-in user can read. The RadiaAI backend sets these from each
-user's own linked Jama account (the same link used by the Jama Requirement Reviewer feature); a
-caller that omits them falls back to the shared credentials configured here. See
-[`mcp_radia/tools/_identity.py`](mcp_radia/tools/_identity.py).
+- **HTTP (deployed; used by RadiaAI chat).** The backend forwards the signed-in user's own linked
+  Jama account (linked in the RadiaAI UI under Settings - the same link the Jama Requirement
+  Reviewer uses) as the `X-Radia-Jama-Client-Id` / `X-Radia-Jama-Client-Secret` headers. A call
+  without them fails with "Link your Jama account in RadiaAI Settings". `JAMA_CLIENT_ID` /
+  `JAMA_CLIENT_SECRET` are never read over HTTP. See
+  [`mcp_radia/tools/_identity.py`](mcp_radia/tools/_identity.py).
+- **stdio (local GitHub Copilot / Claude Desktop).** Set `JAMA_CLIENT_ID` / `JAMA_CLIENT_SECRET`
+  to *your own* Jama OAuth client. Only the stdio entry point loads them.
 
 ### Atlassian Cloud — Jira + Confluence (`ATLASSIAN_*`)
 

@@ -173,6 +173,68 @@ async def test_jama_credentials_are_forwarded_only_for_jama_tools() -> None:
     }
 
 
+_RELATED_ITEMS_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "system": {"type": "string", "enum": ["jama", "jira", "confluence", "genesys"]},
+        "item_id": {"type": "string", "minLength": 1},
+    },
+    "required": ["system", "item_id"],
+}
+
+
+def _related_items_adapter() -> tuple[MCPClientAdapter, FakeTransport]:
+    fake = FakeTransport(
+        tools=[
+            MCPToolDescriptor(
+                name="list_related_items", description="", input_schema=_RELATED_ITEMS_SCHEMA
+            )
+        ]
+    )
+    settings = _enabled_settings(allowed_tools=["list_related_items"])
+    return _adapter_with_fake_transport(settings, fake), fake
+
+
+async def test_list_related_items_is_offered_to_chat_as_jama_only() -> None:
+    adapter, _ = _related_items_adapter()
+
+    (tool,) = await adapter.available_tools()
+
+    assert tool.input_schema["properties"]["system"]["enum"] == ["jama"]
+    # The cached discovery result itself is left untouched.
+    assert _RELATED_ITEMS_SCHEMA["properties"]["system"]["enum"] == [  # type: ignore[index]
+        "jama",
+        "jira",
+        "confluence",
+        "genesys",
+    ]
+
+
+async def test_list_related_items_rejects_non_jama_systems() -> None:
+    adapter, fake = _related_items_adapter()
+
+    with pytest.raises(MCPToolArgumentsInvalidError):
+        await adapter.call_tool("list_related_items", {"system": "jira", "item_id": "BMS-1"})
+    assert fake.calls == []
+
+
+async def test_list_related_items_forwards_the_users_jama_credentials() -> None:
+    adapter, fake = _related_items_adapter()
+
+    await adapter.call_tool(
+        "list_related_items",
+        {"system": "jama", "item_id": "123"},
+        jama_client_id="user-cid",
+        jama_client_secret="user-secret",
+    )
+
+    _, _, headers = fake.calls[0]
+    assert headers == {
+        "X-Radia-Jama-Client-Id": "user-cid",
+        "X-Radia-Jama-Client-Secret": "user-secret",
+    }
+
+
 async def test_a_tool_level_error_result_raises_an_execution_error() -> None:
     fake = FakeTransport(
         tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema={})],

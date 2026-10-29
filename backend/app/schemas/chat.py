@@ -44,6 +44,15 @@ class ChatRequest(BaseModel):
             "'citations' array is always returned regardless of this setting."
         ),
     )
+    mode: Literal["standards", "radiaai"] = Field(
+        default="standards",
+        description=(
+            "'standards' (default) answers from the indexed standards documents only - "
+            "no live-data tools. 'radiaai' (entered in the UI with '/radiaai', left with "
+            "'/exit') skips document retrieval and answers only from mcp-radia live "
+            "engineering-data tools (e.g. Jama)."
+        ),
+    )
 
 
 class CitedChunk(BaseModel):

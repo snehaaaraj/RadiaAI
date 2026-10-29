@@ -52,6 +52,17 @@ class LinkingService:
         self._confluence = confluence
         self._genesys = genesys
 
+    @property
+    def jama(self) -> JamaClient:
+        """The server-wide Jama connector: no account over HTTP, the local user's over stdio."""
+        return self._jama
+
+    def with_jama(self, jama: JamaClient) -> "LinkingService":
+        """Return a copy that reads Jama through ``jama`` (e.g. a per-user, request-scoped client)."""
+        return LinkingService(
+            jama=jama, jira=self._jira, confluence=self._confluence, genesys=self._genesys
+        )
+
     async def list_related_items(
         self,
         system: str,

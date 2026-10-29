@@ -29,9 +29,10 @@ def settings() -> ServerSettings:
 def server(settings: ServerSettings) -> MCPServer:
     """A server whose connectors are deliberately unconfigured.
 
-    Passing an explicit unconfigured JamaClient stops the fixture reading a
-    developer's real mcp-radia/.env, so no test can reach a live system by
-    accident. Tests that need working connectors build their own server.
+    Passing an explicit JamaClient with no base URL and no account stops the
+    fixture reading a developer's real mcp-radia/.env, so no test can reach a
+    live system by accident. Tests that need working connectors build their
+    own server.
     """
     unconfigured_jama = JamaClient(JamaSettings(_env_file=None, base_url=""))
     return build_server(settings, jama_client=unconfigured_jama)

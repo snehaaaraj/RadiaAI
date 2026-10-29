@@ -10,7 +10,7 @@ from mcp_radia.connectors.jira import JiraClient
 from mcp_radia.linking.references import extract_candidate_keys, texts_from_mapping
 from mcp_radia.linking.service import MAX_TEXT_LOOKUPS, LinkingService
 from tests.atlassian_fixtures import ISSUE_PAYLOAD, PAGE_PAYLOAD, atlassian_settings
-from tests.jama_fixtures import ITEM_PAYLOAD, RecordingHandler, basic_settings
+from tests.jama_fixtures import CREDENTIALS, ITEM_PAYLOAD, RecordingHandler, jama_settings
 
 pytestmark = pytest.mark.unit
 
@@ -101,7 +101,7 @@ def _service(
                     return httpx2.Response(status, json=payload, request=request)
             return httpx2.Response(404, json={}, request=request)
 
-        return RecordingHandler(_respond)
+        return RecordingHandler(_respond, answer_token=True)
 
     jira_handler = _router(jira_routes or {"/issue/": (200, ISSUE_PAYLOAD)})
     jama_handler = _router(
@@ -117,9 +117,9 @@ def _service(
     def _client(handler: RecordingHandler) -> httpx2.AsyncClient:
         return httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
 
-    jama_settings = basic_settings() if jama_configured else basic_settings(base_url="")
+    jama_connection = jama_settings() if jama_configured else jama_settings(base_url="")
     service = LinkingService(
-        jama=JamaClient(jama_settings, client=_client(jama_handler)),
+        jama=JamaClient(jama_connection, CREDENTIALS, client=_client(jama_handler)),
         jira=JiraClient(atlassian_settings(), client=_client(jira_handler)),
         confluence=ConfluenceClient(atlassian_settings(), client=_client(confluence_handler)),
         genesys=GenesysClient(GenesysSettings(_env_file=None)),
@@ -168,6 +168,31 @@ async def test_native_links_do_not_need_the_text_scan() -> None:
 
 
 # -- jama --------------------------------------------------------------------
+
+
+async def test_with_jama_routes_jama_reads_through_the_given_client() -> None:
+    """A per-user Jama client replaces the server-wide one, which is never called."""
+    service, handlers = _service()
+    per_user_handler = RecordingHandler(
+        lambda request: httpx2.Response(
+            200,
+            json=JAMA_RELATED_PAYLOAD if "related" in request.url.path else ITEM_PAYLOAD,
+            request=request,
+        ),
+        answer_token=True,
+    )
+    per_user = JamaClient(
+        jama_settings(),
+        CREDENTIALS,
+        client=httpx2.AsyncClient(transport=httpx2.MockTransport(per_user_handler)),
+    )
+
+    result = await service.with_jama(per_user).list_related_items("jama", "12345")
+
+    assert result.system == "jama"
+    assert per_user_handler.requests
+    assert handlers["jama"].requests == []
+    assert service.jama is not per_user
 
 
 async def test_jama_upstream_and_downstream_become_related_items() -> None:

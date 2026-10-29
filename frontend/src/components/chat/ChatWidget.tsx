@@ -28,7 +28,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
 import { useAppContext } from '@/context/useAppContext';
-import type { ChatMessage, ChatSource } from '@/types/api';
+import type { ChatSource } from '@/types/api';
+import { deriveChatMode, planChatSend } from '@/utils/chatMode';
 
 const WIDGET_WIDTH = 360;
 const WIDGET_HEIGHT = 500;
@@ -51,6 +52,7 @@ export function ChatWidget() {
   const endRef = useRef<HTMLDivElement>(null);
 
   const reduceMotion = motionPreference === 'reduced';
+  const isRadiaMode = deriveChatMode(history) === 'radiaai';
 
   const scrollToEnd = () => {
     setTimeout(() => endRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' }), 50);
@@ -68,20 +70,29 @@ export function ChatWidget() {
   }, [streamingText]);
 
   const handleSend = () => {
-    const question = input.trim();
-    if (!question || isStreaming) return;
+    const text = input.trim();
+    if (!text || isStreaming) return;
 
-    const updatedHistory = [...history, { role: 'user' as const, content: question }];
-    setHistory(updatedHistory);
+    const plan = planChatSend(history, text, HISTORY_TURNS_SENT_TO_API);
+    const updatedHistory = [...history, { role: 'user' as const, content: text }];
     setInput('');
+
+    if (plan.kind === 'local') {
+      setHistory([...updatedHistory, { role: 'assistant', content: plan.notice }]);
+      scrollToEnd();
+      return;
+    }
+
+    setHistory(updatedHistory);
     scrollToEnd();
 
-    const apiHistory: ChatMessage[] = updatedHistory
-      .slice(-HISTORY_TURNS_SENT_TO_API)
-      .map((t) => ({ role: t.role, content: t.content }));
-
     sendMessage(
-      { question, conversation_history: apiHistory, citation_style: 'none' },
+      {
+        question: plan.question,
+        conversation_history: plan.history,
+        citation_style: 'none',
+        mode: plan.mode,
+      },
       {
         onDone: (data) => {
           setHistory((prev) => {
@@ -196,6 +207,9 @@ export function ChatWidget() {
                     <Typography variant="body2">
                       Ask a question about how to write requirements.
                     </Typography>
+                    <Typography variant="caption">
+                      Type /radiaai to ask about live engineering data, /exit to return.
+                    </Typography>
                   </Box>
                 )}
 
@@ -290,13 +304,24 @@ export function ChatWidget() {
 
               <Divider />
 
+              {isRadiaMode && (
+                <Box px={1.5} pt={1}>
+                  <Chip
+                    icon={<HubIcon fontSize="small" />}
+                    label="RadiaAI mode · type /exit to leave"
+                    size="small"
+                    color="info"
+                  />
+                </Box>
+              )}
+
               {/* Input area */}
               <Box display="flex" gap={1} p={1.5}>
                 <TextField
                   fullWidth
                   multiline
                   maxRows={3}
-                  placeholder="Ask a question…"
+                  placeholder={isRadiaMode ? 'Ask about engineering data…' : 'Ask a question…'}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => {

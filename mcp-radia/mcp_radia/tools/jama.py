@@ -219,9 +219,14 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
                 await scoped.aclose()
 
     names = ["jama_get_item", "jama_search", "jama_get_children", "jama_list_projects"]
-    logger.info("jama_tools_registered", tools=names, configured=client.is_configured)
-    if not client.is_configured:
+    logger.info(
+        "jama_tools_registered",
+        tools=names,
+        base_url_configured=client.settings.is_configured,
+        local_account=client.credentials is not None,
+    )
+    if not client.settings.is_configured:
         # Registered but not usable: the tools stay visible so a client can
         # discover them, and each call fails with a message naming what to set.
-        logger.warning("jama_not_configured", hint="set JAMA_BASE_URL and credentials")
+        logger.warning("jama_not_configured", hint="set JAMA_BASE_URL")
     return names

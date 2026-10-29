@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx2
 
-from mcp_radia.connectors.jama import JamaClient, JamaSettings
+from mcp_radia.connectors.jama import JamaClient, JamaCredentials, JamaSettings
 
 # -- sample payloads ---------------------------------------------------------
 
@@ -136,27 +136,16 @@ PROJECTS_PAYLOAD: dict[str, Any] = {
 
 # -- settings builders -------------------------------------------------------
 
+#: The individual Jama account the tests act as (OAuth client-credentials).
+CREDENTIALS = JamaCredentials(client_id="cid", client_secret="csecret")
 
-def basic_settings(**overrides: Any) -> JamaSettings:
-    """Fully configured basic-auth settings. ``_env_file=None`` keeps a
+TOKEN_PATH = "/rest/oauth/token"
+
+
+def jama_settings(**overrides: Any) -> JamaSettings:
+    """Connection settings for a test instance. ``_env_file=None`` keeps a
     developer's real mcp-radia/.env from leaking into the tests."""
-    values: dict[str, Any] = {
-        "base_url": "https://example.jamacloud.com",
-        "auth_type": "basic",
-        "username": "api-id",
-        "password": "api-key",
-    }
-    values.update(overrides)
-    return JamaSettings(_env_file=None, **values)
-
-
-def oauth_settings(**overrides: Any) -> JamaSettings:
-    values: dict[str, Any] = {
-        "base_url": "https://example.jamacloud.com",
-        "auth_type": "oauth",
-        "client_id": "cid",
-        "client_secret": "csecret",
-    }
+    values: dict[str, Any] = {"base_url": "https://example.jamacloud.com"}
     values.update(overrides)
     return JamaSettings(_env_file=None, **values)
 
@@ -165,13 +154,26 @@ def oauth_settings(**overrides: Any) -> JamaSettings:
 
 
 class RecordingHandler:
-    """A MockTransport handler that records requests and replays canned responses."""
+    """A MockTransport handler that records requests and replays canned responses.
 
-    def __init__(self, responder: Callable[[httpx2.Request], httpx2.Response]) -> None:
+    With ``answer_token=True`` the OAuth token endpoint is answered with
+    :data:`TOKEN_PAYLOAD` and *not* recorded, so tests about REST calls see
+    only REST calls. Tests about the token exchange itself leave it off.
+    """
+
+    def __init__(
+        self,
+        responder: Callable[[httpx2.Request], httpx2.Response],
+        *,
+        answer_token: bool = False,
+    ) -> None:
         self._responder = responder
+        self._answer_token = answer_token
         self.requests: list[httpx2.Request] = []
 
     def __call__(self, request: httpx2.Request) -> httpx2.Response:
+        if self._answer_token and request.url.path == TOKEN_PATH:
+            return httpx2.Response(200, json=TOKEN_PAYLOAD, request=request)
         self.requests.append(request)
         return self._responder(request)
 
@@ -183,11 +185,14 @@ class RecordingHandler:
 def make_client(
     settings: JamaSettings,
     responder: Callable[[httpx2.Request], httpx2.Response],
+    *,
+    credentials: JamaCredentials | None = CREDENTIALS,
+    auto_token: bool = True,
 ) -> tuple[JamaClient, RecordingHandler]:
     """Build a JamaClient whose HTTP goes to ``responder`` instead of the network."""
-    handler = RecordingHandler(responder)
+    handler = RecordingHandler(responder, answer_token=auto_token)
     http_client = httpx2.AsyncClient(transport=httpx2.MockTransport(handler))
-    return JamaClient(settings, client=http_client), handler
+    return JamaClient(settings, credentials, client=http_client), handler
 
 
 def json_responder(

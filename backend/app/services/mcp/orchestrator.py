@@ -116,13 +116,15 @@ async def run_chat_with_tools(
     trusted_source_hosts: frozenset[str],
     jama_client_id: str | None = None,
     jama_client_secret: str | None = None,
+    unavailable_answer: str | None = None,
 ) -> ToolAugmentedAnswer:
     """Run the bounded tool-augmented chat loop and return the final answer.
 
-    Falls back to a plain (tool-less) completion if MCP has no approved
-    tools available right now, or if mcp-radia cannot be reached at all for
-    tool discovery - the caller does not need to branch on either case, and
-    an MCP outage must never prevent chat from answering ordinary questions.
+    If MCP has no approved tools available right now, or mcp-radia cannot be
+    reached for tool discovery, the result depends on ``unavailable_answer``:
+    when given, it is returned verbatim (no LLM call - so a live-data question
+    is never answered by an ungrounded model guess); otherwise this falls back
+    to a plain (tool-less) completion.
     """
     try:
         tools = await mcp_client.available_tools()
@@ -134,6 +136,8 @@ async def run_chat_with_tools(
     messages.append({"role": "user", "content": question})
 
     if not tools:
+        if unavailable_answer is not None:
+            return ToolAugmentedAnswer(answer=unavailable_answer, used_mcp=False)
         answer = await to_thread.run_sync(
             lambda: openai_client.chat_completion(messages, model=model, max_tokens=max_tokens),
             abandon_on_cancel=True,

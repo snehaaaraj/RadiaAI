@@ -10,7 +10,7 @@ from mcp_radia.config import ServerSettings
 from mcp_radia.connectors.atlassian import AtlassianSettings
 from mcp_radia.connectors.confluence import ConfluenceClient
 from mcp_radia.connectors.genesys import GenesysClient, GenesysSettings
-from mcp_radia.connectors.jama import JamaClient, JamaSettings
+from mcp_radia.connectors.jama import JamaClient, JamaCredentials, JamaSettings
 from mcp_radia.connectors.jira import JiraClient
 from mcp_radia.linking.service import LinkingService
 from mcp_radia.logging import get_logger
@@ -27,6 +27,7 @@ def register_tools(
     server: MCPServer,
     settings: ServerSettings,
     *,
+    jama_credentials: JamaCredentials | None = None,
     jama_client: JamaClient | None = None,
     jira_client: JiraClient | None = None,
     confluence_client: ConfluenceClient | None = None,
@@ -47,6 +48,10 @@ def register_tools(
     Args:
         server: The MCP server to attach tools to.
         settings: Server settings.
+        jama_credentials: The Jama account the server-wide Jama client acts
+            as when a call carries no per-user headers. Only the stdio entry
+            point passes this (the local user's own account); over HTTP it is
+            ``None``, so Jama calls always run as the signed-in user.
         jama_client: Override the Jama connector (tests).
         jira_client: Override the Jira connector (tests).
         confluence_client: Override the Confluence connector (tests).
@@ -60,7 +65,7 @@ def register_tools(
     # share one settings object unless a caller injects its own client.
     atlassian = AtlassianSettings()
 
-    jama = jama_client or JamaClient(JamaSettings())
+    jama = jama_client or JamaClient(JamaSettings(), jama_credentials)
     jira = jira_client or JiraClient(atlassian)
     confluence = confluence_client or ConfluenceClient(atlassian)
     genesys = genesys_client or GenesysClient(GenesysSettings())

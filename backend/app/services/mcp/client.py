@@ -17,6 +17,7 @@ chat orchestration layer depends on and must not reimplement itself:
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 
 import anyio
 
@@ -39,6 +40,31 @@ logger = get_logger(__name__)
 #: Must match that module's header names exactly.
 _JAMA_CLIENT_ID_HEADER = "X-Radia-Jama-Client-Id"
 _JAMA_CLIENT_SECRET_HEADER = "X-Radia-Jama-Client-Secret"  # noqa: S105 (header name, not a secret)
+
+#: Non-``jama_`` tools that also read Jama and honor the per-user credential headers.
+_JAMA_IDENTITY_TOOLS = frozenset({"list_related_items"})
+
+#: Per-tool argument values chat may use, narrowing what mcp-radia itself accepts.
+#: ``list_related_items`` can also read Jira/Confluence, but those run on mcp-radia's
+#: shared Atlassian credential (per-user Atlassian linking is on hold), so chat is
+#: limited to Jama, which runs as the signed-in user's own linked account.
+_CHAT_ARGUMENT_RESTRICTIONS: dict[str, dict[str, tuple[str, ...]]] = {
+    "list_related_items": {"system": ("jama",)},
+}
+
+
+def _restrict_schema(descriptor: MCPToolDescriptor) -> MCPToolDescriptor:
+    """Return ``descriptor`` with its schema's enums narrowed to the chat restrictions."""
+    restrictions = _CHAT_ARGUMENT_RESTRICTIONS.get(descriptor.name)
+    properties = (descriptor.input_schema or {}).get("properties")
+    if not restrictions or not isinstance(properties, dict):
+        return descriptor
+    narrowed = dict(properties)
+    for argument, allowed in restrictions.items():
+        spec = narrowed.get(argument)
+        if isinstance(spec, dict):
+            narrowed[argument] = {**spec, "enum": list(allowed)}
+    return replace(descriptor, input_schema={**descriptor.input_schema, "properties": narrowed})
 
 
 class MCPClientAdapter:
@@ -104,7 +130,7 @@ class MCPClientAdapter:
                         allowed=sorted(self._settings.allowed_tools),
                     )
         allowed = set(self._settings.allowed_tools)
-        return [tool for name, tool in self._tools.items() if name in allowed]
+        return [_restrict_schema(tool) for name, tool in self._tools.items() if name in allowed]
 
     async def call_tool(
         self,
@@ -132,9 +158,11 @@ class MCPClientAdapter:
             raise MCPToolNotAllowedError(f"Tool '{name}' is not approved for chat use.")
 
         self._validate_arguments(descriptor, arguments)
+        self._enforce_restrictions(name, arguments)
 
         extra_headers: dict[str, str] = {}
-        if name.startswith("jama_") and jama_client_id and jama_client_secret:
+        reads_jama = name.startswith("jama_") or name in _JAMA_IDENTITY_TOOLS
+        if reads_jama and jama_client_id and jama_client_secret:
             extra_headers[_JAMA_CLIENT_ID_HEADER] = jama_client_id
             extra_headers[_JAMA_CLIENT_SECRET_HEADER] = jama_client_secret
 
@@ -148,6 +176,17 @@ class MCPClientAdapter:
         if result.is_error:
             raise MCPToolExecutionError(result.text or f"Tool '{name}' failed.")
         return result
+
+    @staticmethod
+    def _enforce_restrictions(name: str, arguments: dict[str, object]) -> None:
+        """Re-check chat argument restrictions, independent of the schema the model saw."""
+        for argument, allowed in _CHAT_ARGUMENT_RESTRICTIONS.get(name, {}).items():
+            value = arguments.get(argument)
+            if isinstance(value, str) and value.strip().lower() in allowed:
+                continue
+            raise MCPToolArgumentsInvalidError(
+                f"Argument '{argument}' for '{name}' must be one of: {', '.join(allowed)}."
+            )
 
     @staticmethod
     def _validate_arguments(descriptor: MCPToolDescriptor, arguments: dict[str, object]) -> None:

@@ -20,27 +20,6 @@ param mcpServiceToken string
 @description('Jama Connect instance root URL, e.g. https://yourorg.jamacloud.com. Leave empty to deploy with Jama unconfigured.')
 param jamaBaseUrl string = ''
 
-@description('Jama auth mode for the server-wide fallback credential: basic or oauth.')
-@allowed([
-  'basic'
-  'oauth'
-])
-param jamaAuthType string = 'basic'
-
-@description('Jama username or API ID (basic auth fallback). Leave empty when using per-user Jama credentials exclusively.')
-param jamaUsername string = ''
-
-@secure()
-@description('Jama password or API key (basic auth fallback).')
-param jamaPassword string = ''
-
-@description('Jama OAuth client id (oauth fallback).')
-param jamaClientId string = ''
-
-@secure()
-@description('Jama OAuth client secret (oauth fallback).')
-param jamaClientSecret string = ''
-
 @description('Existing subnet resource ID to inject the Container Apps environment into, for VNet-integrated internal ingress. Leave empty to let Container Apps manage its own (still internal-only, but not peerable from outside Azure).')
 param infrastructureSubnetId string = ''
 
@@ -127,14 +106,6 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
           name: 'mcp-service-token'
           value: mcpServiceToken
         }
-        {
-          name: 'jama-password'
-          value: jamaPassword
-        }
-        {
-          name: 'jama-client-secret'
-          value: jamaClientSecret
-        }
       ]
     }
     template: {
@@ -157,12 +128,9 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             { name: 'MCP_RADIA_PORT', value: '8081' }
             { name: 'MCP_RADIA_HTTP_PATH', value: '/mcp' }
             { name: 'MCP_RADIA_SERVICE_TOKEN', secretRef: 'mcp-service-token' }
+            // No Jama credentials: every Jama call runs as the signed-in user,
+            // whose linked OAuth client the backend forwards per request.
             { name: 'JAMA_BASE_URL', value: jamaBaseUrl }
-            { name: 'JAMA_AUTH_TYPE', value: jamaAuthType }
-            { name: 'JAMA_USERNAME', value: jamaUsername }
-            { name: 'JAMA_PASSWORD', secretRef: 'jama-password' }
-            { name: 'JAMA_CLIENT_ID', value: jamaClientId }
-            { name: 'JAMA_CLIENT_SECRET', secretRef: 'jama-client-secret' }
           ]
           probes: [
             {

@@ -20,6 +20,7 @@ from app.prompts.chat_prompts import (
     CHAT_SYSTEM_PROMPT,
     CHAT_SYSTEM_PROMPT_NO_CITATIONS,
     NO_ANSWER_MESSAGE,
+    RADIAAI_UNAVAILABLE_MESSAGE,
 )
 from app.rag.service import RetrievedContext
 from app.services.mcp.client import MCPClientAdapter
@@ -547,10 +548,10 @@ def _enabled_mcp_client() -> MCPClientAdapter:
 
 
 @pytest.mark.unit
-def test_mcp_enabled_question_triggers_tool_call_and_returns_sources(
+def test_radiaai_mode_question_triggers_tool_call_and_returns_sources(
     client: TestClient, test_settings
 ) -> None:
-    """A question with no matching document chunks is still answered via an MCP tool call."""
+    """In RadiaAI mode a question is answered via an MCP tool call, with no document retrieval."""
     dummy = DummyRAGService(chunks=[], openai_client=_FakeOpenAIToolClient())
     app = _install(client, dummy)
     app.dependency_overrides[get_mcp_client] = lambda: _enabled_mcp_client()
@@ -567,7 +568,10 @@ def test_mcp_enabled_question_triggers_tool_call_and_returns_sources(
     try:
         response = client.post(
             "/api/v1/chat",
-            json={"question": "What does Jama item 42 say about state of charge?"},
+            json={
+                "question": "What does Jama item 42 say about state of charge?",
+                "mode": "radiaai",
+            },
         )
     finally:
         app.dependency_overrides.pop(get_mcp_client, None)
@@ -580,6 +584,67 @@ def test_mcp_enabled_question_triggers_tool_call_and_returns_sources(
     assert body["sources"] == [
         {"label": "SRS-42", "url": "https://example.jamacloud.com/perspective.req#/items/42"}
     ]
+    assert body["citations"] == []
+    assert dummy.retrieve_calls == []  # standards documents never consulted
+
+
+@pytest.mark.unit
+def test_standards_mode_never_calls_mcp_tools_even_when_enabled(client: TestClient) -> None:
+    """Default (standards) mode answers only from documents, even with MCP enabled."""
+    dummy = DummyRAGService(chunks=[], openai_client=_FakeOpenAIToolClient())
+    app = _install(client, dummy)
+    app.dependency_overrides[get_mcp_client] = lambda: _enabled_mcp_client()
+    try:
+        response = client.post(
+            "/api/v1/chat",
+            json={"question": "What does Jama item 42 say about state of charge?"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_mcp_client, None)
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["answer"] == NO_ANSWER_MESSAGE
+    assert body["used_mcp"] is False
+    assert len(dummy.retrieve_calls) == 1
+
+
+@pytest.mark.unit
+def test_radiaai_mode_with_mcp_disabled_returns_unavailable_message(client: TestClient) -> None:
+    """RadiaAI mode never falls back to an ungrounded answer or to the standards pipeline."""
+    dummy = DummyRAGService(chunks=[_SAMPLE_CHUNK])
+    _install(client, dummy)  # default override: MCPSettings(enabled=False)
+
+    response = client.post(
+        "/api/v1/chat", json={"question": "Show Jama item 42", "mode": "radiaai"}
+    )
+
+    assert response.status_code == 200
+    body = response.json()["data"]
+    assert body["answer"] == RADIAAI_UNAVAILABLE_MESSAGE
+    assert body["used_mcp"] is False
+    assert dummy.retrieve_calls == []
+    assert dummy.generate_calls == []
+
+
+@pytest.mark.unit
+def test_radiaai_mode_stream_returns_tool_answer(client: TestClient, test_settings) -> None:
+    dummy = DummyRAGService(chunks=[], openai_client=_FakeOpenAIToolClient())
+    app = _install(client, dummy)
+    app.dependency_overrides[get_mcp_client] = lambda: _enabled_mcp_client()
+    try:
+        response = client.post(
+            "/api/v1/chat/stream",
+            json={"question": "What does Jama item 42 say?", "mode": "radiaai"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_mcp_client, None)
+
+    assert response.status_code == 200
+    assert "event: done" in response.text
+    assert "SRS-42 requires battery state-of-charge reporting." in response.text
+    assert '"used_mcp": true' in response.text
+    assert dummy.retrieve_calls == []
 
 
 @pytest.mark.unit
@@ -655,7 +720,9 @@ def test_mcp_tool_failure_produces_a_safe_answer_not_a_crash(client: TestClient)
     adapter._transport = _UnavailableMCPTransport()  # type: ignore[assignment]
     app.dependency_overrides[get_mcp_client] = lambda: adapter
     try:
-        response = client.post("/api/v1/chat", json={"question": "Get Jama item 1"})
+        response = client.post(
+            "/api/v1/chat", json={"question": "Get Jama item 1", "mode": "radiaai"}
+        )
     finally:
         app.dependency_overrides.pop(get_mcp_client, None)
 
