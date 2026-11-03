@@ -87,6 +87,10 @@ For a signed-in Microsoft session, the account menu keeps **Sign out** available
 even while the API account lookup is loading or has failed (including on the
 public landing page). Roles and the Jama account shortcut appear only after the
 API verifies the user; Microsoft session details alone do not grant API access.
+The Jama account shortcut shows a green tick for a usable linked account and a
+warning for an unlinked account, a required re-link, or unavailable linking.
+While checking it shows a spinner; lookup errors show a warning with the reason.
+Linking or unlinking in Settings refreshes this status automatically.
 
 Assign `Radia.Admin` to anyone who needs document-management permissions;
 assign `Radia.User` for read-only document access and running reviews.

@@ -1,7 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AccountInfo } from '@azure/msal-browser';
-import type { CurrentUser } from '@/types/api';
+import type { CurrentUser, JamaAccountStatus } from '@/types/api';
 import { signOut } from '@/auth/msal';
 import { UserMenu } from './UserMenu';
 
@@ -10,6 +10,15 @@ const auth = vi.hoisted(() => ({
   account: null as AccountInfo | null,
   error: null as unknown,
   enabled: true,
+  jama: {
+    data: undefined as JamaAccountStatus | undefined,
+    isPending: true,
+    isError: false,
+    error: null as unknown,
+  },
+}));
+vi.mock('@/radia_ai/features/jamaRequirementReviewer/hooks/useJama', () => ({
+  useJamaAccount: () => auth.jama,
 }));
 vi.mock('@/hooks/useCurrentUser', () => ({
   useCurrentUser: () => ({ data: auth.user, error: auth.error }),
@@ -26,6 +35,81 @@ beforeEach(() => {
   auth.account = null;
   auth.error = null;
   auth.enabled = true;
+  auth.jama = { data: undefined, isPending: true, isError: false, error: null };
+});
+
+describe('Jama account status', () => {
+  const unlinked: JamaAccountStatus = {
+    linking_enabled: true,
+    linked: false,
+    relink_required: false,
+    jama_base_url: 'https://jama.example',
+    jama_user_id: null,
+    jama_username: null,
+    jama_email: null,
+    jama_display_name: null,
+    linked_at: null,
+  };
+
+  beforeEach(() => {
+    auth.user = {
+      tenant_id: 'tenant', user_id: 'alice', display_name: 'Alice',
+      email: 'alice@example.test', auth_method: 'entra',
+      roles: ['Radia.User'], is_admin: false, can_manage_documents: false,
+    };
+  });
+
+  it('shows loading rather than an unlinked warning before status is known', () => {
+    render(<UserMenu onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    expect(screen.getByRole('progressbar', { name: 'Checking Jama account status' })).toBeVisible();
+    expect(screen.queryByRole('img')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { status: unlinked, label: 'Jama account not linked' },
+    { status: { ...unlinked, linked: true }, label: 'Jama account linked' },
+    { status: { ...unlinked, linked: true, relink_required: true }, label: 'Jama account needs to be re-linked' },
+    { status: { ...unlinked, linking_enabled: false }, label: 'Jama account linking is not enabled' },
+  ])('shows the icon for $label and preserves settings navigation', ({ status, label }) => {
+    auth.jama = { data: status, isPending: false, isError: false, error: null };
+    const navigate = vi.fn();
+    render(<UserMenu onNavigate={navigate} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    expect(screen.getByRole('img', { name: label })).toHaveAttribute(
+      'data-testid', label === 'Jama account linked' ? 'CheckCircleIcon' : 'WarningAmberIcon',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Jama account' }));
+    expect(navigate).toHaveBeenCalledWith('/settings#jama-account');
+  });
+
+  it('replaces the warning with a tick after linking, and restores it after unlinking', () => {
+    auth.jama = { data: unlinked, isPending: false, isError: false, error: null };
+    const { rerender } = render(<UserMenu onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    expect(screen.getByRole('img', { name: 'Jama account not linked' })).toBeVisible();
+    auth.jama.data = { ...unlinked, linked: true };
+    rerender(<UserMenu onNavigate={vi.fn()} />);
+    expect(screen.getByRole('img', { name: 'Jama account linked' })).toBeVisible();
+    auth.jama.data = unlinked;
+    rerender(<UserMenu onNavigate={vi.fn()} />);
+    expect(screen.getByRole('img', { name: 'Jama account not linked' })).toBeVisible();
+  });
+
+  it('shows a status error instead of a stale linked tick when the lookup fails', () => {
+    auth.jama = {
+      data: { ...unlinked, linked: true },
+      isPending: false,
+      isError: true,
+      error: { error: { code: 'HTTP_ERROR', message: 'Status unavailable', detail: {} } },
+    };
+    render(<UserMenu onNavigate={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Account' }));
+    expect(screen.getByRole('img', {
+      name: 'Could not load Jama account status: Status unavailable',
+    })).toBeVisible();
+    expect(screen.queryByRole('img', { name: 'Jama account linked' })).not.toBeInTheDocument();
+  });
 });
 
 describe('profile allocation tag', () => {
