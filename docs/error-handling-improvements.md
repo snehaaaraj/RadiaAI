@@ -1,34 +1,39 @@
-# Error Handling Improvements
+# Error Handling
 
 ## Summary
 
-Enhanced error handling system with detailed context and user-friendly error messages to help identify and recover from failures in production.
+The API uses a consistent error envelope, logs request-correlated diagnostic
+context, and avoids returning unhandled exception tracebacks. The frontend
+normalizes API and JavaScript errors for display. This document describes the
+current behavior and its known UI coverage.
 
-## Changes Made
+## Current behavior
 
-### Backend Enhancements
+### Backend errors
 
-#### 1. New Error Context Utilities (`app/core/error_context.py`)
-- `enrich_error_detail()`: Adds execution context to errors
-- `format_error_for_user()`: Formats user-friendly error messages
+#### Error context helpers (`app/core/error_context.py`)
 
-#### 2. Enhanced Exception Classes (`app/core/exceptions.py`)
-Updated exception classes with structured context:
+`enrich_error_detail()` and `format_error_for_user()` are available to service
+code that needs them; they are not automatically applied to every exception.
 
-- **AzureServiceError**: Now includes service, operation, and original error
-- **EmbeddingError**: Includes model name and text count
+#### Domain exceptions (`app/core/exceptions.py`)
+Domain exceptions carry an error code, HTTP status, message, and optional detail:
+
+- **AzureServiceError**: Includes service, operation, and original error
+- **EmbeddingError**: Includes model name
 - **SearchError**: Includes index name and truncated query
-- **LLMError**: Includes model name and message count
+- **LLMError**: Includes model name
 - **IngestionError**: Includes filename and failure stage
 
-#### 3. Updated Azure Clients (`app/core/azure_clients.py`)
-- `OpenAIClient.generate_embeddings()`: Wraps errors with context
-- `OpenAIClient.chat_completion()`: Wraps errors with context
-- Better logging with structured context
+The global handlers in `app/main.py` return domain details in the error envelope,
+format request-validation failures as `VALIDATION_ERROR`, and return a generic
+`INTERNAL_ERROR` for unexpected exceptions while logging their traceback
+internally. Request IDs are included in responses and propagated into structured
+logs.
 
-### Frontend Enhancements
+### Frontend errors
 
-#### 1. New ErrorDisplay Component (`components/ErrorDisplay.tsx`)
+#### ErrorDisplay component (`frontend/src/components/ErrorDisplay.tsx`)
 - Displays structured error information
 - Shows user-friendly error titles
 - Provides actionable suggestions
@@ -37,8 +42,11 @@ Updated exception classes with structured context:
 - Retry functionality
 - Context-aware suggestions based on error code
 
-#### 2. Updated Pages
-- **RequirementReview** and **SetReview**: Use `ErrorDisplay` with retry functionality
+#### Current page coverage
+
+The individual Requirement Review and Set Review pages use `ErrorDisplay`.
+Callers can provide context and a retry callback; other pages may use their own
+inline or page-specific error presentation.
 
 ## Error Information Structure
 
@@ -69,18 +77,29 @@ Updated exception classes with structured context:
 - **Details**: Expandable technical details for debugging
 - **Retry**: Optional retry button
 
+`ErrorDisplay` recognizes the codes below. Other codes fall back to the generic
+title; code-specific suggestions are shown only where available.
+
 ## Error Codes and Suggestions
 
-| Error Code | User-Friendly Title | Auto-Generated Suggestion |
-|------------|---------------------|---------------------------|
-| `NETWORK_ERROR` | Network Connection Error | Check internet connection |
-| `EMBEDDING_ERROR` | Embedding Generation Failed | Service temporarily unavailable |
-| `LLM_ERROR` | AI Model Error | Rate limit or service unavailable |
-| `SEARCH_ERROR` | Search Failed | Index may not be initialized |
-| `INGESTION_ERROR` | Document Processing Failed | Check file format |
-| `AUTHENTICATION_REQUIRED` | Authentication Required | Please log in |
-| `FORBIDDEN` | Access Denied | Contact administrator |
+| Error Code | User-Friendly Title | UI suggestion |
+|------------|---------------------|---------------|
+| `NETWORK_ERROR` | Network Connection Error | Check the connection and retry |
+| `TIMEOUT_ERROR` | Request Timed Out | Retry the individual requirement |
+| `RATE_LIMITED` | Rate Limit Exceeded | Wait, then retry failed items |
+| `HTTP_ERROR` | Unexpected Server Response | No code-specific suggestion |
+| `VALIDATION_ERROR` | Validation Error | No code-specific suggestion |
+| `DOCUMENT_NOT_FOUND` | Document Not Found | No code-specific suggestion |
+| `INDEX_NOT_FOUND` | Search Index Not Found | Contact support |
+| `AZURE_SERVICE_ERROR` | Azure Service Error | No code-specific suggestion |
+| `EMBEDDING_ERROR` | Embedding Generation Failed | Retry when the service is available |
+| `SEARCH_ERROR` | Search Failed | Check the search index/service |
+| `LLM_ERROR` | AI Model Error | Check service availability or rate limits |
+| `INGESTION_ERROR` | Document Processing Failed | Check the file/stage when a stage is provided |
+| `AUTHENTICATION_REQUIRED` | Authentication Required | Sign in again |
+| `FORBIDDEN` | Access Denied | Contact an administrator |
 | `CONFIGURATION_ERROR` | Configuration Error | Contact support |
+| `INTERNAL_ERROR` | Internal Server Error | No code-specific suggestion |
 
 ## Benefits
 
@@ -119,21 +138,19 @@ except Exception as e:
 )}
 ```
 
-## Remaining follow-up ideas
+## Known scope and follow-up
 
-The items below are follow-up ideas, not claims that the shared error-handling
-work is complete across every application surface:
+`ErrorDisplay` is not a global error boundary and is not used by every page or
+component. Remaining opportunities include:
 
 1. Review remaining service/client paths for consistent structured context.
 2. Extend `ErrorDisplay` to additional user-facing flows where a retry is useful.
 3. Consider React error boundaries for component-render failures.
 4. Consider error analytics for tracking common failures.
 
-## Testing
+## Validation
 
-Test the error handling by:
-1. Disconnecting network → should show NETWORK_ERROR
-2. Invalid credentials → should show AZURE_SERVICE_ERROR with details
-3. Rate limiting → should show LLM_ERROR with rate limit suggestion
-4. Check that request IDs appear in both logs and UI
-5. Verify copy-to-clipboard works for bug reports
+Use the backend and frontend test suites for automated coverage. For a manual
+check, exercise a retryable error on Requirement Review or Set Review and verify
+the message, optional suggestion, request ID/details, retry action, and
+copy-details control when those values are present.

@@ -17,11 +17,12 @@ Sign in with Microsoft  ──►  Bearer <Entra access token>
                              • scope access_as_user
                              • app role Radia.*
                              │
-                             ├─ /jama/*  ──► decrypt *this user's* Jama
-                             │               API credentials ──────────►  OAuth client-credentials
-                             │                                            token for that user;
-                             │                                            Jama enforces their own
-                             │                                            project permissions
+                             ├─ /jama/* and approved review write-back
+                             │            ──► decrypt *this user's* Jama
+                             │                API credentials ──────────► OAuth client-credentials
+                             │                                           token for that user;
+                             │                                           Jama enforces their own
+                             │                                           project permissions
                              └─ review history stored with owner id
 ```
 
@@ -42,6 +43,10 @@ credentials, created in Jama under **profile → Set API Credentials**. Each use
 
 From then on, every Jama request runs as that user. Jama itself decides which
 projects they can read or write, and Jama's audit trail shows the real person.
+The reviewer can import requirements from Jama. Writing a revised Description
+back requires a saved accepting decision on a review of that Jama item; only the
+Description is changed, and a modification-time check prevents overwriting an
+item changed since the review.
 If the user revokes the credentials in Jama, Radia returns
 `JAMA_CREDENTIALS_INVALID` and the UI asks them to re-link.
 
@@ -129,6 +134,7 @@ application.
 | `/jama/*` (including `/jama/account`)      | `Radia.User` + the user's own linked Jama account |
 | `POST /ingest`, `/ingest/upload`, `GET /ingest/jobs/{id}`, `POST /ingest/webhook/subscribe`, `DELETE /documents/{id}` | `Radia.Admin` |
 | `GET /review/history` (all users)          | `Radia.Admin`; others only see their own      |
+| `POST /review/history/{id}/disposition`, `/decision`, `/jama-write` | Review owner or `Radia.Admin`; `/jama-write` also requires the owner's linked Jama account and an eligible saved decision |
 
 Protection is applied when routers are mounted in
 [router.py](../backend/app/api/v1/router.py), so a new endpoint is protected

@@ -1,25 +1,29 @@
 # mcp-radia
 
-A standalone [Model Context Protocol](https://modelcontextprotocol.io) server that will expose
-RadiaAI's engineering systems of record — **Jama, Jira, Confluence and Genesys** — through one
-read-only MCP surface, as a digital-thread integration layer.
+A standalone [Model Context Protocol](https://modelcontextprotocol.io) server exposing
+RadiaAI's engineering systems of record through a read-only digital-thread surface.
 
-> **Status: Phase 4 — feature-complete for this pass.** Jama, Jira and Confluence are connected
-> read-only, with cross-system linking on top: **7 tools**. GENESYS is a
-> [placeholder](#vitech-genesys--placeholder) and registers no tools.
+> **Status: Phases 0-2, 4, and 5 implemented.** The server exposes **8 read-only
+> tools** for Jama, Jira, Confluence, and cross-system linking. Vitech GENESYS
+> remains a [placeholder](#vitech-genesys--placeholder) and registers no tools.
+> Radia AI chat can optionally use the Jama tools; Jira/Confluence tools are not
+> currently in the chat allowlist. See [the architecture guide](../docs/architecture.md)
+> for the distinction between the standalone MCP surface and the chat integration.
 
 ## Relationship to the rest of this repo
 
-`mcp-radia/` is deliberately **independent** of `backend/` and `frontend/`:
+`mcp-radia/` is a separately packaged and deployed service, independent of the
+backend's Python package and the frontend:
 
 - Its own `pyproject.toml`, `.env`, tests and virtualenv.
 - It **never imports** from `app` or `radia_ai`, and nothing in `backend/` imports from it.
 - It reads only `mcp-radia/.env` — never `backend/.env` or the repo-root `.env`.
 
-The backend's existing Jama connector was read for inspiration, but the connector here is a fresh
-implementation. The RadiaAI backend talks to this server as an MCP client over Streamable HTTP —
-see [`docs/architecture.md`](../docs/architecture.md) for how that integration is wired end to end,
-and [Deploy](#deploy) below for running this server itself.
+The RadiaAI backend talks to this server as an MCP client over Streamable HTTP;
+it does not import this package. The chat integration is optional and disabled
+by default. See [`docs/architecture.md`](../docs/architecture.md) for its
+allowlist, identity forwarding, and deployment details, and [Deploy](#deploy)
+for running this server itself.
 
 ## Requirements
 
@@ -47,9 +51,10 @@ pip install -e ".[dev]"
 cp .env.example .env
 ```
 
-The server runs against an empty `.env` — every setting has a working default, and an
-unconfigured connector still lists its tools, failing per-call with a message naming the variable
-to set. Server settings are prefixed `MCP_RADIA_`:
+The stdio server can start with an empty `.env`; the HTTP transport additionally
+requires `MCP_RADIA_SERVICE_TOKEN`. Unconfigured connectors still list their
+tools, but a call fails with a message naming the variable to set. Server
+settings are prefixed `MCP_RADIA_`:
 
 | Variable                | Default     | Purpose                                        |
 | ----------------------- | ----------- | ---------------------------------------------- |
@@ -182,7 +187,9 @@ carry it as `Authorization: Bearer <token>`; anything else gets a `401`, logged 
 npx @modelcontextprotocol/inspector mcp-radia stdio
 ```
 
-Phase 0 will show a successful connection and an empty tool list. That is the expected result.
+The inspector should show the registered Jama, Jira, Confluence, and linking
+tools. An unconfigured connector still appears in discovery, but its calls fail
+with a configuration message.
 
 ## Test
 
@@ -255,8 +262,10 @@ Two deployment shapes are supported, both documented end to end in
 Mirrors how the RadiaAI backend itself deploys to Vercel: `api/index.py` and
 `vercel.json` in this directory build a **stateless** Streamable HTTP ASGI app
 (see [`mcp_radia/asgi.py`](mcp_radia/asgi.py)) as mcp-radia's own, separate
-Vercel project. Set `MCP_RADIA_SERVICE_TOKEN` and the `JAMA_*` variables as
-that project's environment variables (not `.env` — Vercel never sees it).
+Vercel project. Set `MCP_RADIA_SERVICE_TOKEN` and `JAMA_BASE_URL` as that
+project's environment variables (not `.env` — Vercel never sees it).
+`JAMA_CLIENT_ID` and `JAMA_CLIENT_SECRET` are for stdio only; the RadiaAI
+backend forwards each signed-in user's linked credentials to the HTTP server.
 
 **This path has no network isolation** — Vercel gives the deployment a public
 URL, and `MCP_RADIA_SERVICE_TOKEN` is the *only* access control in front of
@@ -310,8 +319,10 @@ that lists the server's entire surface area. Each phase adds its registration ca
   cross-reference fields live, on every call. A persisted/indexed link graph — which is what would
   make reverse lookups and whole-thread traversal fast — is a **future enhancement, not part of
   this pass**.
-- **No backend integration.** Making the RadiaAI backend an MCP client of this server is a separate
-  task.
+- **Limited chat surface.** The RadiaAI backend is an MCP client, but its chat
+  allowlist currently enables Jama tools only. Jira and Confluence tools are
+  available to direct MCP clients when configured; per-user Atlassian linking
+  and enabling those tools in Radia AI chat remain on hold.
 
 ## Tools
 
@@ -357,7 +368,7 @@ calling it again with a child's id.
 - Descriptions are Atlassian Document Format (ADF) JSON, not text, and are flattened by
   `connectors/text.py`.
 - `issuelinks` are flattened into a single `links` list with the direction and the phrasing as
-  read *from this issue* — this is the native cross-reference Phase 4 will build on.
+  read *from this issue* — these native cross-references are used by Phase 4's linking tool.
 
 **Confluence.** Deliberately spans two API versions, because neither covers both operations:
 

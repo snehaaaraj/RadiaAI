@@ -1,8 +1,9 @@
 # Radia AI 2.0
 
-AI-powered Requirements Engineering platform for aerospace and systems teams.
-Uses Retrieval-Augmented Generation (RAG) against indexed standards documents to provide 
-grounded, traceable, and explainable requirement reviews.
+AI-powered requirements engineering platform for aerospace and systems teams.
+Radia AI reviews requirements against indexed standards, connects to a user's
+Jama account for requirement import and approved Description write-back, and
+provides grounded document search and chat.
 
 The Chat page and floating chat window open at the latest message and follow new
 responses automatically. Scroll up to pause following; use the down-arrow button
@@ -15,10 +16,10 @@ and project filter are retained when switching input tabs. Clear Review resets t
 
 ## Architecture
 
-For a fuller technical breakdown and the current implementation status, see
-[docs/architecture.md](docs/architecture.md). The architecture describes the
-target design; features marked **In progress** or **Planned** there are not
-production-ready.
+For the current implementation and deployment details, see
+[docs/architecture.md](docs/architecture.md). It distinguishes shipped
+capabilities from optional, disabled integrations and features that remain
+unimplemented.
 
 ```
 ┌────────────────────────────────────────────────────────────┐
@@ -27,11 +28,10 @@ production-ready.
 │                    port 5173 (Vite dev server)             │
 │                                                            │
 │  src/pages/                         ← shared app pages     │
-│  src/radia_ai/features/resources/   ← resource hub         │
 │  src/radia_ai/features/jamaRequirementReviewer/            │
 │                                   ← reviewer feature UI    │
-│  src/radia_ai/features/jamaRoundtrip/                      │
-│                                   ← roundtrip placeholder  │
+│  Jama requirement review, set review, delta review, history│
+│  Jama Roundtrip page                ← reserved placeholder │
 └──────────────────────┬─────────────────────────────────────┘
                        │  /api/v1/*
 ┌──────────────────────▼─────────────────────────────────────┐
@@ -40,14 +40,15 @@ production-ready.
 │                       port 8000                            │
 │                                                            │
 │  LLM-based review pipeline:                                │
-│    1. RAG retrieval (Azure AI Search) - ~5s                │
-│    2. GPT-5 consolidated review                            │
-│    3. Enrich with SharePoint URLs                          │
-│    4. Report completion status (or why it failed)          │
+│    1. Retrieve standards (Azure AI Search)                 │
+│    2. Review and score all four categories                 │
+│    3. Synthesize and validate one recommendation           │
+│    4. Resolve references and report completion status      │
 │                                                            │
 │  Ingestion API: persist job → Azure Storage Queue          │
 │  Azure Functions worker: extract → chunk → embed → index   │
 │    File-hash caching skips unchanged documents             │
+│  Optional MCP client: live Jama reads in RadiaAI chat      │
 └──────────┬──────────┬────────────────┬─────────────────────┘
            │          │                │
     ┌──────▼──┐ ┌─────▼──────┐ ┌──────▼──────┐
@@ -62,76 +63,22 @@ production-ready.
 ## Project Structure
 
 ```
-RadiaAi-2.0/
-├── backend/
-│   ├── radia_ai/
-│   │   ├── main.py                    # project-named FastAPI entrypoint
-│   │   └── features/
-│   │       ├── jama_requirement_reviewer/
-│   │       │   ├── api/v1/endpoints/  # review + standards REST endpoints
-│   │       │   ├── connectors/        # SharePoint Graph API client
-│   │       │   ├── dependencies/      # DI container + lifespan (Azure client init)
-│   │       │   ├── models/            # Pydantic domain models (review, standards)
-│   │       │   ├── repositories/      # review history persistence
-│   │       │   ├── reviewers/         # review orchestration:
-│   │       │   │   ├── base.py        #   abstract reviewer interface
-│   │       │   │   ├── orchestrator.py#   LLM review + category scoring + completion
-│   │       │   │   └── consolidated.py#   per-category version metadata
-│   │       │   │                      #   (analysis lives in the prompt)
-│   │       │   ├── schemas/           # API request/response schemas
-│   │       │   ├── services/          # review, delta, history, standards services
-│   │       │   ├── standards/         # standards registry (fallback)
-│   │       │   └── utils/             # normalization, scoring helpers
-│   │       └── jama_roundtrip/        # placeholder namespace
-│   │
-│   ├── app/                           # shared infrastructure layer
-│   │   ├── api/v1/endpoints/          # search, ingest, chat, health, documents
-│   │   ├── core/
-│   │   │   ├── azure_clients.py       # OpenAI, Search, Blob client wrappers
-│   │   │   ├── config.py             # Pydantic settings (all Azure config)
-│   │   │   ├── logging.py            # structlog configuration
-│   │   │   ├── exceptions.py         # domain exception hierarchy
-│   │   │   └── security.py           # Entra ID token validation, roles, get_current_user
-│   │   ├── ingestion/
-│   │   │   ├── service.py            # end-to-end ingest pipeline
-│   │   │   ├── chunker.py            # token-based text chunking with overlap
-│   │   │   └── extractor.py          # PDF/DOCX/TXT text extraction
-│   │   ├── rag/
-│   │   │   ├── service.py            # RAG retrieval + diversified search
-│   │   │   └── llm_review_enhancer_v2.py  # consolidated single-call LLM review
-│   │   ├── prompts/
-│   │   │   └── review_prompts.py     # GPT-5 system prompt (all categories)
-│   │   ├── schemas/                   # shared Pydantic schemas
-│   │   ├── dependencies/              # compatibility wrapper (re-exports)
-│   │   └── main.py                    # FastAPI app factory + middleware
-│   │
-│   ├── tests/
-│   │   └── unit/                      # 55 unit tests
-│   ├── .env.example
-│   ├── pyproject.toml
-│   └── requirements.txt
-│
-├── frontend/
-│   ├── src/
-│   │   ├── api/client.ts              # Axios client (5-min timeout for GPT-5)
-│   │   ├── components/                # reusable UI components
-│   │   ├── hooks/                     # React Query hooks
-│   │   ├── pages/                     # shared route-level pages
-│   │   ├── context/                   # global app state
-│   │   ├── radia_ai/features/
-│   │   │   ├── jamaRequirementReviewer/
-│   │   │   │   ├── api/              # review API calls
-│   │   │   │   ├── components/       # FinalRecommendationPanel, ReviewChangeSet, CategoryScoreGrid, etc.
-│   │   │   │   ├── hooks/            # useRequirementReview, useReviewHistory
-│   │   │   │   └── pages/            # RequirementReview, DeltaReview, Standards
-│   │   │   ├── jamaRoundtrip/
-│   │   │   └── resources/
-│   │   └── types/                     # TypeScript API interfaces
-│   ├── .env.example
-│   ├── .env.production.example
-│   └── package.json
-│
-└── README.md
+backend/
+  app/                         Shared API, auth, Azure clients, RAG, ingestion, MCP client
+  radia_ai/features/
+    jama_requirement_reviewer/ Review, Jama connector, history, synthesis, Skillz
+    jama_roundtrip/            Reserved namespace; no roundtrip implementation
+  tests/                       Unit and integration tests
+  function_app.py              Azure Functions ingestion workers
+  api/index.py                 Vercel FastAPI entry point
+frontend/src/
+  pages/                       Chat, search, documents, settings, landing
+  radia_ai/features/
+    jamaRequirementReviewer/   Review workflows and Jama integration UI
+    jamaRoundtrip/             Reserved placeholder page
+mcp-radia/                     Standalone MCP server; see its README
+docs/                          Architecture, authentication, and error handling
+infra/                         Azure deployment templates
 ```
 
 ---
@@ -144,13 +91,12 @@ The review system uses **LLM-based architecture** with GPT-5 + RAG:
                         ┌─────────────────────────┐
     Input Requirement   │   LLM Review Pipeline   │
     ─────────────────►  │                         │
-                        │  1. Embed query         │
-                        │  2. Search (diverse)    │  ← Azure AI Search (~5s)
-                        │  3. GPT-5 consolidated  │  ← GPT-5 (~60s)
-                        │     review prompt       │
-                        │   (language/structure/  │
-                        │     verifiability/      │
-                        │     certification)      │
+                        │  1. Normalize and embed │
+                        │  2. Retrieve standards  │  ← Azure AI Search
+                        │  3. Review + score      │  ← GPT-5, four categories
+                        │  4. Synthesize and      │  ← validated recommendation
+                        │     validate one        │
+                        │     Description        │
                         └────────────┬────────────┘
                                      │
                               Enrich references
@@ -227,6 +173,10 @@ poll `GET /api/v1/ingest/jobs/{job_id}` for `queued`, `processing`, `retrying`, 
 or `failed`. Supply an `Idempotency-Key` header when retrying the same API request; reuse
 of that key with a different request returns HTTP 409. Document file hashes are also used
 to make safe retries after partial indexing.
+
+The Functions app also runs a two-minute recovery timer that redispatches jobs
+whose Blob record was created but whose queue message was not submitted. This
+covers the producer's brief Blob-write/Queue-send failure window.
 
 Run the queue consumer locally from `backend/` with Azure Functions Core Tools using
 `func start`. Storage Queue is created by the API on first submission; the configured
@@ -317,6 +267,43 @@ button, so there's always a single place to check ingestion health.
 - [x] Show each requirement's score, findings, evidence, and final recommendation
 - [x] Report partial completion when only some requirements could be reviewed
 
+### Jama-connected review workflow
+
+- [x] Link a user's own Jama API credentials; credentials are encrypted at rest
+- [x] Search projects and requirements visible to that user's Jama account and
+      import a requirement into an individual review
+- [x] Save an explicit decision on the synthesized recommendation
+- [x] Write the approved Description back to the reviewed Jama item, either using
+      the recommendation or reviewer-modified text; rejected recommendations
+      cannot be written
+- [x] Detect a Jama item changed since review before writing, and record
+      successful writes in review history
+
+This guarded write-back is part of the requirement-review workflow. The separate
+**Jama Roundtrip** page is still a placeholder; it does not provide bulk
+roundtrip, synchronization, or reporting.
+
+### Review history and workspace
+
+- [x] Persist reviews, finding dispositions, recommendation decisions, and Jama
+      write records in Blob Storage (10-day retention)
+- [x] Keep user history private; administrators can review all users' history
+- [x] Export review reports to PDF
+- [x] Personalize theme, accent color, density, motion, sidebar, start page, and
+      review-completion sound
+
+### Search and chat
+
+- [x] Search indexed documents using keyword, vector, or hybrid retrieval
+- [x] Ask grounded questions with citations, using standard JSON or streamed SSE
+- [x] Optionally switch a conversation to live Jama MCP tools; document RAG and
+      live engineering-data answers are kept in separate conversation modes
+- [x] Show indexed document metadata/chunks and let administrators remove
+      indexed content without deleting the SharePoint source
+
+The MCP chat integration is disabled by default. Jira and Confluence tools are
+available in the standalone MCP server but are not enabled in Radia AI chat.
+
 ### Document ingestion
 
 - [x] On-demand sync from SharePoint via `POST /api/v1/ingest`
@@ -338,6 +325,9 @@ button, so there's always a single place to check ingestion health.
 - Node.js 22.13+ or 24+ (for local frontend development; see `frontend/package.json`)
 - Python 3.12+ (for local backend development)
 - Azure subscription with: Azure OpenAI (GPT-5 + text-embedding-3-large), Azure AI Search, Azure Blob Storage
+- Microsoft Entra tenant and API/SPA app registrations for signed-in deployments
+- Azure Functions Core Tools if running the durable ingestion worker locally
+- SharePoint and Jama configuration for those integrations; both are optional for local startup
 
 ### 1. Clone and configure
 
@@ -401,14 +391,17 @@ the lockfile within the version ranges in `frontend/package.json`. Commit both
 files when changing dependencies. Build, lint, and test commands require the
 development dependencies; do not omit them before building.
 
-### 4. Frontend deployment to Vercel (temporary production path)
+### 4. Frontend deployment to Vercel
 
 This repository is configured to deploy the frontend from the repo root using [vercel.json](./vercel.json).
+The FastAPI backend is deployed separately; for Vercel, use `backend/` as the
+project root so Vercel picks up `backend/vercel.json`.
 
 1. Import this repo into Vercel (or run `vercel` from the repo root)
    - Select Node.js 24.x in the project's build settings.
 2. Add `VITE_API_BASE_URL` in Vercel Project Settings → Environment Variables
-   - Value format: `https://<your-azure-backend>.azurewebsites.net/api/v1`
+   - Point it at the separately deployed backend API, for example
+     `https://<your-backend-project>.vercel.app/api/v1` (or your chosen API host)
    - Also add `VITE_ENTRA_CLIENT_ID`, `VITE_ENTRA_TENANT_ID`, and `VITE_ENTRA_API_SCOPE`
      for Microsoft sign-in (see [docs/authentication.md](./docs/authentication.md))
 3. Redeploy after env var updates
@@ -416,8 +409,8 @@ This repository is configured to deploy the frontend from the repo root using [v
    Vercel URL as a redirect URI on the SPA app registration
 
 Quick validation after deploy:
-- `GET <azure-backend>/api/v1/health/live` returns 200 (process is running)
-- `GET <azure-backend>/api/v1/health/ready` returns 200 with `dependencies` all `ok`/`not_configured` (external services reachable)
+- `GET <backend-api>/api/v1/health/live` returns 200 (process is running)
+- `GET <backend-api>/api/v1/health/ready` returns 200 with required dependencies healthy
 - Frontend loads without API/CORS errors in browser console
 - Run one small PDF ingestion/review path end-to-end first, then scale up
 
@@ -440,6 +433,8 @@ app role unless noted. See [docs/authentication.md](./docs/authentication.md).
 | POST | `/api/v1/review/delta` | Score changed requirements against their baseline (no rewrites proposed) |
 | GET | `/api/v1/review/history` | The caller's review runs (`Radia.Admin` sees everyone's) |
 | POST | `/api/v1/review/history/{id}/disposition` | Apply finding disposition (Accepted/Rejected/Deferred) on your own review |
+| POST | `/api/v1/review/history/{id}/decision` | Save a decision on the final recommendation |
+| POST | `/api/v1/review/history/{id}/jama-write` | Write the saved, approved Description to the reviewed Jama item |
 | GET / PUT / DELETE | `/api/v1/jama/account` | Status / link / unlink the caller's own Jama account |
 | GET | `/api/v1/jama/projects`, `/jama/requirements`, `/jama/requirements/{id}` | Jama access as the caller's linked Jama account |
 | POST | `/api/v1/search` | Document search (keyword/vector/hybrid) |
@@ -483,6 +478,7 @@ full reference with descriptions.
 | `ENTRA_*` | Microsoft Entra ID API app registration (required in staging/production; see [docs/authentication.md](./docs/authentication.md)) |
 | `VITE_ENTRA_*` | Frontend Microsoft sign-in (SPA app registration, tenant, API scope) |
 | `JAMA_BASE_URL` / `JAMA_CREDENTIAL_ENCRYPTION_KEY` | Jama instance and the key that encrypts each user's linked Jama credentials |
+| `MCP_ENABLED` / `MCP_SERVER_URL` / `MCP_SERVICE_TOKEN` / `MCP_ALLOWED_TOOLS` | Optional live Jama chat integration; disabled by default and server-side allowlisted |
 | `ALLOWED_ORIGINS` / `ALLOWED_ORIGIN_REGEX` | CORS origins; clear the regex when hosting internally |
 
 ---
@@ -497,6 +493,9 @@ full reference with descriptions.
   environments fail closed without Entra configuration.
 - Jama is accessed as each user's own linked Jama account, so Jama enforces their
   project permissions. Linked credentials are encrypted at rest in a dedicated container.
+- Jama write-back is only available for a Jama-sourced review after an explicit
+  accepted decision; only the Description field is updated, and concurrent Jama
+  edits are detected before the write.
 - Review history is private to the user who ran it (`Radia.Admin` sees all)
 - All API responses use a standardized error envelope (no stack traces exposed)
 - Input validation via Pydantic v2 on all endpoints
@@ -513,22 +512,21 @@ pytest -m integration           # integration tests only (requires Azure)
 pytest --cov=app --cov=radia_ai # with coverage report
 ```
 
-Backend unit-test coverage is enforced at **70%** in CI. Coverage increases are
-staged with focused tests for authentication and authorization, configuration
-validation, chat/RAG, ingestion and webhook failures, blob persistence, search
-failures, and API contracts.
+Backend unit-test coverage is enforced at **70%** in CI.
 
 ---
 
 ## Technology Stack
 
-**Backend:** Python 3.12, FastAPI, Pydantic v2, Azure OpenAI SDK, Azure AI Search SDK, Azure Blob SDK, PyMuPDF, python-docx, structlog, pytest
+**Backend:** Python 3.12+, FastAPI, Pydantic v2, Azure OpenAI SDK, Azure AI Search SDK, Azure Blob/Queue SDKs, Azure Functions, PyMuPDF, python-docx, structlog, pytest
 
 **Frontend:** React 18, TypeScript, Vite, MUI v6, React Query v5, Axios, Framer Motion
 
 **AI/ML:** Azure OpenAI (gpt-5 with reasoning capabilities), text-embedding-3-large (3072d), Azure AI Search (vector + semantic + keyword hybrid search)
 
-**Infrastructure:** Azure App Service / Container Apps, Azure OpenAI, Azure AI Search, Azure Blob Storage
+**Integrations:** Microsoft Entra ID, SharePoint Graph API, Jama Connect, optional MCP chat service
+
+**Infrastructure:** Vercel (frontend and FastAPI API deployment options), Azure Functions (durable ingestion worker), Azure OpenAI, Azure AI Search, Azure Blob Storage, optional Azure Container Apps for mcp-radia
 
 ---
 ## Notes
@@ -538,4 +536,8 @@ failures, and API contracts.
   invocations, but entries are automatically deleted after 10 days. This requires
   a valid `AZURE_BLOB_CONNECTION_STRING` configuration.
 
-- Partial features have functional UIs and basic backend integration but may require enhancement for production workflows.
+- **Not implemented:** bulk Jama roundtrip, synchronization, and reporting on the
+  Jama Roundtrip page; Vitech GENESYS MCP tools.
+- **On hold:** per-user Jira/Confluence account linking and using Jira/Confluence
+  tools from Radia AI chat. The standalone MCP server has Jira/Confluence tools
+  for direct MCP use when configured.
