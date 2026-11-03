@@ -5,6 +5,7 @@ import {
   RADIAAI_ENTER_NOTICE,
   RADIAAI_EXIT_NOTICE,
   buildApiHistory,
+  changeChatMode,
   deriveChatMode,
   parseChatCommand,
   planChatSend,
@@ -33,6 +34,41 @@ describe('deriveChatMode', () => {
     expect(deriveChatMode([])).toBe('standards');
     expect(deriveChatMode([user('/radiaai'), assistant(RADIAAI_ENTER_NOTICE)])).toBe('radiaai');
     expect(deriveChatMode([user('/radiaai q'), assistant('a'), user('/exit')])).toBe('standards');
+  });
+});
+
+describe('changeChatMode', () => {
+  it('persists switch changes without slash command messages and isolates each context', () => {
+    const enabled = changeChatMode([user('standards q'), assistant('standards a')], 'radiaai');
+    expect(enabled.at(-1)).toEqual(assistant(RADIAAI_ENTER_NOTICE));
+    const restored: ChatMessage[] = JSON.parse(JSON.stringify(enabled));
+    expect(deriveChatMode(restored)).toBe('radiaai');
+    expect(planChatSend(restored, 'engineering q', 10)).toEqual({
+      kind: 'ask', mode: 'radiaai', question: 'engineering q', history: [],
+    });
+
+    const disabled = changeChatMode([...restored, user('engineering q'), assistant('engineering a')], 'standards');
+    expect(disabled.at(-1)).toEqual(assistant(RADIAAI_EXIT_NOTICE));
+    expect(planChatSend(disabled, 'standards again', 10)).toEqual({
+      kind: 'ask', mode: 'standards', question: 'standards again', history: [],
+    });
+    expect(buildApiHistory(changeChatMode(disabled, 'radiaai'), 10)).toEqual([]);
+  });
+
+  it('does not add duplicate boundaries when already in the requested mode', () => {
+    const history = [user('/radiaai')];
+    expect(changeChatMode(history, 'radiaai')).toBe(history);
+  });
+
+  it('recognizes and strips notices saved before the header switch existed', () => {
+    const history = [
+      user('/radiaai'),
+      assistant('RadiaAI mode is on. Your questions now go to live engineering data (Jama). Type /exit to return to the standards checker.'),
+      user('engineering q'),
+    ];
+    expect(deriveChatMode(history)).toBe('radiaai');
+    expect(buildApiHistory(history, 10)).toEqual([user('engineering q')]);
+    expect(deriveChatMode(changeChatMode(history, 'standards'))).toBe('standards');
   });
 });
 

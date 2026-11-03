@@ -446,14 +446,16 @@ deployed [`mcp-radia`](../mcp-radia/README.md) server, instead of relying only o
 the indexed-document RAG pipeline above. **Disabled by default** (`MCP_ENABLED=false`);
 when disabled, chat behaves exactly as described in section 10.
 
-The two pipelines are never mixed. Users opt in per conversation: a chat message
-starting with `/radiaai` switches the conversation to **RadiaAI mode**
+The two pipelines are never mixed. Users opt in per conversation using the
+**Radia AI** switch at the right of the Chat header (on both the page and widget).
+Turning it on switches the conversation to **RadiaAI mode**
 (`ChatRequest.mode="radiaai"`), where document retrieval is skipped and answers come
-only from mcp-radia tools; `/exit` returns to the standards checker (the default
-`mode="standards"`, which never calls tools). `/radiaai <question>` switches and asks
-in one step. The mode is derived from the command turns in the persisted conversation
+only from mcp-radia tools; turning it off returns to the standards checker (the default
+`mode="standards"`, which never calls tools). The switch is disabled while a reply is
+streaming. Legacy `/radiaai`, `/exit`, and `/radiaai <question>` commands remain supported.
+The mode is derived from local mode notices and legacy command turns in the persisted conversation
 ([`frontend/src/utils/chatMode.ts`](../frontend/src/utils/chatMode.ts)), and only turns
-since the last command are sent as history, so standards answers never leak into a
+since the last mode boundary are sent as history, so standards answers never leak into a
 live-data question (or vice versa). In RadiaAI mode, if MCP is disabled or unreachable,
 a fixed "unavailable" message is returned instead of an ungrounded model answer.
 
@@ -463,7 +465,7 @@ a fixed "unavailable" message is returned instead of an ungrounded model answer.
 Browser (signed-in user)
   -> POST /api/v1/chat[/stream]  (Entra ID token, enforced as today)
   -> mode="standards" (default): RAG retrieval + grounded answer, no tools
-  -> mode="radiaai" (/radiaai ... /exit): no retrieval; bounded tool-calling loop
+  -> mode="radiaai" (Radia AI switch on): no retrieval; bounded tool-calling loop
        -> MCPClientAdapter discovers tools via mcp-radia's tools/list
        -> intersects with the server-side allowlist (MCP_ALLOWED_TOOLS)
        -> validates the model's requested arguments against the tool's own JSON Schema
@@ -589,7 +591,7 @@ Steps:
    MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_list_projects,list_related_items
    ```
    Redeploy the backend (or restart it locally) so the new variables take effect.
-3. **Verify the handshake and tool discovery**: type `/radiaai` in the chat, then ask a
+3. **Verify the handshake and tool discovery**: turn on the Radia AI switch in the chat, then ask a
    Jama-shaped question (e.g. "What does Jama item 12345 say?"). A `mcp_tools_discovered`
    log line confirms the handshake; `mcp_tool_iteration_complete` confirms a
    tool call executed.
@@ -624,8 +626,8 @@ Steps:
    MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
    MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_list_projects,list_related_items
    ```
-4. **Verify the handshake and tool discovery**: start the backend, then type
-   `/radiaai` in the chat, then ask a Jama-shaped question (e.g. "What does Jama item 12345 say?"). A
+4. **Verify the handshake and tool discovery**: start the backend, then turn on
+   the Radia AI switch in the chat, then ask a Jama-shaped question (e.g. "What does Jama item 12345 say?"). A
    `mcp_tools_discovered` log line confirms the handshake; `mcp_tool_iteration_complete`
    confirms a tool call executed.
 5. **Test an authenticated read-only request** end-to-end: sign in, link a Jama

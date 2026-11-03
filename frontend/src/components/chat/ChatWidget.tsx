@@ -30,7 +30,8 @@ import { useChatHistory } from '@/hooks/useChatHistory';
 import { useAppContext } from '@/context/useAppContext';
 import type { ChatSource } from '@/types/api';
 import { MessageText } from '@/components/chat/MessageText';
-import { deriveChatMode, planChatSend } from '@/utils/chatMode';
+import { RadiaModeToggle } from '@/components/chat/RadiaModeToggle';
+import { changeChatMode, deriveChatMode, planChatSend } from '@/utils/chatMode';
 
 const WIDGET_WIDTH = 360;
 const WIDGET_HEIGHT = 500;
@@ -154,17 +155,32 @@ export function ChatWidget() {
                 display="flex"
                 alignItems="center"
                 justifyContent="space-between"
-                px={2}
+                px={1.5}
                 py={1.5}
-                sx={{ bgcolor: 'primary.main', color: 'primary.contrastText' }}
+                sx={{
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.contrastText' },
+                  '& .MuiSwitch-track, & .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                    bgcolor: 'primary.contrastText',
+                  },
+                }}
               >
-                <Box display="flex" alignItems="center" gap={1}>
+                <Box display="flex" alignItems="center" gap={0.5}>
                   <ForumIcon fontSize="small" />
                   <Typography variant="subtitle1" fontWeight={700}>
-                    Ask Radia AI
+                    Chat
                   </Typography>
                 </Box>
-                <Box>
+                <Box display="flex" alignItems="center" gap={0.5}>
+                  <RadiaModeToggle
+                    checked={isRadiaMode}
+                    disabled={isStreaming}
+                    onChange={(checked) => {
+                      setHistory((prev) => changeChatMode(prev, checked ? 'radiaai' : 'standards'));
+                      scrollToEnd();
+                    }}
+                  />
                   <Tooltip title="Clear conversation">
                     <span>
                       <IconButton
@@ -209,7 +225,7 @@ export function ChatWidget() {
                       Ask a question about how to write requirements.
                     </Typography>
                     <Typography variant="caption">
-                      Type /radiaai to ask about live engineering data, /exit to return.
+                      Turn on Radia AI to ask about live engineering data.
                     </Typography>
                   </Box>
                 )}
@@ -304,17 +320,6 @@ export function ChatWidget() {
               </Box>
 
               <Divider />
-
-              {isRadiaMode && (
-                <Box px={1.5} pt={1}>
-                  <Chip
-                    icon={<HubIcon fontSize="small" />}
-                    label="RadiaAI mode · type /exit to leave"
-                    size="small"
-                    color="info"
-                  />
-                </Box>
-              )}
 
               {/* Input area */}
               <Box display="flex" gap={1} p={1.5}>

@@ -16,7 +16,8 @@ import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
 import type { ChatSource } from '@/types/api';
 import { MessageText } from '@/components/chat/MessageText';
-import { deriveChatMode, planChatSend } from '@/utils/chatMode';
+import { RadiaModeToggle } from '@/components/chat/RadiaModeToggle';
+import { changeChatMode, deriveChatMode, planChatSend } from '@/utils/chatMode';
 
 const HISTORY_TURNS_SENT_TO_API = 10;
 
@@ -95,9 +96,19 @@ export default function Chat() {
 
   return (
     <Box display="flex" flexDirection="column" flexGrow={1} minHeight={0}>
-      <Typography variant="h5" fontWeight={700} mb={2} flexShrink={0}>
-        Chat
-      </Typography>
+      <Box display="flex" alignItems="center" justifyContent="space-between" mb={2} flexShrink={0}>
+        <Typography variant="h5" fontWeight={700}>
+          Chat
+        </Typography>
+        <RadiaModeToggle
+          checked={isRadiaMode}
+          disabled={isStreaming}
+          onChange={(checked) => {
+            setHistory((prev) => changeChatMode(prev, checked ? 'radiaai' : 'standards'));
+            scrollToEnd();
+          }}
+        />
+      </Box>
 
       {/* Conversation area - the only part of this page that scrolls. */}
       <Paper
@@ -117,7 +128,7 @@ export default function Chat() {
             <BoltIcon fontSize="large" />
             <Typography>Ask a question about your documents</Typography>
             <Typography variant="body2">
-              Type /radiaai to ask about live engineering data, /exit to return.
+              Turn on Radia AI to ask about live engineering data.
             </Typography>
           </Box>
         )}
@@ -194,17 +205,6 @@ export default function Chat() {
       </Paper>
 
       <Divider sx={{ flexShrink: 0 }} />
-
-      {isRadiaMode && (
-        <Box pt={1} flexShrink={0}>
-          <Chip
-            icon={<HubIcon />}
-            label="RadiaAI mode · type /exit to leave"
-            size="small"
-            color="info"
-          />
-        </Box>
-      )}
 
       {/* Input area */}
       <Box display="flex" gap={1} pt={2} flexShrink={0}>
