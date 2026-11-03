@@ -4,6 +4,10 @@ AI-powered Requirements Engineering platform for aerospace and systems teams.
 Uses Retrieval-Augmented Generation (RAG) against indexed standards documents to provide 
 grounded, traceable, and explainable requirement reviews.
 
+The Chat page and floating chat window open at the latest message and follow new
+responses automatically. Scroll up to pause following; use the down-arrow button
+to return to the end of the conversation and resume automatic scrolling.
+
 ---
 
 ## Architecture
