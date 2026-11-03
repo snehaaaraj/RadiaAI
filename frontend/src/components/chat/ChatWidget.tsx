@@ -188,7 +188,7 @@ export function ChatWidget() {
               </Box>
 
               {/* Conversation area */}
-              <ChatConversation key={openCount} padding={1.5}>
+              <ChatConversation key={openCount} padding={1.5} reduceMotion={reduceMotion}>
                 {history.length === 0 && (
                   <Box
                     display="flex"

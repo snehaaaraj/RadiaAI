@@ -7,7 +7,8 @@ provides grounded document search and chat.
 
 The Chat page and floating chat window open at the latest message and follow new
 responses automatically. Scroll up to pause following; use the down-arrow button
-to return to the end of the conversation and resume automatic scrolling.
+to smoothly scroll to the end of the conversation and resume automatic scrolling.
+Reduced-motion preferences use an immediate scroll instead.
 
 In Individual Requirement Review, the From Jama search text, selected requirement,
 and project filter are retained when switching input tabs. Clear Review resets them.

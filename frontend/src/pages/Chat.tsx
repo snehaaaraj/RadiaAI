@@ -14,6 +14,7 @@ import BoltIcon from '@mui/icons-material/Bolt';
 import HubIcon from '@mui/icons-material/Hub';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
+import { useAppContext } from '@/context/useAppContext';
 import type { ChatSource } from '@/types/api';
 import { MessageText } from '@/components/chat/MessageText';
 import { ChatConversation } from '@/components/chat/ChatConversation';
@@ -35,6 +36,7 @@ interface McpTurnInfo {
 }
 
 export default function Chat() {
+  const { motionPreference } = useAppContext();
   const [input, setInput] = useState('');
   const { history, setHistory } = useChatHistory();
   const [mcpInfoByIndex, setMcpInfoByIndex] = useState<Record<number, McpTurnInfo>>({});
@@ -105,7 +107,7 @@ export default function Chat() {
         variant="outlined"
         sx={{ display: 'flex', flexDirection: 'column', flexGrow: 1, minHeight: 0, overflow: 'hidden', mb: 2 }}
       >
-        <ChatConversation>
+        <ChatConversation reduceMotion={motionPreference === 'reduced'}>
           {history.length === 0 && (
             <Box
               display="flex"

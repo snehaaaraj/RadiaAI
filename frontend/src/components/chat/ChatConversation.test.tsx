@@ -19,16 +19,32 @@ vi.mock('@/context/useAppContext', () => ({
   useAppContext: () => ({ motionPreference: 'reduced' }),
 }));
 
+function motionQuery(matches: boolean): MediaQueryList {
+  return {
+    matches,
+    media: '(prefers-reduced-motion: reduce)',
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  };
+}
+
 describe('chat conversation scrolling', () => {
   let contentHeight: number;
   let viewportHeight: number;
   let notifyResize: () => void;
   const disconnect = vi.fn();
+  const scrollTo = vi.fn();
 
   beforeEach(() => {
     contentHeight = 1000;
     viewportHeight = 400;
     disconnect.mockClear();
+    scrollTo.mockClear();
+    vi.stubGlobal('matchMedia', vi.fn(() => motionQuery(false)));
     vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockImplementation(() => contentHeight);
     vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockImplementation(() => viewportHeight);
     vi.stubGlobal('ResizeObserver', class {
@@ -75,13 +91,13 @@ describe('chat conversation scrolling', () => {
   });
 
   it('pauses when scrolled up and resumes when the down arrow is clicked', () => {
-    const { rerender } = render(<ChatConversation>Answer</ChatConversation>);
+    const { rerender } = render(<ChatConversation reduceMotion>Answer</ChatConversation>);
     const viewport = screen.getByRole('region', { name: 'Conversation' });
     fireEvent.scroll(viewport, { target: { scrollTop: 200 } });
     expect(screen.getByRole('button', { name: 'Scroll to latest message' })).toBeVisible();
 
     contentHeight = 1300;
-    rerender(<ChatConversation>Longer answer</ChatConversation>);
+    rerender(<ChatConversation reduceMotion>Longer answer</ChatConversation>);
     act(() => notifyResize());
     expect(viewport.scrollTop).toBe(200);
 
@@ -90,8 +106,59 @@ describe('chat conversation scrolling', () => {
     expect(screen.queryByRole('button')).not.toBeInTheDocument();
 
     contentHeight = 1400;
-    rerender(<ChatConversation>Even longer answer</ChatConversation>);
+    rerender(<ChatConversation reduceMotion>Even longer answer</ChatConversation>);
     expect(viewport.scrollTop).toBe(1000);
+  });
+
+  it('animates the arrow scroll without jumping during streaming, then resumes following', () => {
+    const { rerender } = render(<ChatConversation>Answer</ChatConversation>);
+    const viewport = screen.getByRole('region', { name: 'Conversation' });
+    viewport.scrollTo = scrollTo;
+    fireEvent.scroll(viewport, { target: { scrollTop: 200 } });
+    fireEvent.click(screen.getByRole('button', { name: 'Scroll to latest message' }));
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 1000, behavior: 'smooth' });
+    expect(viewport.scrollTop).toBe(200);
+
+    contentHeight = 1200;
+    rerender(<ChatConversation>More streamed text</ChatConversation>);
+    act(() => notifyResize());
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 1200, behavior: 'smooth' });
+    expect(viewport.scrollTop).toBe(200);
+    fireEvent.scroll(viewport, { target: { scrollTop: 780 } });
+    expect(viewport.scrollTop).toBe(780);
+    expect(screen.getByRole('button', { name: 'Scroll to latest message' })).toBeVisible();
+    fireEvent.scroll(viewport, { target: { scrollTop: 800 } });
+    expect(screen.queryByRole('button')).not.toBeInTheDocument();
+
+    contentHeight = 1300;
+    rerender(<ChatConversation>Final answer</ChatConversation>);
+    expect(viewport.scrollTop).toBe(900);
+  });
+
+  it.each(['wheel', 'touchStart', 'keyDown'])('lets the user interrupt the animation with %s', (event) => {
+    const { rerender } = render(<ChatConversation>Answer</ChatConversation>);
+    const viewport = screen.getByRole('region', { name: 'Conversation' });
+    viewport.scrollTo = scrollTo;
+    fireEvent.scroll(viewport, { target: { scrollTop: 200 } });
+    fireEvent.click(screen.getByRole('button', { name: 'Scroll to latest message' }));
+    if (event === 'wheel') fireEvent.wheel(viewport, { deltaY: -100 });
+    else if (event === 'touchStart') fireEvent.touchStart(viewport);
+    else fireEvent.keyDown(viewport, { key: 'PageUp' });
+    expect(scrollTo).toHaveBeenLastCalledWith({ top: 200, behavior: 'instant' });
+    contentHeight = 1300;
+    rerender(<ChatConversation>More text</ChatConversation>);
+    expect(viewport.scrollTop).toBe(200);
+  });
+
+  it('uses an immediate arrow scroll for system reduced-motion preferences', () => {
+    vi.mocked(window.matchMedia).mockReturnValue(motionQuery(true));
+    render(<ChatConversation>Answer</ChatConversation>);
+    const viewport = screen.getByRole('region', { name: 'Conversation' });
+    viewport.scrollTo = scrollTo;
+    fireEvent.scroll(viewport, { target: { scrollTop: 200 } });
+    fireEvent.click(screen.getByRole('button', { name: 'Scroll to latest message' }));
+    expect(viewport.scrollTop).toBe(600);
+    expect(scrollTo).not.toHaveBeenCalled();
   });
 
   it('resumes following when the user manually returns within 48px of the bottom', () => {
