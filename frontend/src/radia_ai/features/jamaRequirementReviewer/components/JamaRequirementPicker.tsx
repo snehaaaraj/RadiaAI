@@ -23,7 +23,15 @@ import { SETTINGS_SECTION_IDS } from '@/utils/settingsSections';
 
 interface JamaRequirementPickerProps {
   onRequirementSelected: (requirement: JamaRequirement) => void;
+  state: JamaRequirementPickerState;
+  onStateChange: (state: JamaRequirementPickerState) => void;
   disabled?: boolean;
+}
+
+export interface JamaRequirementPickerState {
+  projectId: number | '';
+  inputValue: string;
+  selectedRequirement: JamaRequirementSummary | null;
 }
 
 function summaryLabel(summary: JamaRequirementSummary): string {
@@ -33,12 +41,12 @@ function summaryLabel(summary: JamaRequirementSummary): string {
 
 export function JamaRequirementPicker({
   onRequirementSelected,
+  state,
+  onStateChange,
   disabled = false,
 }: JamaRequirementPickerProps) {
-  const [projectId, setProjectId] = useState<number | ''>('');
-  const [inputValue, setInputValue] = useState('');
-  const [debouncedQuery, setDebouncedQuery] = useState('');
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const { projectId, inputValue, selectedRequirement } = state;
+  const [debouncedQuery, setDebouncedQuery] = useState(inputValue.trim());
   const { guardedNavigate } = useNavigationGuardContext();
 
   const projectsQuery = useJamaProjects();
@@ -56,7 +64,7 @@ export function JamaRequirementPicker({
     enabled: searchEnabled,
   });
 
-  const requirementQuery = useJamaRequirement(selectedId);
+  const requirementQuery = useJamaRequirement(selectedRequirement?.id ?? null);
 
   // When a full requirement finishes loading, hand it up to the parent form.
   useEffect(() => {
@@ -120,7 +128,7 @@ export function JamaRequirementPicker({
         value={projectId === '' ? '' : String(projectId)}
         onChange={(event) => {
           const value = event.target.value;
-          setProjectId(value === '' ? '' : Number(value));
+          onStateChange({ ...state, projectId: value === '' ? '' : Number(value) });
         }}
         disabled={disabled || projectsQuery.isLoading}
         helperText={
@@ -142,6 +150,8 @@ export function JamaRequirementPicker({
         fullWidth
         size="small"
         disabled={disabled}
+        value={selectedRequirement}
+        inputValue={inputValue}
         options={options}
         loading={searchQuery.isFetching}
         filterOptions={(x) => x}
@@ -153,9 +163,13 @@ export function JamaRequirementPicker({
             : 'No matching requirements'
         }
         onInputChange={(_, value, reason) => {
-          if (reason === 'input') setInputValue(value);
+          if (reason === 'input') onStateChange({ ...state, inputValue: value });
         }}
-        onChange={(_, value) => setSelectedId(value ? value.id : null)}
+        onChange={(_, value) => onStateChange({
+          ...state,
+          selectedRequirement: value,
+          inputValue: value ? summaryLabel(value) : '',
+        })}
         renderInput={(params) => (
           <TextField
             {...params}

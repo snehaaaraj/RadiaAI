@@ -13,7 +13,10 @@ import Typography from '@mui/material/Typography';
 import { CategoryScoreGrid } from '@/radia_ai/features/jamaRequirementReviewer/components/CategoryScoreGrid';
 import { FileUploadZone } from '@/radia_ai/features/jamaRequirementReviewer/components/FileUploadZone';
 import { FinalRecommendationPanel } from '@/radia_ai/features/jamaRequirementReviewer/components/FinalRecommendationPanel';
-import { JamaRequirementPicker } from '@/radia_ai/features/jamaRequirementReviewer/components/JamaRequirementPicker';
+import {
+  JamaRequirementPicker,
+  type JamaRequirementPickerState,
+} from '@/radia_ai/features/jamaRequirementReviewer/components/JamaRequirementPicker';
 import { ReviewChangeSet } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewChangeSet';
 import { ReviewIncompleteNotice } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewIncompleteNotice';
 import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/components/ReviewResultHero';
@@ -46,10 +49,17 @@ type RequirementReviewFormState = {
   text: string;
   inputMode: InputMode;
   uploadedFilename: string;
+  jamaPicker?: JamaRequirementPickerState;
   /** The Jama item currently loaded into the form. */
   jamaSource?: JamaSource | null;
   /** The Jama item the displayed review result was run on (the write-back target). */
   reviewedJamaSource?: JamaSource | null;
+};
+
+const EMPTY_JAMA_PICKER_STATE: JamaRequirementPickerState = {
+  projectId: '',
+  inputValue: '',
+  selectedRequirement: null,
 };
 
 const DEFAULT_FORM_STATE: RequirementReviewFormState = {
@@ -58,6 +68,7 @@ const DEFAULT_FORM_STATE: RequirementReviewFormState = {
   text: '',
   inputMode: 'paste',
   uploadedFilename: '',
+  jamaPicker: EMPTY_JAMA_PICKER_STATE,
   jamaSource: null,
   reviewedJamaSource: null,
 };
@@ -173,6 +184,8 @@ export default function RequirementReview() {
   };
 
   const handleJamaRequirementSelected = (requirement: JamaRequirement) => {
+    // Remounting the picker must not replace edits to an already loaded item.
+    if (jamaSource?.itemId === requirement.id) return;
     const nextId = requirement.document_key ?? String(requirement.id);
     const parts = [
       requirement.name ? `Title: ${requirement.name}` : '',
@@ -353,6 +366,8 @@ export default function RequirementReview() {
               />
             ) : (
               <JamaRequirementPicker
+                state={formState.jamaPicker ?? EMPTY_JAMA_PICKER_STATE}
+                onStateChange={(jamaPicker) => updateFormState({ jamaPicker })}
                 onRequirementSelected={handleJamaRequirementSelected}
                 disabled={isPending}
               />

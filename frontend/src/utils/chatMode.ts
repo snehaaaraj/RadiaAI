@@ -2,13 +2,13 @@
  * Chat routing between the two fully separate backend pipelines:
  *
  * - 'standards' (default): answers from the indexed standards documents.
- * - 'radiaai': entered by a message starting with `/radiaai`, left with `/exit`;
+ * - 'radiaai': enabled by the header switch (or legacy `/radiaai` command);
  *   answers only from mcp-radia live engineering data (e.g. Jama).
  *
- * The active mode is derived from the command turns already in the persisted
+ * The active mode is derived from mode notices and legacy commands in the persisted
  * conversation, so it is shared by the Chat page and the pop-up widget and
- * survives reloads without a separate store. Each command also starts a fresh
- * context segment: only turns since the last command are sent as history, so
+ * survives reloads without a separate store. Each mode change starts a fresh
+ * context segment: only turns since the last change are sent as history, so
  * standards answers never leak into a RadiaAI question (or vice versa).
  */
 
@@ -20,13 +20,20 @@ export const RADIAAI_COMMAND = '/radiaai';
 export const EXIT_COMMAND = '/exit';
 
 export const RADIAAI_ENTER_NOTICE =
-  'RadiaAI mode is on. Your questions now go to live engineering data (Jama). Type /exit to return to the standards checker.';
+  'RadiaAI mode is on. Your questions now go to live engineering data (Jama). Use the Radia AI switch to return to the standards checker.';
 export const RADIAAI_EXIT_NOTICE =
   'Exited RadiaAI mode. Your questions now go to the standards checker.';
 export const NOT_IN_RADIAAI_NOTICE =
-  'You are not in RadiaAI mode. Type /radiaai to ask about live engineering data.';
+  'You are not in RadiaAI mode. Turn on the Radia AI switch to ask about live engineering data.';
 
-const LOCAL_NOTICES = new Set([RADIAAI_ENTER_NOTICE, RADIAAI_EXIT_NOTICE, NOT_IN_RADIAAI_NOTICE]);
+const LEGACY_ENTER_NOTICE =
+  'RadiaAI mode is on. Your questions now go to live engineering data (Jama). Type /exit to return to the standards checker.';
+const LEGACY_NOT_IN_NOTICE =
+  'You are not in RadiaAI mode. Type /radiaai to ask about live engineering data.';
+const LOCAL_NOTICES = new Set([
+  RADIAAI_ENTER_NOTICE, RADIAAI_EXIT_NOTICE, NOT_IN_RADIAAI_NOTICE,
+  LEGACY_ENTER_NOTICE, LEGACY_NOT_IN_NOTICE,
+]);
 
 export type ChatCommand = { kind: 'enter'; question: string } | { kind: 'exit' };
 
@@ -39,20 +46,39 @@ export function parseChatCommand(text: string): ChatCommand | null {
   return null;
 }
 
-/** Index of the last command turn in the history, or -1 if none. */
-function lastCommandIndex(history: ChatMessage[]): number {
+function modeChange(turn: ChatMessage): ChatMode | null {
+  if (turn.role === 'user') {
+    const command = parseChatCommand(turn.content);
+    return command ? (command.kind === 'enter' ? 'radiaai' : 'standards') : null;
+  }
+  if (turn.content === RADIAAI_ENTER_NOTICE || turn.content === LEGACY_ENTER_NOTICE) {
+    return 'radiaai';
+  }
+  return turn.content === RADIAAI_EXIT_NOTICE ? 'standards' : null;
+}
+
+/** Index of the last mode boundary, or -1 if none. */
+function lastModeChangeIndex(history: ChatMessage[]): number {
   for (let i = history.length - 1; i >= 0; i--) {
-    const turn = history[i];
-    if (turn.role === 'user' && parseChatCommand(turn.content)) return i;
+    if (modeChange(history[i]) !== null) return i;
   }
   return -1;
 }
 
 /** The mode in effect after the given conversation. */
 export function deriveChatMode(history: ChatMessage[]): ChatMode {
-  const index = lastCommandIndex(history);
+  const index = lastModeChangeIndex(history);
   if (index === -1) return 'standards';
-  return parseChatCommand(history[index].content)?.kind === 'enter' ? 'radiaai' : 'standards';
+  return modeChange(history[index]) ?? 'standards';
+}
+
+/** Persist a local mode boundary without adding a slash command to the chat. */
+export function changeChatMode(history: ChatMessage[], mode: ChatMode): ChatMessage[] {
+  if (deriveChatMode(history) === mode) return history;
+  return [...history, {
+    role: 'assistant',
+    content: mode === 'radiaai' ? RADIAAI_ENTER_NOTICE : RADIAAI_EXIT_NOTICE,
+  }];
 }
 
 /**
@@ -61,7 +87,7 @@ export function deriveChatMode(history: ChatMessage[]): ChatMode {
  * any) and local mode notices dropped, capped to the last `limit` turns.
  */
 export function buildApiHistory(history: ChatMessage[], limit: number): ChatMessage[] {
-  const start = Math.max(lastCommandIndex(history), 0);
+  const start = Math.max(lastModeChangeIndex(history), 0);
   const segment: ChatMessage[] = [];
   for (const turn of history.slice(start)) {
     if (turn.role === 'assistant' && LOCAL_NOTICES.has(turn.content)) continue;

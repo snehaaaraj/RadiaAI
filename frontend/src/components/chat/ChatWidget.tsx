@@ -5,7 +5,7 @@
  * retained across page navigation and reloads.
  */
 
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import Badge from '@mui/material/Badge';
 import Box from '@mui/material/Box';
 import Chip from '@mui/material/Chip';
@@ -30,7 +30,9 @@ import { useChatHistory } from '@/hooks/useChatHistory';
 import { useAppContext } from '@/context/useAppContext';
 import type { ChatSource } from '@/types/api';
 import { MessageText } from '@/components/chat/MessageText';
-import { deriveChatMode, planChatSend } from '@/utils/chatMode';
+import { ChatConversation } from '@/components/chat/ChatConversation';
+import { RadiaModeToggle } from '@/components/chat/RadiaModeToggle';
+import { changeChatMode, deriveChatMode, planChatSend } from '@/utils/chatMode';
 
 const WIDGET_WIDTH = 360;
 const WIDGET_HEIGHT = 500;
@@ -45,30 +47,20 @@ interface McpTurnInfo {
 
 export function ChatWidget() {
   const [open, setOpen] = useState(false);
+  const [openCount, setOpenCount] = useState(0);
   const [input, setInput] = useState('');
   const { history, setHistory, clearHistory } = useChatHistory();
   const [mcpInfoByIndex, setMcpInfoByIndex] = useState<Record<number, McpTurnInfo>>({});
   const { motionPreference } = useAppContext();
   const { isStreaming, streamingText, sendMessage } = useChatStream();
-  const endRef = useRef<HTMLDivElement>(null);
 
   const reduceMotion = motionPreference === 'reduced';
   const isRadiaMode = deriveChatMode(history) === 'radiaai';
 
-  const scrollToEnd = () => {
-    setTimeout(() => endRef.current?.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth' }), 50);
-  };
-
   const handleOpen = () => {
+    setOpenCount((count) => count + 1);
     setOpen(true);
-    scrollToEnd();
   };
-
-  // Keep the conversation pinned to the bottom as the streamed answer grows.
-  useEffect(() => {
-    if (streamingText) scrollToEnd();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [streamingText]);
 
   const handleSend = () => {
     const text = input.trim();
@@ -80,12 +72,10 @@ export function ChatWidget() {
 
     if (plan.kind === 'local') {
       setHistory([...updatedHistory, { role: 'assistant', content: plan.notice }]);
-      scrollToEnd();
       return;
     }
 
     setHistory(updatedHistory);
-    scrollToEnd();
 
     sendMessage(
       {
@@ -107,11 +97,9 @@ export function ChatWidget() {
             }
             return next;
           });
-          scrollToEnd();
         },
         onError: (message) => {
           setHistory((prev) => [...prev, { role: 'assistant', content: `Error: ${message}` }]);
-          scrollToEnd();
         },
       }
     );
@@ -154,17 +142,31 @@ export function ChatWidget() {
                 display="flex"
                 alignItems="center"
                 justifyContent="space-between"
-                px={2}
+                px={1.5}
                 py={1.5}
-                sx={{ bgcolor: 'primary.main', color: 'primary.contrastText' }}
+                sx={{
+                  bgcolor: 'primary.main',
+                  color: 'primary.contrastText',
+                  '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.contrastText' },
+                  '& .MuiSwitch-track, & .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
+                    bgcolor: 'primary.contrastText',
+                  },
+                }}
               >
-                <Box display="flex" alignItems="center" gap={1}>
+                <Box display="flex" alignItems="center" gap={0.5}>
                   <ForumIcon fontSize="small" />
                   <Typography variant="subtitle1" fontWeight={700}>
-                    Ask Radia AI
+                    Chat
                   </Typography>
                 </Box>
-                <Box>
+                <Box display="flex" alignItems="center" gap={0.5}>
+                  <RadiaModeToggle
+                    checked={isRadiaMode}
+                    disabled={isStreaming}
+                    onChange={(checked) => {
+                      setHistory((prev) => changeChatMode(prev, checked ? 'radiaai' : 'standards'));
+                    }}
+                  />
                   <Tooltip title="Clear conversation">
                     <span>
                       <IconButton
@@ -186,12 +188,7 @@ export function ChatWidget() {
               </Box>
 
               {/* Conversation area */}
-              <Box
-                flexGrow={1}
-                overflow="auto"
-                sx={{ overflowX: 'hidden', bgcolor: 'background.default' }}
-                p={1.5}
-              >
+              <ChatConversation key={openCount} padding={1.5}>
                 {history.length === 0 && (
                   <Box
                     display="flex"
@@ -209,7 +206,7 @@ export function ChatWidget() {
                       Ask a question about how to write requirements.
                     </Typography>
                     <Typography variant="caption">
-                      Type /radiaai to ask about live engineering data, /exit to return.
+                      Turn on Radia AI to ask about live engineering data.
                     </Typography>
                   </Box>
                 )}
@@ -299,22 +296,9 @@ export function ChatWidget() {
                     <Typography variant="caption">Thinking…</Typography>
                   </Box>
                 )}
-
-                <div ref={endRef} />
-              </Box>
+              </ChatConversation>
 
               <Divider />
-
-              {isRadiaMode && (
-                <Box px={1.5} pt={1}>
-                  <Chip
-                    icon={<HubIcon fontSize="small" />}
-                    label="RadiaAI mode · type /exit to leave"
-                    size="small"
-                    color="info"
-                  />
-                </Box>
-              )}
 
               {/* Input area */}
               <Box display="flex" gap={1} p={1.5}>

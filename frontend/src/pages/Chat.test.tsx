@@ -77,7 +77,7 @@ describe('Chat page - /radiaai and /exit routing', () => {
     rerender(<Chat />);
 
     expect(mocks.sendMessage).not.toHaveBeenCalled();
-    expect(screen.getByText('RadiaAI mode · type /exit to leave')).toBeInTheDocument();
+    expect(screen.getByRole('switch', { name: 'Radia AI mode' })).toBeChecked();
     expect(screen.getByPlaceholderText('Ask about engineering data…')).toBeInTheDocument();
   });
 
