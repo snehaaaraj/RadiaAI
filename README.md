@@ -8,6 +8,9 @@ The Chat page and floating chat window open at the latest message and follow new
 responses automatically. Scroll up to pause following; use the down-arrow button
 to return to the end of the conversation and resume automatic scrolling.
 
+In Individual Requirement Review, the From Jama search text, selected requirement,
+and project filter are retained when switching input tabs. Clear Review resets them.
+
 ---
 
 ## Architecture
