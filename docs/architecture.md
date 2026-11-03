@@ -1,10 +1,10 @@
 # Radia AI Architecture
 
-Radia AI is an explainable requirements-engineering platform for aerospace and systems teams. It combines a React frontend with a FastAPI backend to support requirement quality review, delta review, standards lookup, review history, and document-oriented workflows.
+Radia AI is an explainable requirements-engineering platform for aerospace and systems teams. It combines a React frontend with a FastAPI backend to support single, set, and delta requirement review; Jama-linked selection and approved write-back; standards lookup; review history; and document search and chat.
 
-> **Architecture status:** This document describes the target architecture. The
-> implementation-status table in §13 identifies capabilities that are currently
-> implemented, in progress, or planned.
+> **Architecture status:** This document describes the current implementation.
+> Optional integrations and unimplemented areas are called out explicitly; see
+> §13 for a compact status summary.
 
 ## 1. System goals
 
@@ -56,9 +56,8 @@ The frontend is a single-page application built with React and TypeScript.
 
 ### Primary routes
 
-- `/` - Launchpad
-- `/radia-ai` - Radia AI Resources
-- `/workspace` - Main application workspace
+- `/` - Launchpad with links to the available tools
+- `/workspace` - Reviewer home
 - `/review/requirement` - Single requirement review
 - `/review/set` - Review multiple requirements parsed from a PDF
 - `/review/delta` - Delta review
@@ -67,8 +66,8 @@ The frontend is a single-page application built with React and TypeScript.
 - `/chat` - Document Q&A
 - `/search` - Search
 - `/documents` - Indexed document inventory and details
-- `/settings` - Personalization, Jama account linking, and document ingestion controls
-- `/jama-roundtrip` - Jama roundtrip feature entry point (currently a placeholder)
+- `/settings` - Personalization, Jama account linking, and role-gated ingestion controls
+- `/jama-roundtrip` - Reserved Jama roundtrip page; currently a placeholder
 
 ### Frontend behavior
 
@@ -79,8 +78,11 @@ The frontend is a single-page application built with React and TypeScript.
 - Clear review actions to reset stored review state
 - Result presentation focused on score, category breakdown, one final recommended requirement, and expandable supporting evidence
 - Set review presents results independently for each parsed requirement and reports partial completion
+- Jama requirements can be selected as review inputs; a saved reviewer decision can authorize a guarded Description-only write-back
+- Review history records findings, dispositions, recommendation decisions, and Jama write results
+- Review reports can be exported to PDF
 - Chat supports streamed responses as well as the standard response endpoint
-- Settings include per-user Jama account linking and role-gated SharePoint ingestion
+- Settings include per-user Jama account linking, role-gated ingestion, and personal UI preferences
 
 ## 4. Backend architecture
 
@@ -207,6 +209,34 @@ layer, not as another search document: it is not indexed in Azure AI Search.
   labelled "Skillz not applied".
 - Every recommendation records the Skillz package, revision, content hash and
   SharePoint URL, plus the full text of every rule it cites.
+
+### 5.3 Jama selection and approved write-back
+
+Users can link their own Jama API credentials in Settings, search projects and
+requirements visible to that account, and load a requirement into an individual
+review. The review history records its Jama item ID and modified timestamp so a
+later write can be tied to the exact source item and version.
+
+Writing is an explicit, decision-gated action:
+
+1. The reviewer saves one of three decisions on the final recommendation:
+   **Ready to replace**, **Accept, but modify**, or **Reject**.
+2. The write action uses the saved decision, not arbitrary Description text sent
+   by the client. Ready-to-replace writes the synthesized Description;
+   accept-but-modify writes the reviewer's saved modified Description. A rejected
+   recommendation is never written.
+3. Before writing, the service checks the Jama item's modification timestamp
+   against the version captured by the review (or the most recent successful
+   write). A changed source produces a conflict instead of overwriting newer
+   work.
+4. Only the Jama Description field is changed. The write is made with the
+   signed-in user's linked credentials, so Jama applies that user's permissions.
+5. The successful write, decision, writer, time, Jama item, and written text are
+   persisted with the review history.
+
+This is single-item, reviewer-approved write-back within the review workflow. It
+does not implement bulk import/export or automatic synchronization; the separate
+`/jama-roundtrip` page remains a placeholder.
 
 ### Set review
 
@@ -398,6 +428,7 @@ Stored data includes:
 - review ID
 - workflow type
 - subject ID
+- Jama item ID and source modification timestamp, when the review was started from Jama
 - timestamp
 - overall result
 - completion record
@@ -405,6 +436,7 @@ Stored data includes:
 - category results
 - determinism snapshot
 - disposition records
+- final recommendation decision and any Jama write record
 
 Users can apply dispositions to findings:
 
@@ -416,7 +448,7 @@ Review history persists across deployments and serverless invocations via Azure 
 
 ## 10. Document and RAG surfaces
 
-The target architecture includes these document-centric workflows:
+The implemented document-centric workflows include:
 
 - chat over indexed content
 - document search (keyword / vector / hybrid)
@@ -440,11 +472,17 @@ depends on this index being populated: with an empty index, reviews return
 
 ## 10.1 MCP (Model Context Protocol) engineering-data chat integration
 
-Chat can optionally ground an answer in live engineering-system data (Jama today;
-Jira/Confluence remain on hold) by calling read-only tools on the separately
-deployed [`mcp-radia`](../mcp-radia/README.md) server, instead of relying only on
-the indexed-document RAG pipeline above. **Disabled by default** (`MCP_ENABLED=false`);
-when disabled, chat behaves exactly as described in section 10.
+Chat can optionally ground an answer in live Jama data by calling read-only tools
+on the separately deployed [`mcp-radia`](../mcp-radia/README.md) server, instead
+of relying only on the indexed-document RAG pipeline above. **Disabled by
+default** (`MCP_ENABLED=false`); when disabled, chat behaves exactly as described
+in section 10.
+
+The standalone MCP server also implements Jira and Confluence tools, but Radia AI
+chat does not allow them: the chat allowlist is configured for Jama, and
+per-user Atlassian account linking is not implemented. Direct MCP deployments
+can configure the server's shared Atlassian credentials separately; see its
+README. Vitech GENESYS remains unimplemented.
 
 The two pipelines are never mixed. Users opt in per conversation using the
 **Radia AI** switch at the right of the Chat header (on both the page and widget).
@@ -470,7 +508,8 @@ Browser (signed-in user)
        -> intersects with the server-side allowlist (MCP_ALLOWED_TOOLS)
        -> validates the model's requested arguments against the tool's own JSON Schema
           (list_related_items is narrowed to system="jama" for chat)
-       -> calls mcp-radia over Streamable HTTP (service bearer token + internal network)
+       -> calls mcp-radia over Streamable HTTP (service bearer token; network
+          isolation depends on the deployment path)
        -> mcp-radia calls Jama as the signed-in user's own linked account, if linked
           (jama_* tools and list_related_items alike)
   -> grounded answer (+ sources, used_mcp) returned to the chat UI, unchanged SSE/JSON shape
@@ -505,9 +544,10 @@ overall deadline, never executes a tool outside the allowlist regardless of what
     token is the *only* thing standing between the internet and whatever Jama
     data it is configured to reach. This tradeoff is accepted for demo
     purposes only; see the Vercel walkthrough below for what that implies.
-- Jira and Confluence linking is **on hold**: the Settings page shows a disabled
-  "Link Atlassian account" placeholder, and no Jira/Confluence tools are in the
-  default allowlist.
+- Jira and Confluence tools are implemented in the standalone MCP server, but
+  their use from Radia AI chat is **on hold** because the backend has no
+  per-user Atlassian account linking. Settings shows the disabled "Link
+  Atlassian account" control; chat's allowlist excludes those tools.
 
 ### Failure handling
 
@@ -694,7 +734,10 @@ Steps:
 | Microsoft Entra ID authentication and authorization | Implemented | SPA sign-in with MSAL; API validates Entra access tokens (RS256/JWKS, issuer, audience, expiry, tenant, scope) and enforces `Radia.User` / `Radia.Admin` app roles on every non-public endpoint. Local/test environments may use a synthetic user; deployed environments fail closed. See [authentication.md](./authentication.md). |
 | Per-user Jama access | Implemented | Each user links their own Jama API credentials (encrypted at rest); all Jama calls run as that user so Jama enforces their project permissions. Review history is private per user. |
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
-| MCP chat integration (Jama) | Implemented, disabled by default | Bounded tool-calling loop over a separately deployed `mcp-radia` server; server-side allowlist + schema validation + per-user Jama credential forwarding. Jira/Confluence tools and Atlassian account linking are on hold (Settings shows a disabled placeholder). Deployable to Vercel (demo; bearer-token-only, no network isolation - see section 11) or Azure Container Apps (production posture; internal-only ingress). |
+| Jama requirement selection and approved Description write-back | Implemented | Uses each user's linked Jama credentials; write-back requires a saved accepting decision, changes only Description, checks for intervening Jama edits, and records the result in review history. This does not implement bulk roundtrip or synchronization. |
+| MCP chat integration (Jama) | Implemented, disabled by default | Bounded tool-calling loop over a separately deployed `mcp-radia` server; server-side allowlist + schema validation + per-user Jama credential forwarding. |
+| Standalone MCP server tools | Implemented for Jama, Jira, Confluence; GENESYS unimplemented | Eight read-only tools across Jama, Jira, Confluence, and cross-system linking; Jira/Confluence are not allowed in Radia AI chat, and Atlassian per-user linking remains on hold. |
+| Jama Roundtrip page | Placeholder | No bulk roundtrip, synchronization, or reporting implementation. |
 
 ## 14. Summary
 

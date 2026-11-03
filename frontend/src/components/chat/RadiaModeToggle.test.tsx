@@ -46,9 +46,11 @@ describe.each(['page', 'widget'] as const)('Radia AI switch in the %s', (surface
     const { unmount } = renderChat();
     const toggle = screen.getByRole('switch', { name: 'Radia AI mode' });
     expect(toggle).not.toBeChecked();
+    expect(screen.getByText('OFF')).toBeVisible();
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft question' } });
     fireEvent.click(toggle);
     expect(toggle).toBeChecked();
+    expect(screen.getByText('ON')).toBeVisible();
     expect(mocks.sendMessage).not.toHaveBeenCalled();
     expect(screen.getByPlaceholderText('Ask about engineering data…')).toHaveValue('Draft question');
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
@@ -77,6 +79,20 @@ describe.each(['page', 'widget'] as const)('Radia AI switch in the %s', (surface
     mocks.isStreaming = true;
     renderChat();
     expect(screen.getByRole('switch', { name: 'Radia AI mode' })).toBeDisabled();
+  });
+
+  it('shows a hover hint for the current mode', async () => {
+    renderChat();
+    const label = screen.getByText('Radia AI').closest('label');
+    expect(label).not.toBeNull();
+    if (!label) throw new Error('Radia AI toggle label is missing');
+    fireEvent.mouseOver(label);
+    expect(await screen.findByRole('tooltip'))
+      .toHaveTextContent('Turn it on to connect to Jama contents');
+
+    fireEvent.click(screen.getByRole('switch', { name: 'Radia AI mode' }));
+    expect(screen.getByRole('tooltip'))
+      .toHaveTextContent('Turn it off to switch back to Radia Chatbot');
   });
 });
 

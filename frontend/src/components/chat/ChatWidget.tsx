@@ -147,10 +147,6 @@ export function ChatWidget() {
                 sx={{
                   bgcolor: 'primary.main',
                   color: 'primary.contrastText',
-                  '& .MuiSwitch-switchBase.Mui-checked': { color: 'primary.contrastText' },
-                  '& .MuiSwitch-track, & .MuiSwitch-switchBase.Mui-checked + .MuiSwitch-track': {
-                    bgcolor: 'primary.contrastText',
-                  },
                 }}
               >
                 <Box display="flex" alignItems="center" gap={0.5}>
@@ -188,7 +184,7 @@ export function ChatWidget() {
               </Box>
 
               {/* Conversation area */}
-              <ChatConversation key={openCount} padding={1.5}>
+              <ChatConversation key={openCount} padding={1.5} reduceMotion={reduceMotion}>
                 {history.length === 0 && (
                   <Box
                     display="flex"

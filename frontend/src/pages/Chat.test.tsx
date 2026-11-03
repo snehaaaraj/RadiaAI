@@ -4,6 +4,10 @@ import type { ChatData, ChatRequest } from '@/types/api';
 import type { UseChatStreamHandlers } from '@/hooks/useChatStream';
 import Chat from './Chat';
 
+vi.mock('@/context/useAppContext', () => ({
+  useAppContext: () => ({ motionPreference: 'full' }),
+}));
+
 const mocks = vi.hoisted(() => ({
   sendMessage: vi.fn<(request: ChatRequest, handlers: UseChatStreamHandlers) => void>(),
   setHistory: vi.fn(),
