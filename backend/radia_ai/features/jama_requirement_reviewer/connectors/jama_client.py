@@ -28,6 +28,7 @@ import re
 import threading
 import time
 from dataclasses import dataclass, field
+from json import JSONDecodeError
 from typing import Any, cast
 
 import httpx
@@ -60,6 +61,24 @@ _MAX_PAGE_SIZE = 50
 
 _TAG_RE = re.compile(r"<[^>]+>")
 _WS_RE = re.compile(r"[ \t\r\f\v]+")
+
+
+def _jama_error_message(response: httpx.Response) -> str | None:
+    """Extract only Jama's error message, not item data or the full response."""
+    try:
+        payload = response.json()
+    except (JSONDecodeError, UnicodeDecodeError):
+        return None
+    if not isinstance(payload, dict):
+        return None
+    meta = payload.get("meta")
+    if not isinstance(meta, dict):
+        return None
+    message = meta.get("message")
+    if not isinstance(message, str) or not message.strip():
+        return None
+    normalized = " ".join(message.split())
+    return normalized if len(normalized) <= 1000 else normalized[:1000] + "..."
 
 
 @dataclass(frozen=True)
@@ -284,16 +303,22 @@ class JamaClient:
                     "changed by someone else. Unlock the item in Jama and try again.",
                     detail={"path": path, "jama_status_code": status_code},
                 ) from exc
+            jama_message = _jama_error_message(exc.response)
+            message = f"Jama API returned HTTP {status_code} for {method} {path}."
+            detail = {
+                "request_method": method,
+                "request_content_type": content_type,
+                "response_content_type": exc.response.headers.get("content-type", ""),
+            }
+            if jama_message:
+                message += f" {jama_message}"
+                detail["jama_message"] = jama_message
             raise JamaServiceError(
-                f"Jama API returned HTTP {status_code} for {method} {path}.",
+                message,
                 operation=path,
                 status_code=status_code,
                 original_error=str(exc),
-                detail={
-                    "request_method": method,
-                    "request_content_type": content_type,
-                    "response_content_type": exc.response.headers.get("content-type", ""),
-                },
+                detail=detail,
             ) from exc
         except httpx.HTTPError as exc:
             raise JamaServiceError(

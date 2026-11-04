@@ -14,6 +14,7 @@ from radia_ai.features.jama_requirement_reviewer.connectors import jama_client a
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
     JamaApiCredentials,
     JamaClient,
+    _jama_error_message,
     _strip_html,
     plain_text_to_jama_html,
 )
@@ -98,6 +99,34 @@ def test_strip_html_normalizes_rich_text() -> None:
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize(
+    ("body", "expected"),
+    [
+        ({"meta": {"message": " Invalid\n patch\tpath. "}}, "Invalid patch path."),
+        ({"meta": {"message": "x" * 1001}}, "x" * 1000 + "..."),
+        ({"meta": {"message": " "}}, None),
+        ({"meta": {"message": ["Private data"]}}, None),
+        ({"meta": {"message": None}}, None),
+        ({"meta": "Private data"}, None),
+        ({"meta": None}, None),
+        ({"data": {"description": "Private data"}}, None),
+        ([], None),
+        (None, None),
+    ],
+)
+def test_jama_error_message_only_extracts_bounded_meta_message(
+    body: Any, expected: str | None
+) -> None:
+    assert _jama_error_message(httpx.Response(400, json=body)) == expected
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("body", [b"", b"<html>Gateway error</html>", b"{invalid", b"\xff"])
+def test_jama_error_message_ignores_non_json_bodies(body: bytes) -> None:
+    assert _jama_error_message(httpx.Response(400, content=body)) is None
+
+
+@pytest.mark.unit
 @pytest.mark.parametrize("patch_status", [200, 400, 415, 500])
 def test_update_description_http_contract(
     monkeypatch: pytest.MonkeyPatch, patch_status: int
@@ -111,7 +140,13 @@ def test_update_description_http_contract(
                 return httpx.Response(415, text="Unsupported Media Type")
             if patch_status == 200:
                 return httpx.Response(200, json={})
-            return httpx.Response(patch_status, text="Private upstream response")
+            return httpx.Response(
+                patch_status,
+                json={
+                    "meta": {"message": "The requested field cannot be updated."},
+                    "data": {"description": "Private upstream response"},
+                },
+            )
         return httpx.Response(
             200,
             json={
@@ -141,12 +176,16 @@ def test_update_description_http_contract(
     else:
         with pytest.raises(JamaServiceError) as error:
             client.update_description(101, "Updated")
-        assert error.value.message == f"Jama API returned HTTP {patch_status} for PATCH items/101."
+        assert error.value.message == (
+            f"Jama API returned HTTP {patch_status} for PATCH items/101. "
+            "The requested field cannot be updated."
+        )
         assert error.value.detail["jama_status_code"] == patch_status
         assert error.value.detail["operation"] == "items/101"
         assert error.value.detail["request_method"] == "PATCH"
         assert error.value.detail["request_content_type"] == "application/json"
-        assert error.value.detail["response_content_type"].startswith("text/plain")
+        assert error.value.detail["response_content_type"] == "application/json"
+        assert error.value.detail["jama_message"] == "The requested field cannot be updated."
         assert "Private upstream response" not in str(error.value.detail)
         assert [request.method for request in requests] == ["PATCH"]
 
