@@ -232,6 +232,7 @@ class JamaClient:
         *,
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | list[Any] | None = None,
+        content_type: str = "application/json",
     ) -> dict[str, Any]:
         """
         Perform an authenticated request against the REST base and return parsed JSON.
@@ -249,7 +250,11 @@ class JamaClient:
                     url,
                     params=params,
                     json=json,
-                    headers={"Accept": "application/json", **headers},
+                    headers={
+                        "Accept": "application/json",
+                        "Content-Type": content_type,
+                        **headers,
+                    },
                     timeout=self._settings.timeout_seconds,
                 )
                 resp.raise_for_status()
@@ -412,6 +417,7 @@ class JamaClient:
                     "value": plain_text_to_jama_html(description),
                 }
             ],
+            content_type="application/json-patch+json",
         )
         return self.get_requirement(item_id)
 
