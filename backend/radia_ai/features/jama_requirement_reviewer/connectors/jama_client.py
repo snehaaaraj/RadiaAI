@@ -285,10 +285,15 @@ class JamaClient:
                     detail={"path": path, "jama_status_code": status_code},
                 ) from exc
             raise JamaServiceError(
-                "Jama API returned an error response.",
+                f"Jama API returned HTTP {status_code} for {method} {path}.",
                 operation=path,
                 status_code=status_code,
                 original_error=str(exc),
+                detail={
+                    "request_method": method,
+                    "request_content_type": content_type,
+                    "response_content_type": exc.response.headers.get("content-type", ""),
+                },
             ) from exc
         except httpx.HTTPError as exc:
             raise JamaServiceError(
@@ -406,6 +411,7 @@ class JamaClient:
         """Replace only the Description field of an item and return the updated item.
 
         Uses a JSON Patch so no other field (name, rationale, status, ...) is touched.
+        Jama expects application/json, not application/json-patch+json.
         """
         self._request(
             "PATCH",
@@ -417,7 +423,6 @@ class JamaClient:
                     "value": plain_text_to_jama_html(description),
                 }
             ],
-            content_type="application/json-patch+json",
         )
         return self.get_requirement(item_id)
 

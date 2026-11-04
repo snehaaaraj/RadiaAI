@@ -31,6 +31,28 @@ format request-validation failures as `VALIDATION_ERROR`, and return a generic
 internally. Request IDs are included in responses and propagated into structured
 logs.
 
+#### Debugging Jama writes
+
+The Jama write alert displays the upstream HTTP status, method, and resource
+when Jama returns an otherwise unclassified HTTP error. In browser DevTools,
+filter Network requests for `jama-write` and inspect the failed POST's Response.
+Use `request_id` to locate the matching `domain_exception` in backend logs.
+`error.detail` includes `jama_status_code`, `operation`, `request_method`,
+`request_content_type`, and `response_content_type`. The application's HTTP 502
+is a gateway error; `jama_status_code` identifies Jama's actual rejection.
+
+Jama item PATCH requests use `Content-Type: application/json` with a JSON Patch
+array, as in the
+[Jama-maintained Python client's `patch_item`](https://github.com/jamasoftware-ps/py-jama-rest-client/blob/master/py_jama_rest_client/client.py).
+Using `application/json-patch+json` can cause HTTP 415.
+
+Upstream response bodies are not copied into logs or API errors because they
+may contain private requirement data. When the status and metadata are not
+enough, reproduce against a test item with the backend debugger paused in
+`JamaClient._request`'s `HTTPStatusError` handler and inspect
+`exc.response.text` locally. Never share credentials, authorization headers,
+cookies, or unredacted response bodies.
+
 ### Frontend errors
 
 #### ErrorDisplay component (`frontend/src/components/ErrorDisplay.tsx`)
