@@ -3,14 +3,17 @@
 from collections.abc import Iterator
 from typing import Any
 
+import httpx
 import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import JamaSettings
+from radia_ai.features.jama_requirement_reviewer.connectors import jama_client as jama_client_module
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
     JamaApiCredentials,
     JamaClient,
     _strip_html,
+    plain_text_to_jama_html,
 )
 from radia_ai.features.jama_requirement_reviewer.dependencies.container import get_jama_service
 from radia_ai.features.jama_requirement_reviewer.services.jama_service import JamaService
@@ -90,6 +93,50 @@ def jama_client(test_app) -> Iterator[None]:
 def test_strip_html_normalizes_rich_text() -> None:
     result = _strip_html("<p>The system <b>shall</b> stop within 50&nbsp;m.</p>")
     assert result == "The system shall stop within 50\xa0m."
+
+
+@pytest.mark.unit
+def test_update_description_sends_json_patch_media_type(monkeypatch: pytest.MonkeyPatch) -> None:
+    requests: list[httpx.Request] = []
+
+    def handle_request(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if request.method == "PATCH":
+            return httpx.Response(200, json={})
+        return httpx.Response(
+            200,
+            json={
+                "data": {
+                    "id": 101,
+                    "project": 1,
+                    "fields": {"name": "Requirement", "description": "<p>Updated</p>"},
+                }
+            },
+        )
+
+    transport = httpx.MockTransport(handle_request)
+    original_client = httpx.Client
+
+    class MockHttpClient(original_client):
+        def __init__(self, **kwargs: Any) -> None:
+            super().__init__(transport=transport, **kwargs)
+
+    monkeypatch.setattr(jama_client_module.httpx, "Client", MockHttpClient)
+    client = JamaClient(_configured_settings(), JamaApiCredentials("cid", "secret"))
+    monkeypatch.setattr(client, "_auth_headers", lambda _: {"Authorization": "Bearer token"})
+
+    client.update_description(101, "Updated")
+
+    patch_request = next(request for request in requests if request.method == "PATCH")
+    assert patch_request.headers["content-type"] == "application/json-patch+json"
+    assert (
+        patch_request.read()
+        == (
+            '[{"op":"replace","path":"/fields/description","value":"'
+            + plain_text_to_jama_html("Updated")
+            + '"}]'
+        ).encode()
+    )
 
 
 @pytest.mark.unit

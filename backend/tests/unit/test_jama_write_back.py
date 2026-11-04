@@ -50,6 +50,7 @@ class _FakeJamaClient(JamaClient):
         *,
         params: dict[str, Any] | None = None,
         json: dict[str, Any] | list[Any] | None = None,
+        content_type: str = "application/json",
     ) -> dict[str, Any]:
         assert path == f"items/{ITEM_ID}", path
         if method == "GET":
