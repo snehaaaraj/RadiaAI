@@ -129,11 +129,14 @@ def test_update_description_sends_json_patch_media_type(monkeypatch: pytest.Monk
 
     patch_request = next(request for request in requests if request.method == "PATCH")
     assert patch_request.headers["content-type"] == "application/json-patch+json"
-    assert patch_request.read() == (
-        '[{"op":"replace","path":"/fields/description","value":"'
-        + plain_text_to_jama_html("Updated")
-        + '"}]'
-    ).encode()
+    assert (
+        patch_request.read()
+        == (
+            '[{"op":"replace","path":"/fields/description","value":"'
+            + plain_text_to_jama_html("Updated")
+            + '"}]'
+        ).encode()
+    )
 
 
 @pytest.mark.unit
