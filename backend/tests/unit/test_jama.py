@@ -1,5 +1,6 @@
 """Unit tests for the Jama Connect integration endpoints."""
 
+import json
 from collections.abc import Iterator
 from typing import Any
 
@@ -8,6 +9,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import JamaSettings
+from app.core.exceptions import JamaServiceError
 from radia_ai.features.jama_requirement_reviewer.connectors import jama_client as jama_client_module
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
     JamaApiCredentials,
@@ -96,13 +98,20 @@ def test_strip_html_normalizes_rich_text() -> None:
 
 
 @pytest.mark.unit
-def test_update_description_sends_json_patch_media_type(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("patch_status", [200, 400, 415, 500])
+def test_update_description_http_contract(
+    monkeypatch: pytest.MonkeyPatch, patch_status: int
+) -> None:
     requests: list[httpx.Request] = []
 
     def handle_request(request: httpx.Request) -> httpx.Response:
         requests.append(request)
         if request.method == "PATCH":
-            return httpx.Response(200, json={})
+            if request.headers["content-type"] != "application/json":
+                return httpx.Response(415, text="Unsupported Media Type")
+            if patch_status == 200:
+                return httpx.Response(200, json={})
+            return httpx.Response(patch_status, text="Private upstream response")
         return httpx.Response(
             200,
             json={
@@ -125,18 +134,31 @@ def test_update_description_sends_json_patch_media_type(monkeypatch: pytest.Monk
     client = JamaClient(_configured_settings(), JamaApiCredentials("cid", "secret"))
     monkeypatch.setattr(client, "_auth_headers", lambda _: {"Authorization": "Bearer token"})
 
-    client.update_description(101, "Updated")
+    if patch_status == 200:
+        updated = client.update_description(101, "Updated")
+        assert updated.id == 101
+        assert [request.method for request in requests] == ["PATCH", "GET"]
+    else:
+        with pytest.raises(JamaServiceError) as error:
+            client.update_description(101, "Updated")
+        assert error.value.message == f"Jama API returned HTTP {patch_status} for PATCH items/101."
+        assert error.value.detail["jama_status_code"] == patch_status
+        assert error.value.detail["operation"] == "items/101"
+        assert error.value.detail["request_method"] == "PATCH"
+        assert error.value.detail["request_content_type"] == "application/json"
+        assert error.value.detail["response_content_type"].startswith("text/plain")
+        assert "Private upstream response" not in str(error.value.detail)
+        assert [request.method for request in requests] == ["PATCH"]
 
     patch_request = next(request for request in requests if request.method == "PATCH")
-    assert patch_request.headers["content-type"] == "application/json-patch+json"
-    assert (
-        patch_request.read()
-        == (
-            '[{"op":"replace","path":"/fields/description","value":"'
-            + plain_text_to_jama_html("Updated")
-            + '"}]'
-        ).encode()
-    )
+    assert patch_request.headers["content-type"] == "application/json"
+    assert json.loads(patch_request.read()) == [
+        {
+            "op": "replace",
+            "path": "/fields/description",
+            "value": plain_text_to_jama_html("Updated"),
+        }
+    ]
 
 
 @pytest.mark.unit
