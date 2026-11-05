@@ -1,0 +1,12 @@
+# Used because the frontend image builds from the repository root: send only what it needs.
+*
+!frontend
+!backend/app/VERSION
+frontend/node_modules
+frontend/dist
+frontend/coverage
+frontend/.env
+frontend/.env.*
+!frontend/.env.example
+!frontend/.env.production.example
+frontend/*.tsbuildinfo

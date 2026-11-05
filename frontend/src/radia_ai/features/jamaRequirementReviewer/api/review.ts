@@ -13,8 +13,12 @@ import type {
   StandardsResponse,
 } from '@/types/api';
 
-/** A review now also synthesizes the final recommendation, so it can take longer than the default. */
-const REQUIREMENT_REVIEW_TIMEOUT_MS = 300_000;
+/**
+ * A review also synthesizes the final recommendation, so it can take longer than the default.
+ * Kept just under Azure Container Apps' 240s ingress limit so the browser reports a timeout
+ * itself instead of a gateway error.
+ */
+const REQUIREMENT_REVIEW_TIMEOUT_MS = 230_000;
 
 export async function reviewRequirement(
   payload: RequirementReviewInput

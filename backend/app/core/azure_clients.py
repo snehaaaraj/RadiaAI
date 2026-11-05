@@ -48,6 +48,12 @@ if TYPE_CHECKING:
 
 logger = get_logger(__name__)
 
+# Container Apps ingress closes a request after 240s. Bound a single OpenAI call
+# (including the SDK's own retries) so a slow review fails cleanly instead of
+# being cut off by the platform while the server keeps working.
+_OPENAI_TIMEOUT_SECONDS = 90.0
+_OPENAI_MAX_RETRIES = 1
+
 _SEARCH_UPLOAD_BATCH_SIZE = 100
 
 
@@ -65,6 +71,8 @@ class OpenAIClient:
             azure_endpoint=str(settings.endpoint),
             api_key=settings.api_key,
             api_version=settings.api_version,
+            timeout=_OPENAI_TIMEOUT_SECONDS,
+            max_retries=_OPENAI_MAX_RETRIES,
         )
 
     def generate_embeddings(self, texts: list[str]) -> list[list[float]]:

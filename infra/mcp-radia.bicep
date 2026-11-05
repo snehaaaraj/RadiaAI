@@ -29,8 +29,8 @@ param ingressInternalOnly bool = true
 @description('Minimum number of replicas. 1 keeps a warm instance so chat requests do not pay a cold-start MCP handshake.')
 param minReplicas int = 1
 
-@description('Maximum number of replicas.')
-param maxReplicas int = 3
+@description('Maximum number of replicas. Keep 1 while mcp-radia runs in stateful mode: the backend MCP client pins an Mcp-Session-Id and does not re-initialize if a later request lands on another replica.')
+param maxReplicas int = 1
 
 var logAnalyticsName = '${namePrefix}-logs'
 var environmentName = '${namePrefix}-env'
