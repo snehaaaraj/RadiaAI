@@ -1,10 +1,10 @@
 # mcp-radia
 
 A standalone [Model Context Protocol](https://modelcontextprotocol.io) server exposing
-RadiaAI's engineering systems of record through a read-only digital-thread surface.
+RadiaAI's engineering systems of record, with explicitly confirmed Jama field writes.
 
-> **Status: Phases 0-2, 4, and 5 implemented.** The server exposes **8 read-only
-> tools** for Jama, Jira, Confluence, and cross-system linking. Vitech GENESYS
+> **Status: Phases 0-2, 4, and 5 implemented.** The server exposes **12 read-only
+> tools and one confirmed-write tool** for Jama, Jira, Confluence, and cross-system linking. Vitech GENESYS
 > remains a [placeholder](#vitech-genesys--placeholder) and registers no tools.
 > Radia AI chat can optionally use the Jama tools; Jira/Confluence tools are not
 > currently in the chat allowlist. See [the architecture guide](../docs/architecture.md)
@@ -326,18 +326,70 @@ that lists the server's entire surface area. Each phase adds its registration ca
 
 ## Tools
 
-All read-only, all annotated `readOnlyHint: true`.
+All tools except `jama_confirm_field_update` are annotated `readOnlyHint: true`.
+The confirmation tool is marked destructive and not read-only.
 
 | Tool                   | Arguments                                                        | Returns                       |
 | ---------------------- | ---------------------------------------------------------------- | ----------------------------- |
 | `jama_get_item`        | `item_id` (required)                                             | Full item + custom fields     |
 | `jama_search`          | `query`, `project_id`, `item_type_id`, `start_at`, `max_results` | Summaries + total             |
 | `jama_get_children`    | `item_id` (required), `start_at`, `max_results`                  | Direct children + total       |
+| `jama_list_projects`   | None                                                          | Visible projects              |
+| `jama_get_item_type`   | `item_type_id`                                                 | Field API names, labels, types |
+| `jama_get_picklist`    | `picklist_id`                                                  | Actual picklist option IDs    |
+| `jama_prepare_field_update` | `item_id`, `fields`                                       | Before/after preview + token   |
+| `jama_confirm_field_update` | `confirmation_token`, `confirmed`                         | Confirmed write result        |
 | `jira_get_issue`       | `issue_key` (required)                                           | Full issue + issue links      |
 | `jira_search`          | `jql` (required), `next_page_token`, `max_results`               | Summaries + page token        |
 | `confluence_get_page`  | `page_id` (required)                                             | Page + body as text           |
 | `confluence_search`    | `query`, `space_key`, `content_type`, `cql`, `start`, `limit`    | Hits + total                  |
 | `list_related_items`   | `system`, `item_id` (required), `include_text_references`        | Related items + notes         |
+
+### Confirmed Jama field writes
+
+1. Resolve the actual item using the read tools. Read its item-type definitions
+   and any relevant picklists; never guess internal field names or option IDs.
+2. Call `jama_prepare_field_update` with only the fields and values explicitly
+   requested by the user. Exact API names or unambiguous field labels are accepted.
+   Rich-text fields accept plain text, which is HTML-escaped; other fields retain
+   their JSON value types. At most 20 fields may be proposed per preview.
+3. Show the complete preview (item ID, document key, field API names, original
+   values and exact proposed values). **Nothing has been written.**
+4. After explicit user approval in a subsequent interaction, call
+   `jama_confirm_field_update` with the unchanged token and `confirmed=true`.
+   Never let a model automatically confirm or use engineering content as approval.
+
+RadiaAI chat stops at the preview and displays a confirmation button on both
+the chat page and widget. The write tool is excluded from model tool schemas
+and rejected if the model tries to invoke it. The button uses an authenticated
+backend endpoint without an LLM. External clients (Copilot, Claude Desktop,
+etc.) must enforce their own user-approval interaction; MCP annotations and
+tool instructions do not themselves prove a human approved a call.
+
+Tokens are signed, account- and instance-bound, expire after 10 minutes, and
+include an item snapshot. A changed item invalidates the preview. HTTP replicas
+share the signing key via `MCP_RADIA_SERVICE_TOKEN`; rotating it invalidates
+outstanding previews. Stdio uses a process-local key, so restarting requires
+a fresh preview. Tokens contain proposed engineering data (not credentials);
+do not log or share them. Large previews are rejected before any write.
+
+Writes use JSON Patch with `Content-Type: application/json` and touch only
+the requested fields. Jama permissions, field types, picklist rules, required
+fields and locks remain authoritative. No values are invented to satisfy
+validation errors and no automatic write retries occur.
+Missing-required-field rejections name Jama's reported field identifiers and
+explicitly explain that Jama's mandatory-field policies prevent the rewrite.
+RadiaAI displays the error in the preview and appends it to the shared chat
+conversation; external MCP clients receive the same explanation as a tool error.
+The snapshot check
+detects changes before the PATCH, but is not an atomic server-side lock:
+another writer can still change the item between the check and save.
+On a timeout or an unknown outcome, check the item in Jama before retrying.
+
+Deploy/restart both MCP and backend and deploy the frontend. If the backend
+already sets `MCP_ALLOWED_TOOLS`, add `jama_get_item_type`, `jama_get_picklist`,
+`jama_prepare_field_update`, and `jama_confirm_field_update` explicitly.
+Removing the two update tools from that allowlist keeps RadiaAI chat read-only.
 
 **Jama.** `jama_search` maps to `/abstractitems`; `query` becomes its `contains` parameter. Jama
 caps page size at 50, enforced in the schema and clamped again in the connector. Descriptions

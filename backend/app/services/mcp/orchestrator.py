@@ -25,8 +25,10 @@ from urllib.parse import urlparse
 
 import anyio
 from anyio import to_thread
+from pydantic import ValidationError
 
 from app.core.logging import get_logger
+from app.schemas.chat import JamaWritePreview
 from app.services.mcp.client import MCPClientAdapter
 from app.services.mcp.errors import MCPError
 from app.services.mcp.transport import MCPToolDescriptor
@@ -60,6 +62,7 @@ class ToolAugmentedAnswer:
     answer: str
     used_mcp: bool
     sources: list[ToolSource] = field(default_factory=list)
+    jama_write_preview: JamaWritePreview | None = None
 
 
 def _to_openai_tool(descriptor: MCPToolDescriptor) -> dict[str, Any]:
@@ -165,7 +168,7 @@ async def run_chat_with_tools(
         )
         return ToolAugmentedAnswer(answer=answer, used_mcp=False)
 
-    tool_schemas = [_to_openai_tool(t) for t in tools]
+    tool_schemas = [_to_openai_tool(t) for t in tools if t.name != "jama_confirm_field_update"]
     used_mcp = False
     sources: dict[str, ToolSource] = {}
 
@@ -207,6 +210,37 @@ async def run_chat_with_tools(
                 )
 
                 for call in tool_calls:
+                    if call.function.name == "jama_prepare_field_update":
+                        try:
+                            arguments = json.loads(call.function.arguments)
+                            if not isinstance(arguments, dict):
+                                raise ValueError("Preview arguments must be an object.")
+                            result = await mcp_client.call_tool(
+                                "jama_prepare_field_update",
+                                arguments,
+                                jama_client_id=jama_client_id,
+                                jama_client_secret=jama_client_secret,
+                            )
+                            preview = JamaWritePreview.model_validate(result.structured_content)
+                        except ValidationError:
+                            logger.warning("jama_write_preview_invalid_response")
+                            return ToolAugmentedAnswer(
+                                answer="The Jama preview tool returned an invalid response. "
+                                "Nothing was written. Please prepare a new preview.",
+                                used_mcp=used_mcp,
+                            )
+                        except (MCPError, ValueError) as exc:
+                            logger.info("jama_write_preview_failed", error_type=type(exc).__name__)
+                            return ToolAugmentedAnswer(
+                                answer=f"Could not prepare a Jama write: {exc}", used_mcp=used_mcp
+                            )
+                        return ToolAugmentedAnswer(
+                            answer="Review the exact Jama field changes below. Nothing has been written. "
+                            "Confirm to write, or cancel to leave Jama unchanged.",
+                            used_mcp=True,
+                            sources=list(sources.values()),
+                            jama_write_preview=preview,
+                        )
                     result_text, source, success = await _execute_one_tool_call(
                         call,
                         mcp_client=mcp_client,
@@ -268,6 +302,12 @@ async def _execute_one_tool_call(
     an internal hostname, or a secret. Returns ``(message, source, success)``.
     """
     name = call.function.name
+    if name == "jama_confirm_field_update":
+        return (
+            "error: writing requires the user's confirmation button, not a model tool call",
+            None,
+            False,
+        )
     try:
         arguments = json.loads(call.function.arguments or "{}")
         if not isinstance(arguments, dict):

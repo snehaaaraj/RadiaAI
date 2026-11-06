@@ -1,0 +1,17 @@
+# Radia AI ingestion worker (Azure Functions queue trigger + recovery timer).
+# Build context: backend/    docker build -f backend/Dockerfile.worker -t radia-worker backend
+#
+# Run with minReplicas >= 1: the recovery timer must always be running.
+
+FROM mcr.microsoft.com/azure-functions/python:4-python3.12
+
+ENV AzureWebJobsScriptRoot=/home/site/wwwroot \
+    AzureFunctionsJobHost__Logging__Console__IsEnabled=true \
+    PIP_NO_CACHE_DIR=1
+
+COPY requirements.txt /home/site/wwwroot/
+RUN pip install -r /home/site/wwwroot/requirements.txt
+
+COPY host.json function_app.py /home/site/wwwroot/
+COPY app /home/site/wwwroot/app
+COPY radia_ai /home/site/wwwroot/radia_ai

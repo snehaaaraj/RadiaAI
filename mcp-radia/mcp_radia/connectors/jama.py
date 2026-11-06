@@ -1,4 +1,4 @@
-"""Jama Connect REST API connector (read-only).
+"""Jama Connect REST API connector.
 
 A fresh, async implementation written against the Jama REST API directly. It
 deliberately shares no code with the RadiaAI backend's
@@ -20,15 +20,21 @@ while each caller supplies the latter:
 
 The bearer token is cached until shortly before it expires.
 
-Read operations only:
+Operations:
 
   - :meth:`JamaClient.get_item`      -> GET /rest/{version}/items/{id}
   - :meth:`JamaClient.search`        -> GET /rest/{version}/abstractitems
   - :meth:`JamaClient.get_children`  -> GET /rest/{version}/items/{id}/children
   - :meth:`JamaClient.list_projects` -> GET /rest/{version}/projects
+  - :meth:`JamaClient.get_item_type` -> GET /rest/{version}/itemtypes/{id}
+  - :meth:`JamaClient.get_picklist` -> GET /rest/{version}/picklists/{id}
+  - :meth:`JamaClient.patch_fields` -> PATCH /rest/{version}/items/{id}
+
+The tool layer permits PATCH only after an account-bound preview is confirmed.
 """
 
 import asyncio
+import re
 import time
 from typing import Any
 
@@ -250,7 +256,7 @@ class JamaSearchResult(BaseModel):
 
 
 class JamaClient:
-    """Async, read-only client over the Jama Connect REST API."""
+    """Async client over the Jama Connect REST API."""
 
     def __init__(
         self,
@@ -331,9 +337,7 @@ class JamaClient:
             )
         return self._client
 
-    async def _fetch_token(
-        self, client: httpx2.AsyncClient, credentials: JamaCredentials
-    ) -> str:
+    async def _fetch_token(self, client: httpx2.AsyncClient, credentials: JamaCredentials) -> str:
         """Exchange client credentials for a bearer token."""
         try:
             response = await client.post(
@@ -530,6 +534,82 @@ class JamaClient:
         )
 
     # -- public API ---------------------------------------------------------
+
+    async def get_raw_item(self, item_id: int) -> dict[str, Any]:
+        payload = await self._get(f"items/{item_id}")
+        data = payload.get("data")
+        if not isinstance(data, dict) or data.get("id") != item_id:
+            raise ConnectorServiceError(
+                "Jama did not return the requested item.",
+                system=SYSTEM,
+                operation=f"items/{item_id}",
+            )
+        return data
+
+    async def get_item_type(self, item_type_id: int) -> dict[str, Any]:
+        payload = await self._get(f"itemtypes/{item_type_id}")
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise ConnectorServiceError(
+                "Jama did not return item-type field definitions.",
+                system=SYSTEM,
+                operation=f"itemtypes/{item_type_id}",
+            )
+        return data
+
+    async def get_picklist(self, picklist_id: int) -> dict[str, Any]:
+        payload = await self._get(f"picklists/{picklist_id}")
+        data = payload.get("data")
+        if not isinstance(data, dict):
+            raise ConnectorServiceError(
+                "Jama did not return picklist options.",
+                system=SYSTEM,
+                operation=f"picklists/{picklist_id}",
+            )
+        return data
+
+    async def patch_fields(self, item_id: int, patches: list[dict[str, Any]]) -> None:
+        credentials = self._ensure_configured()
+        client = self._get_client()
+        path = f"items/{item_id}"
+        try:
+            response = await client.patch(
+                f"{self._settings.rest_base}/{path}",
+                json=patches,
+                headers={
+                    "Accept": "application/json",
+                    "Content-Type": "application/json",
+                    "Authorization": "Bearer " + await self._bearer_token(client, credentials),
+                },
+            )
+            response.raise_for_status()
+        except httpx2.HTTPStatusError as exc:
+            remote = extract_remote_message(exc.response.text)
+            missing = re.search(
+                r"You must set the following required fields\.\s*fields:\s*(.+)",
+                remote or "",
+                flags=re.IGNORECASE,
+            )
+            if exc.response.status_code == 400 and missing:
+                raise ConnectorServiceError(
+                    f"Jama reports missing mandatory fields: {missing.group(1)}. "
+                    "I cannot rewrite this item because Jama's own mandatory-field policies "
+                    "block the update. No changes were written. Set the correct required "
+                    "values in Jama, or ask a Jama administrator to review the field configuration, "
+                    "then prepare a new preview. I cannot bypass this policy or guess field values.",
+                    system=SYSTEM,
+                    operation=path,
+                    status_code=400,
+                    remote_message=remote,
+                ) from exc
+            self._raise_for_status(exc, path)
+        except httpx2.HTTPError as exc:
+            raise ConnectorServiceError(
+                "Jama write outcome is unknown because the request failed in transit. "
+                "Check the item in Jama before preparing another write. No automatic retry was made.",
+                system=SYSTEM,
+                operation=path,
+            ) from exc
 
     async def get_item(self, item_id: int) -> JamaItem:
         """Read a single Jama item by its numeric id."""

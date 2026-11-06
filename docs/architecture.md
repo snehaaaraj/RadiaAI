@@ -472,7 +472,7 @@ depends on this index being populated: with an empty index, reviews return
 
 ## 10.1 MCP (Model Context Protocol) engineering-data chat integration
 
-Chat can optionally ground an answer in live Jama data by calling read-only tools
+Chat can optionally ground an answer in live Jama data and prepare confirmed field updates
 on the separately deployed [`mcp-radia`](../mcp-radia/README.md) server, instead
 of relying only on the indexed-document RAG pipeline above. **Disabled by
 default** (`MCP_ENABLED=false`); when disabled, chat behaves exactly as described
@@ -514,6 +514,33 @@ Browser (signed-in user)
           (jama_* tools and list_related_items alike)
   -> grounded answer (+ sources, used_mcp) returned to the chat UI, unchanged SSE/JSON shape
 ```
+
+### Confirmed Jama writes
+
+The model can use `jama_get_item_type` and `jama_get_picklist` to resolve real
+field names and option IDs, then `jama_prepare_field_update` to prepare only
+user-requested field changes. A successful preview stops the tool loop and is
+returned as `jama_write_preview` in both JSON and SSE responses. Both chat
+surfaces display the complete before/after values and a confirmation button;
+previews are not persisted in conversation history.
+
+Only the authenticated `POST /api/v1/chat/jama-write` endpoint invokes
+`jama_confirm_field_update`. It requires the preview token and explicit
+confirmation, forwards the current user's linked Jama credentials, and never
+calls an LLM. The confirm tool is omitted from model schemas and independently
+blocked in the model-call executor, even if included in `MCP_ALLOWED_TOOLS`.
+The MCP server validates the signed, account-bound token, its 10-minute expiry
+and the item's current snapshot before sending a field-only PATCH. Jama's
+validation and permission rules remain in force. Writes are never automatically
+retried; ambiguous outcomes require checking Jama. The pre-save snapshot check
+is not an atomic lock against concurrent Jama writers.
+
+Existing deployments must add `jama_get_item_type`, `jama_get_picklist`,
+`jama_prepare_field_update`, and `jama_confirm_field_update` to their explicit
+`MCP_ALLOWED_TOOLS` list to enable this flow. Remove prepare/confirm to disable
+chat writes. The standalone MCP surface also exposes these tools to external
+clients, which must obtain explicit user approval themselves; see
+[the MCP write contract](../mcp-radia/README.md#confirmed-jama-field-writes).
 
 Key modules: [`app/services/mcp/client.py`](../backend/app/services/mcp/client.py)
 (allowlist + schema validation + session reuse), [`transport.py`](../backend/app/services/mcp/transport.py)
@@ -736,7 +763,7 @@ Steps:
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
 | Jama requirement selection and approved Description write-back | Implemented | Uses each user's linked Jama credentials; write-back requires a saved accepting decision, changes only Description, checks for intervening Jama edits, and records the result in review history. This does not implement bulk roundtrip or synchronization. |
 | MCP chat integration (Jama) | Implemented, disabled by default | Bounded tool-calling loop over a separately deployed `mcp-radia` server; server-side allowlist + schema validation + per-user Jama credential forwarding. |
-| Standalone MCP server tools | Implemented for Jama, Jira, Confluence; GENESYS unimplemented | Eight read-only tools across Jama, Jira, Confluence, and cross-system linking; Jira/Confluence are not allowed in Radia AI chat, and Atlassian per-user linking remains on hold. |
+| Standalone MCP server tools | Implemented for Jama, Jira, Confluence; GENESYS unimplemented | Twelve read-only tools and one confirmed Jama field-write tool; Jira/Confluence remain read-only and are not allowed in Radia AI chat. Atlassian per-user linking remains on hold. |
 | Jama Roundtrip page | Placeholder | No bulk roundtrip, synchronization, or reporting implementation. |
 
 ## 14. Summary

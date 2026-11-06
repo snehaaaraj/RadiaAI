@@ -55,13 +55,15 @@ async def test_the_atlassian_tools_are_advertised() -> None:
     }
 
 
-async def test_every_advertised_tool_is_read_only() -> None:
+async def test_atlassian_tools_remain_read_only() -> None:
     server, _, _ = _server_with(json_responder(ISSUE_PAYLOAD), json_responder(PAGE_PAYLOAD))
 
     async with connected_client(server) as session:
         tools = (await session.list_tools()).tools
 
     for tool in tools:
+        if not tool.name.startswith(("jira_", "confluence_")):
+            continue
         assert tool.annotations is not None, tool.name
         assert tool.annotations.read_only_hint is True, tool.name
         assert tool.annotations.destructive_hint is False, tool.name

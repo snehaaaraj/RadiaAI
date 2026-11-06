@@ -17,14 +17,13 @@ def test_build_server_reports_identity(server: MCPServer) -> None:
 
 
 @pytest.mark.unit
-async def test_every_registered_tool_is_read_only(server: MCPServer) -> None:
-    """The server-wide read-only guarantee, asserted across whatever is registered."""
+async def test_only_confirmed_jama_tool_can_write(server: MCPServer) -> None:
     tools = await server.list_tools()
 
     assert tools, "expected at least one tool to be registered"
     for tool in tools:
         assert tool.annotations is not None, f"{tool.name} has no annotations"
-        assert tool.annotations.read_only_hint is True, f"{tool.name} is not marked read-only"
+        assert tool.annotations.read_only_hint is (tool.name != "jama_confirm_field_update")
 
 
 @pytest.mark.unit
@@ -40,6 +39,10 @@ async def test_mcp_client_completes_handshake_and_lists_tools(server: MCPServer)
         "jama_search",
         "jama_get_children",
         "jama_list_projects",
+        "jama_get_item_type",
+        "jama_get_picklist",
+        "jama_prepare_field_update",
+        "jama_confirm_field_update",
         "jira_get_issue",
         "jira_search",
         "confluence_get_page",

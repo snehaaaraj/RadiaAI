@@ -28,7 +28,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useChatStream } from '@/hooks/useChatStream';
 import { useChatHistory } from '@/hooks/useChatHistory';
 import { useAppContext } from '@/context/useAppContext';
-import type { ChatSource } from '@/types/api';
+import type { ChatSource, JamaWritePreview } from '@/types/api';
+import { JamaWriteConfirmation } from '@/components/chat/JamaWriteConfirmation';
 import { MessageText } from '@/components/chat/MessageText';
 import { ChatConversation } from '@/components/chat/ChatConversation';
 import { RadiaModeToggle } from '@/components/chat/RadiaModeToggle';
@@ -49,6 +50,7 @@ export function ChatWidget() {
   const [open, setOpen] = useState(false);
   const [openCount, setOpenCount] = useState(0);
   const [input, setInput] = useState('');
+  const [writePreview, setWritePreview] = useState<JamaWritePreview | null>(null);
   const { history, setHistory, clearHistory } = useChatHistory();
   const [mcpInfoByIndex, setMcpInfoByIndex] = useState<Record<number, McpTurnInfo>>({});
   const { motionPreference } = useAppContext();
@@ -65,6 +67,7 @@ export function ChatWidget() {
   const handleSend = () => {
     const text = input.trim();
     if (!text || isStreaming) return;
+    setWritePreview(null);
 
     const plan = planChatSend(history, text, HISTORY_TURNS_SENT_TO_API);
     const updatedHistory = [...history, { role: 'user' as const, content: text }];
@@ -86,6 +89,7 @@ export function ChatWidget() {
       },
       {
         onDone: (data) => {
+          setWritePreview(data.jama_write_preview ?? null);
           setHistory((prev) => {
             const next = [...prev, { role: 'assistant' as const, content: data.answer }];
             if (data.used_mcp) {
@@ -160,6 +164,7 @@ export function ChatWidget() {
                     checked={isRadiaMode}
                     disabled={isStreaming}
                     onChange={(checked) => {
+                      setWritePreview(null);
                       setHistory((prev) => changeChatMode(prev, checked ? 'radiaai' : 'standards'));
                     }}
                   />
@@ -167,7 +172,7 @@ export function ChatWidget() {
                     <span>
                       <IconButton
                         size="small"
-                        onClick={clearHistory}
+                        onClick={() => { setWritePreview(null); clearHistory(); }}
                         disabled={history.length === 0}
                         sx={{ color: 'inherit' }}
                       >
@@ -262,6 +267,22 @@ export function ChatWidget() {
                     )}
                   </Box>
                 ))}
+
+                {isRadiaMode && writePreview && (
+                  <JamaWriteConfirmation
+                    key={writePreview.confirmation_token}
+                    preview={writePreview}
+                    disabled={isStreaming}
+                    onCancel={() => setWritePreview(null)}
+                    onError={(message) => {
+                      setHistory((prev) => [...prev, { role: 'assistant', content: message }]);
+                    }}
+                    onComplete={(data) => {
+                      setWritePreview(null);
+                      setHistory((prev) => [...prev, { role: 'assistant', content: data.answer }]);
+                    }}
+                  />
+                )}
 
                 {isStreaming && streamingText && (
                   <Box mb={1.5} display="flex" flexDirection="column" alignItems="flex-start">

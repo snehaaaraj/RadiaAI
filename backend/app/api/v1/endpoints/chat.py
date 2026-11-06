@@ -35,7 +35,7 @@ from fastapi import APIRouter, Request, status
 from fastapi.responses import StreamingResponse
 
 from app.core.config import AppSettings
-from app.core.exceptions import ChatTimeoutError
+from app.core.exceptions import ChatTimeoutError, ValidationError
 from app.core.logging import get_logger
 from app.core.security import AuthenticatedUser, RadiaUserDep
 from app.prompts.chat_prompts import (
@@ -46,9 +46,16 @@ from app.prompts.chat_prompts import (
     get_radiaai_system_prompt,
 )
 from app.rag.service import RAGService, RetrievedContext
-from app.schemas.chat import ChatRequest, ChatResponse, ChatSource, CitedChunk
+from app.schemas.chat import (
+    ChatRequest,
+    ChatResponse,
+    ChatSource,
+    CitedChunk,
+    JamaWriteConfirmation,
+)
 from app.schemas.common import APIResponse
 from app.services.mcp.client import MCPClientAdapter
+from app.services.mcp.errors import MCPError
 from app.services.mcp.orchestrator import ToolAugmentedAnswer, run_chat_with_tools
 from radia_ai.features.jama_requirement_reviewer.dependencies.container import (
     JamaAccountServiceDep,
@@ -134,6 +141,7 @@ async def chat(
                 retrieval_count=0,
                 used_mcp=tool_result.used_mcp,
                 sources=[ChatSource(label=s.label, url=s.url) for s in tool_result.sources],
+                jama_write_preview=tool_result.jama_write_preview,
             ),
             request_id=request.state.request_id,
         )
@@ -167,6 +175,47 @@ async def chat(
         retrieval_count=len(context.chunks),
     )
     return APIResponse(data=response, request_id=request.state.request_id)
+
+
+@router.post("/jama-write", response_model=APIResponse[ChatResponse])
+async def confirm_jama_write(
+    body: JamaWriteConfirmation,
+    request: Request,
+    user: RadiaUserDep,
+    mcp_client: MCPClientDep,
+    jama_account_service: JamaAccountServiceDep,
+) -> APIResponse[ChatResponse]:
+    """Confirm a prepared write directly; no model can execute this action."""
+    credentials = jama_account_service.credentials_for(user)
+    if credentials is None:
+        raise ValidationError("Link your Jama account before confirming a write.")
+    try:
+        result = await mcp_client.call_tool(
+            "jama_confirm_field_update",
+            {"confirmation_token": body.confirmation_token, "confirmed": True},
+            jama_client_id=credentials.client_id,
+            jama_client_secret=credentials.client_secret,
+        )
+    except MCPError as exc:
+        raise ValidationError(f"Jama write was not confirmed: {exc}") from exc
+    content = result.structured_content
+    if (
+        not content
+        or content.get("status") != "written"
+        or not isinstance(content.get("item_id"), int)
+    ):
+        raise ValidationError(
+            "The write tool did not report a confirmed outcome. Check the item in Jama before retrying."
+        )
+    return APIResponse(
+        data=ChatResponse(
+            answer=f"Jama confirmed the requested field update to item {content['item_id']}.",
+            model="mcp",
+            retrieval_count=0,
+            used_mcp=True,
+        ),
+        request_id=request.state.request_id,
+    )
 
 
 @router.post(
@@ -495,6 +544,9 @@ async def _stream_radiaai_events(
             "retrieval_count": 0,
             "used_mcp": result.used_mcp,
             "sources": [{"label": s.label, "url": s.url} for s in result.sources],
+            "jama_write_preview": (
+                result.jama_write_preview.model_dump() if result.jama_write_preview else None
+            ),
         },
     )
 

@@ -533,6 +533,156 @@ class _FakeMCPTransport:
         )
 
 
+@pytest.mark.unit
+@pytest.mark.parametrize("confirmed", [True, False])
+def test_confirm_endpoint_calls_write_only_with_explicit_confirmation(client, confirmed):
+    from app.services.mcp.transport import MCPToolCallResult, MCPToolDescriptor
+    from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
+        JamaApiCredentials,
+    )
+
+    calls = []
+
+    class Accounts:
+        def credentials_for(self, user):
+            return JamaApiCredentials("user-client", "user-secret")
+
+    class WriteTransport:
+        async def list_tools(self):
+            return [
+                MCPToolDescriptor(
+                    name="jama_confirm_field_update",
+                    description="",
+                    input_schema={},
+                )
+            ]
+
+        async def call_tool(self, name, arguments, *, extra_headers=None):
+            calls.append((name, arguments, extra_headers))
+            return MCPToolCallResult(
+                text="written",
+                is_error=False,
+                structured_content={"status": "written", "item_id": 42},
+            )
+
+    adapter = MCPClientAdapter(
+        MCPSettings(
+            _env_file=None,
+            enabled=True,
+            server_url="https://mcp.internal/mcp",
+            service_token="tok",
+            allowed_tools=["jama_confirm_field_update"],
+        )
+    )
+    adapter._transport = WriteTransport()
+    dummy = DummyRAGService()
+    app = _install(client, dummy)
+    app.dependency_overrides[get_jama_account_service] = lambda: Accounts()
+    app.dependency_overrides[get_mcp_client] = lambda: adapter
+    try:
+        response = client.post(
+            "/api/v1/chat/jama-write",
+            json={
+                "confirmation_token": "signed",
+                "confirmed": confirmed,
+            },
+        )
+    finally:
+        app.dependency_overrides.pop(get_jama_account_service, None)
+        app.dependency_overrides.pop(get_mcp_client, None)
+    if confirmed:
+        assert response.status_code == 200
+        assert (
+            response.json()["data"]["answer"]
+            == "Jama confirmed the requested field update to item 42."
+        )
+        assert calls == [
+            (
+                "jama_confirm_field_update",
+                {"confirmation_token": "signed", "confirmed": True},
+                {
+                    "X-Radia-Jama-Client-Id": "user-client",
+                    "X-Radia-Jama-Client-Secret": "user-secret",
+                },
+            )
+        ]
+    else:
+        assert response.status_code == 422
+        assert calls == []
+    assert dummy.generate_calls == [] and dummy.retrieve_calls == []
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("stream", [False, True])
+def test_chat_returns_structured_preview_in_both_response_protocols(client, stream):
+    from types import SimpleNamespace
+
+    from app.services.mcp.transport import MCPToolCallResult, MCPToolDescriptor
+
+    preview = {
+        "item_id": 42,
+        "document_key": "SRS-42",
+        "name": "Item",
+        "changes": [{"field": "name", "label": "Name", "before": "Old", "after": "New"}],
+        "confirmation_token": "signed-preview",
+        "expires_at": 2000000000,
+    }
+
+    class PreviewModel:
+        def chat_completion_with_tools(self, *args, **kwargs):
+            return SimpleNamespace(
+                content=None,
+                tool_calls=[
+                    SimpleNamespace(
+                        id="preview",
+                        function=SimpleNamespace(
+                            name="jama_prepare_field_update",
+                            arguments='{"item_id":42,"fields":{"name":"New"}}',
+                        ),
+                    ),
+                ],
+            )
+
+    class PreviewTransport:
+        async def list_tools(self):
+            return [
+                MCPToolDescriptor(name="jama_prepare_field_update", description="", input_schema={})
+            ]
+
+        async def call_tool(self, name, arguments, **kwargs):
+            return MCPToolCallResult(text="preview", is_error=False, structured_content=preview)
+
+    adapter = MCPClientAdapter(
+        MCPSettings(
+            _env_file=None,
+            enabled=True,
+            server_url="https://mcp.internal/mcp",
+            service_token="tok",
+            allowed_tools=["jama_prepare_field_update"],
+        )
+    )
+    adapter._transport = PreviewTransport()
+    app = _install(client, DummyRAGService(openai_client=PreviewModel()))
+    app.dependency_overrides[get_mcp_client] = lambda: adapter
+    try:
+        response = client.post(
+            "/api/v1/chat/stream" if stream else "/api/v1/chat",
+            json={"question": "Set name to New", "mode": "radiaai"},
+        )
+    finally:
+        app.dependency_overrides.pop(get_mcp_client, None)
+    assert response.status_code == 200
+    if stream:
+        data = next(
+            json.loads(frame.split("data: ", 1)[1])
+            for frame in response.text.split("\n\n")
+            if frame.startswith("event: done")
+        )
+    else:
+        data = response.json()["data"]
+    assert data["jama_write_preview"] == preview
+
+
 def _enabled_mcp_client() -> MCPClientAdapter:
     adapter = MCPClientAdapter(
         MCPSettings(

@@ -341,7 +341,7 @@ class MCPSettings(BaseSettings):
     """
     Configuration for the Model Context Protocol (MCP) chat integration.
 
-    Lets the chat pipeline call read-only tools on the ``mcp-radia`` server
+    Lets the chat pipeline call approved tools on the ``mcp-radia`` server
     (Jama today; Jira/Confluence remain on hold). Disabled by default: the
     feature only activates once an operator has verified the deployment's
     authentication and network isolation, per docs/architecture.md.
@@ -390,12 +390,17 @@ class MCPSettings(BaseSettings):
             "jama_search",
             "jama_get_children",
             "jama_list_projects",
+            "jama_get_item_type",
+            "jama_get_picklist",
+            "jama_prepare_field_update",
+            "jama_confirm_field_update",
             "list_related_items",
         ],
         description=(
             "Server-side allowlist. A tool mcp-radia advertises but that is not listed here "
             "is never offered to the model and never executed, regardless of what the model "
-            "requests. Jira/Confluence/linking tools are intentionally excluded while "
+            "requests. The confirmation tool is additionally excluded from model calls "
+            "and executed only through explicit user confirmation. Jira/Confluence tools are excluded while "
             "per-user Atlassian linking remains on hold."
         ),
     )

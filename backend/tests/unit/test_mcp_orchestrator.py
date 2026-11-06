@@ -17,6 +17,114 @@ from app.services.mcp.transport import MCPToolCallResult, MCPToolDescriptor
 
 pytestmark = pytest.mark.unit
 
+_WRITE_PREVIEW = {
+    "item_id": 1,
+    "document_key": "SRS-1",
+    "name": "Requirement",
+    "changes": [{"field": "name", "label": "Name", "before": "Old", "after": "New"}],
+    "confirmation_token": "signed-preview",
+    "expires_at": 2000000000,
+}
+
+
+@pytest.mark.parametrize("malformed", [False, True])
+async def test_preparing_write_stops_loop_without_giving_model_a_confirmation_token(malformed):
+    settings = _settings(allowed_tools=["jama_prepare_field_update", "jama_confirm_field_update"])
+    transport = FakeTransport(
+        tools=[
+            MCPToolDescriptor(name="jama_prepare_field_update", description="", input_schema={}),
+            MCPToolDescriptor(name="jama_confirm_field_update", description="", input_schema={}),
+        ],
+        result=MCPToolCallResult(
+            text="preview",
+            is_error=False,
+            structured_content={} if malformed else _WRITE_PREVIEW,
+        ),
+    )
+
+    class PreviewModel(FakeOpenAIClient):
+        def chat_completion_with_tools(self, messages, tools, **kwargs):
+            assert all(tool["function"]["name"] != "jama_confirm_field_update" for tool in tools)
+            assert "signed-preview" not in str(messages)
+            return super().chat_completion_with_tools(messages, tools, **kwargs)
+
+    model = PreviewModel(
+        tool_turns=[
+            _message(
+                tool_calls=[
+                    _tool_call(
+                        "preview",
+                        "jama_prepare_field_update",
+                        {"item_id": 1, "fields": {"name": "New"}},
+                    ),
+                ]
+            )
+        ]
+    )
+    result = await run_chat_with_tools(
+        openai_client=model,
+        mcp_client=_adapter_with_fake_transport(settings, transport),
+        settings=settings,
+        system_prompt="system",
+        question="Set name to New",
+        conversation_history=[],
+        model="test",
+        max_tokens=100,
+        trusted_source_hosts=frozenset(),
+    )
+    assert model.calls == 1
+    if malformed:
+        assert result.jama_write_preview is None
+        assert "invalid response" in result.answer
+    else:
+        assert result.jama_write_preview.confirmation_token == "signed-preview"
+        assert "Nothing has been written" in result.answer
+
+
+async def test_model_cannot_invoke_confirmation_even_if_tool_is_allowlisted():
+    settings = _settings(allowed_tools=["jama_confirm_field_update"])
+
+    class NoWriteTransport(FakeTransport):
+        async def call_tool(self, *args, **kwargs):
+            raise AssertionError("Model must never reach the write tool")
+
+    transport = NoWriteTransport(
+        tools=[
+            MCPToolDescriptor(name="jama_confirm_field_update", description="", input_schema={})
+        ],
+        result=MCPToolCallResult(text="", is_error=False),
+    )
+    model = FakeOpenAIClient(
+        tool_turns=[
+            _message(
+                tool_calls=[
+                    _tool_call(
+                        "bad",
+                        "jama_confirm_field_update",
+                        {
+                            "confirmation_token": "token",
+                            "confirmed": True,
+                        },
+                    )
+                ]
+            ),
+            _message(content="Confirmation is required."),
+        ]
+    )
+    result = await run_chat_with_tools(
+        openai_client=model,
+        mcp_client=_adapter_with_fake_transport(settings, transport),
+        settings=settings,
+        system_prompt="system",
+        question="Write",
+        conversation_history=[],
+        model="test",
+        max_tokens=100,
+        trusted_source_hosts=frozenset(),
+    )
+    assert not result.used_mcp
+
+
 _JAMA_ITEM_SOURCE = {
     "document_key": "SRS-42",
     "web_url": "https://example.jamacloud.com/perspective.req#/items/1",
