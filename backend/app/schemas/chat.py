@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, JsonValue
 
 
 class ChatMessage(BaseModel):
@@ -74,6 +74,27 @@ class ChatSource(BaseModel):
     url: str = Field(description="Validated https URL to the source item")
 
 
+class JamaFieldChange(BaseModel):
+    field: str
+    label: str
+    before: JsonValue
+    after: JsonValue
+
+
+class JamaWritePreview(BaseModel):
+    item_id: int = Field(gt=0)
+    document_key: str | None
+    name: str
+    changes: list[JamaFieldChange] = Field(min_length=1, max_length=20)
+    confirmation_token: str = Field(min_length=1, max_length=18000)
+    expires_at: int
+
+
+class JamaWriteConfirmation(BaseModel):
+    confirmation_token: str = Field(min_length=1, max_length=18000)
+    confirmed: Literal[True]
+
+
 class ChatResponse(BaseModel):
     """Response body for POST /api/v1/chat."""
 
@@ -92,3 +113,4 @@ class ChatResponse(BaseModel):
         default_factory=list,
         description="Live-data sources used to ground the answer, when used_mcp is true",
     )
+    jama_write_preview: JamaWritePreview | None = None

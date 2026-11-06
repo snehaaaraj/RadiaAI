@@ -105,6 +105,16 @@ export interface ChatData {
   used_mcp?: boolean;
   /** Live-data sources used to ground the answer, when used_mcp is true. */
   sources?: ChatSource[];
+  jama_write_preview?: JamaWritePreview | null;
+}
+
+export interface JamaWritePreview {
+  item_id: number;
+  document_key: string | null;
+  name: string;
+  changes: { field: string; label: string; before: unknown; after: unknown }[];
+  confirmation_token: string;
+  expires_at: number;
 }
 
 // ---------------------------------------------------------------------------

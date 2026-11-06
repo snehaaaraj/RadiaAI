@@ -17,6 +17,7 @@ from mcp_radia.logging import get_logger
 from mcp_radia.tools.confluence import register_confluence_tools
 from mcp_radia.tools.genesys import register_genesys_tools
 from mcp_radia.tools.jama import register_jama_tools
+from mcp_radia.tools.jama_write import register_jama_write_tools
 from mcp_radia.tools.jira import register_jira_tools
 from mcp_radia.tools.linking import register_linking_tools
 
@@ -72,6 +73,7 @@ def register_tools(
 
     registered: list[str] = []
     registered += register_jama_tools(server, jama)
+    registered += register_jama_write_tools(server, jama, settings)
     registered += register_jira_tools(server, jira)
     registered += register_confluence_tools(server, confluence)
     # Registers nothing today: the GENESYS connector is a placeholder.

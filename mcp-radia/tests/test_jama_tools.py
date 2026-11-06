@@ -45,6 +45,10 @@ async def test_both_jama_tools_are_advertised() -> None:
         "jama_search",
         "jama_get_children",
         "jama_list_projects",
+        "jama_get_item_type",
+        "jama_get_picklist",
+        "jama_prepare_field_update",
+        "jama_confirm_field_update",
     }
 
 
@@ -154,7 +158,6 @@ async def test_unconfigured_jama_reports_what_to_set() -> None:
     assert "JAMA_BASE_URL" in message
 
 
-
 async def test_call_without_a_linked_account_asks_the_user_to_link_one() -> None:
     """Over HTTP with no per-user headers there is no account to fall back to."""
     jama_client, handler = make_client(
@@ -171,6 +174,7 @@ async def test_call_without_a_linked_account_asks_the_user_to_link_one() -> None
     assert "Link your Jama account" in str(result.content)
     assert handler.requests == [], "must not call Jama without an account"
 
+
 async def test_tools_are_still_listed_when_jama_is_unconfigured() -> None:
     """Discovery must not depend on credentials being present."""
     server, _ = _server_with(json_responder(ITEM_PAYLOAD), settings=jama_settings(base_url=""))
@@ -183,6 +187,10 @@ async def test_tools_are_still_listed_when_jama_is_unconfigured() -> None:
         "jama_search",
         "jama_get_children",
         "jama_list_projects",
+        "jama_get_item_type",
+        "jama_get_picklist",
+        "jama_prepare_field_update",
+        "jama_confirm_field_update",
     }
 
 

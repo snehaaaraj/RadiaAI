@@ -8,6 +8,14 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatData> {
   return data.data;
 }
 
+export async function confirmJamaWrite(confirmationToken: string): Promise<ChatData> {
+  const { data } = await apiClient.post<APIResponse<ChatData>>('/chat/jama-write', {
+    confirmation_token: confirmationToken,
+    confirmed: true,
+  });
+  return data.data;
+}
+
 /** Callbacks driving a single streamed chat turn - see `streamChatMessage`. */
 export interface ChatStreamHandlers {
   /** Called for every incremental chunk of answer text, in order. */

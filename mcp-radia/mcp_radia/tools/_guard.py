@@ -15,8 +15,8 @@ from mcp_radia.logging import get_logger
 
 logger = get_logger(__name__)
 
-#: Applied to every tool this server exposes. Nothing here writes.
 READ_ONLY = ToolAnnotations(read_only_hint=True, destructive_hint=False, open_world_hint=True)
+WRITE = ToolAnnotations(read_only_hint=False, destructive_hint=True, open_world_hint=True)
 
 
 async def guard[T](operation: str, call: Callable[[], Awaitable[T]]) -> T:
