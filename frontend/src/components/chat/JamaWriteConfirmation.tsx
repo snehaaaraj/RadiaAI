@@ -10,6 +10,22 @@ import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { getApiErrorMessage } from '@/utils/apiErrorMessage';
 import type { ChatData, JamaWritePreview } from '@/types/api';
 
+function previewText(value: unknown): string {
+  if (typeof value !== 'string') return JSON.stringify(value, null, 2) ?? '';
+  if (!/<\/?[a-z][^>]*>/i.test(value)) return value;
+
+  const template = document.createElement('template');
+  template.innerHTML = value;
+  template.content.querySelectorAll('script, style').forEach((element) => element.remove());
+  template.content.querySelectorAll('br').forEach((element) => {
+    element.replaceWith(document.createTextNode('\n'));
+  });
+  template.content.querySelectorAll('p, div, li, h1, h2, h3, h4, h5, h6, tr').forEach((element) => {
+    element.appendChild(document.createTextNode('\n'));
+  });
+  return (template.content.textContent ?? '').trim();
+}
+
 export function JamaWriteConfirmation({
   preview, disabled, onComplete, onCancel, onError,
 }: {
@@ -64,14 +80,33 @@ export function JamaWriteConfirmation({
             <Typography fontWeight={700}>{change.label} ({change.field})</Typography>
             <Typography variant="caption">Before</Typography>
             <Box component="pre" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', m: 0 }}>
-              {JSON.stringify(change.before, null, 2)}
+              {previewText(change.before)}
             </Box>
-            <Typography variant="caption">After (exact API value)</Typography>
+            <Typography variant="caption">After</Typography>
             <Box component="pre" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', m: 0 }}>
-              {JSON.stringify(change.after, null, 2)}
+              {previewText(change.after)}
             </Box>
           </Box>
         ))}
+        {(preview.preserved_fields?.length ?? 0) > 0 && (
+          <Box>
+            <Typography fontWeight={700}>Required fields preserved unchanged</Typography>
+            <Typography variant="body2">
+              These existing values are included for Jama validation. No means an unchecked checkbox,
+              not a missing value.
+            </Typography>
+            {preview.preserved_fields?.map((field) => (
+              <Box key={field.field} sx={{ mt: 1 }}>
+                <Typography>{field.label} ({field.field})</Typography>
+                <Box component="pre" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', m: 0 }}>
+                  {typeof field.after === 'boolean'
+                    ? `${field.after ? 'Yes' : 'No'} (unchanged)`
+                    : previewText(field.after)}
+                </Box>
+              </Box>
+            ))}
+          </Box>
+        )}
         {error && <Alert severity="error">{error}</Alert>}
         <Stack direction="row" spacing={1}>
           <Button variant="contained" disabled={disabled || writing || submitted.current}

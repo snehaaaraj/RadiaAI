@@ -531,8 +531,14 @@ calls an LLM. The confirm tool is omitted from model schemas and independently
 blocked in the model-call executor, even if included in `MCP_ALLOWED_TOOLS`.
 The MCP server validates the signed, account-bound token, its 10-minute expiry
 and the item's current snapshot before sending a field-only PATCH. Jama's
-validation and permission rules remain in force. Writes are never automatically
-retried; ambiguous outcomes require checking Jama. The pre-save snapshot check
+validation and permission rules remain in force.
+Existing editable required values are included unchanged, using item-type
+metadata; unchecked boolean `false` is preserved as "No". Chat exposes these
+as `preserved_fields`, separately from user-requested `changes`. The reviewer's
+Description write also preserves existing required values rather than sending
+only Description. Neither path invents defaults for absent or null fields.
+Writes are never automatically retried; ambiguous outcomes require checking
+Jama. The pre-save snapshot check
 is not an atomic lock against concurrent Jama writers.
 
 Existing deployments must add `jama_get_item_type`, `jama_get_picklist`,

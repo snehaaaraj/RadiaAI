@@ -135,6 +135,8 @@ def test_update_description_http_contract(
 
     def handle_request(request: httpx.Request) -> httpx.Response:
         requests.append(request)
+        if request.url.path == "/rest/v1/itemtypes/67":
+            return httpx.Response(200, json={"data": {"fields": []}})
         if request.method == "PATCH":
             if request.headers["content-type"] != "application/json":
                 return httpx.Response(415, text="Unsupported Media Type")
@@ -153,6 +155,7 @@ def test_update_description_http_contract(
                 "data": {
                     "id": 101,
                     "project": 1,
+                    "itemType": 67,
                     "fields": {"name": "Requirement", "description": "<p>Updated</p>"},
                 }
             },
@@ -172,7 +175,7 @@ def test_update_description_http_contract(
     if patch_status == 200:
         updated = client.update_description(101, "Updated")
         assert updated.id == 101
-        assert [request.method for request in requests] == ["PATCH", "GET"]
+        assert [request.method for request in requests] == ["GET", "GET", "PATCH", "GET"]
     else:
         with pytest.raises(JamaServiceError) as error:
             client.update_description(101, "Updated")
@@ -187,7 +190,7 @@ def test_update_description_http_contract(
         assert error.value.detail["response_content_type"] == "application/json"
         assert error.value.detail["jama_message"] == "The requested field cannot be updated."
         assert "Private upstream response" not in str(error.value.detail)
-        assert [request.method for request in requests] == ["PATCH"]
+        assert [request.method for request in requests] == ["GET", "GET", "PATCH"]
 
     patch_request = next(request for request in requests if request.method == "PATCH")
     assert patch_request.headers["content-type"] == "application/json"

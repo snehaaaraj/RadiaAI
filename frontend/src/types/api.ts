@@ -113,6 +113,7 @@ export interface JamaWritePreview {
   document_key: string | null;
   name: string;
   changes: { field: string; label: string; before: unknown; after: unknown }[];
+  preserved_fields?: { field: string; label: string; before: unknown; after: unknown }[];
   confirmation_token: string;
   expires_at: number;
 }

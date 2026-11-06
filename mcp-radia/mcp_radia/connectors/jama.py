@@ -592,10 +592,11 @@ class JamaClient:
             )
             if exc.response.status_code == 400 and missing:
                 raise ConnectorServiceError(
-                    f"Jama reports missing mandatory fields: {missing.group(1)}. "
+                    f"Jama rejected mandatory-field validation for: {missing.group(1)}. "
                     "I cannot rewrite this item because Jama's own mandatory-field policies "
-                    "block the update. No changes were written. Set the correct required "
-                    "values in Jama, or ask a Jama administrator to review the field configuration, "
+                    "block the update. No changes were written. This does not prove the stored "
+                    "values are missing: an unchecked checkbox is No (false). Review the "
+                    "required-field values and Jama API validation with a Jama administrator, "
                     "then prepare a new preview. I cannot bypass this policy or guess field values.",
                     system=SYSTEM,
                     operation=path,

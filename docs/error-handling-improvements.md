@@ -49,6 +49,19 @@ array, as in the
 [Jama-maintained Python client's `patch_item`](https://github.com/jamasoftware-ps/py-jama-rest-client/blob/master/py_jama_rest_client/client.py).
 Using `application/json-patch+json` can cause HTTP 415.
 
+Both the reviewer's Description write and MCP chat writes read the item's
+field definitions and resubmit existing editable required fields unchanged.
+This preserves Release and unchecked boolean `false` ("No") values without
+inventing defaults for absent or null fields. Chat previews list these under
+"Required fields preserved unchanged", separately from requested changes.
+Jama required-field error messages do not by themselves prove stored values
+are missing; inspect the raw item and field metadata before recommending a
+classification change. Jama's validation remains authoritative.
+An approved no-content-change live PATCH was accepted with the original
+Description, existing Release, and all three required checkboxes explicitly
+resubmitted as `false`; the before/after field comparison found no changes.
+This verifies preservation for that item, not every Jama configuration.
+
 Apart from the selected `meta.message` field, upstream response bodies are not
 copied into logs or API errors because they may contain private requirement data.
 Jama's message may itself quote submitted values; redact it before sharing.

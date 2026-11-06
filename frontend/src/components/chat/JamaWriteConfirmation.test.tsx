@@ -21,17 +21,66 @@ describe('Jama write confirmation', () => {
     mocks.user.user_id = 'user';
   });
 
-  it('shows exact values and writes only after clicking confirmation', async () => {
+  it('shows readable text and writes only after clicking confirmation', async () => {
     const onComplete = vi.fn();
     mocks.confirm.mockResolvedValue({ answer: 'Written' });
     render(<JamaWriteConfirmation preview={preview} disabled={false}
       onComplete={onComplete} onCancel={vi.fn()} />);
-    expect(screen.getByText('"Old"')).toBeInTheDocument();
-    expect(screen.getByText('"<p>New</p>"')).toBeInTheDocument();
+    expect(screen.getByText('Old')).toBeInTheDocument();
+    expect(screen.getByText('New')).toBeInTheDocument();
+    expect(screen.queryByText(/<p>/)).not.toBeInTheDocument();
     expect(mocks.confirm).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm & write to Jama' }));
     await waitFor(() => expect(onComplete).toHaveBeenCalled());
     expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith('signed');
+  });
+
+  it('preserves line breaks and entities without rendering upstream HTML', () => {
+    const richPreview = {
+      ...preview,
+      changes: [{
+        field: 'description', label: 'Description',
+        before: '<p>Stop &lt; 50 m &amp; hold.</p><p>Second paragraph</p>',
+        after: '<p>Line one<br /><br />- Test</p><script>bad()</script><img src="https://example.com/image" />',
+      }],
+    };
+    const { container } = render(<JamaWriteConfirmation preview={richPreview} disabled={false}
+      onComplete={vi.fn()} onCancel={vi.fn()} />);
+    const values = container.querySelectorAll('pre');
+    expect(values[0].textContent).toBe('Stop < 50 m & hold.\nSecond paragraph');
+    expect(values[1].textContent).toBe('Line one\n\n- Test');
+    expect(container.querySelector('script, img')).toBeNull();
+    expect(richPreview.changes[0].after).toContain('<p>');
+  });
+
+  it('keeps non-HTML strings and typed field values readable', () => {
+    const typedPreview = {
+      ...preview,
+      changes: [
+        { field: 'name', label: 'Name', before: 'Stop < 50 m', after: 'Go > 10 m' },
+        { field: 'custom', label: 'Custom', before: false, after: [1, 2] },
+      ],
+    };
+    const { container } = render(<JamaWriteConfirmation preview={typedPreview} disabled={false}
+      onComplete={vi.fn()} onCancel={vi.fn()} />);
+    expect(Array.from(container.querySelectorAll('pre'), (element) => element.textContent)).toEqual([
+      'Stop < 50 m', 'Go > 10 m', 'false', '[\n  1,\n  2\n]',
+    ]);
+  });
+
+  it('shows preserved required checkboxes as unchanged No without rewriting preview values', () => {
+    const preservedPreview = {
+      ...preview,
+      preserved_fields: [{
+        field: 'safety_requirement$67', label: 'Safety Requirement', before: false, after: false,
+      }],
+    };
+    render(<JamaWriteConfirmation preview={preservedPreview} disabled={false}
+      onComplete={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByText('Required fields preserved unchanged')).toBeInTheDocument();
+    expect(screen.getByText('No (unchanged)')).toBeInTheDocument();
+    expect(preservedPreview.preserved_fields[0].after).toBe(false);
+    expect(mocks.confirm).not.toHaveBeenCalled();
   });
 
   it('cancels without making a write request', () => {

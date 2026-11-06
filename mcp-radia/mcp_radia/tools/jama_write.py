@@ -35,6 +35,7 @@ class JamaWritePreview(BaseModel):
     document_key: str | None
     name: str
     changes: list[JamaFieldChange]
+    preserved_fields: list[JamaFieldChange] = Field(default_factory=list)
     confirmation_token: str
     expires_at: int
 
@@ -131,6 +132,29 @@ class JamaWriteService:
                     "value": value,
                 }
             )
+        preserved_fields: list[JamaFieldChange] = []
+        for field in definitions:
+            if not isinstance(field, dict):
+                raise ValueError("Jama returned an invalid field definition.")
+            if field.get("required") is not True or field.get("readOnly") is True:
+                continue
+            name = field.get("name")
+            if not isinstance(name, str) or not name:
+                raise ValueError("Jama returned an invalid required field name.")
+            if name in seen or name not in current or current[name] is None:
+                continue
+            seen.add(name)
+            value = current[name]
+            preserved_fields.append(
+                JamaFieldChange(
+                    field=name,
+                    label=str(field.get("label") or name),
+                    before=value,
+                    after=value,
+                )
+            )
+            pointer = name.replace("~", "~0").replace("/", "~1")
+            patches.append({"op": "replace", "path": f"/fields/{pointer}", "value": value})
         expires = int(time.time()) + _TTL_SECONDS
         payload = _serialize(
             {
@@ -138,12 +162,14 @@ class JamaWriteService:
                 "item_id": item_id,
                 "snapshot": _snapshot(raw),
                 "patches": patches,
+                "changed_fields": [change.field for change in changes],
                 "expires_at": expires,
             }
         )
         if (
             len(payload) > _MAX_PREVIEW_BYTES
-            or len(_serialize([change.model_dump() for change in changes])) > _MAX_PREVIEW_BYTES
+            or len(_serialize([change.model_dump() for change in changes + preserved_fields]))
+            > _MAX_PREVIEW_BYTES
         ):
             raise ValueError(
                 "The proposed changes are too large. Prepare fewer or smaller field changes."
@@ -155,6 +181,7 @@ class JamaWriteService:
             document_key=raw.get("documentKey"),
             name=str(current.get("name") or ""),
             changes=changes,
+            preserved_fields=preserved_fields,
             confirmation_token=f"{encoded}.{signature}",
             expires_at=expires,
         )
@@ -181,7 +208,9 @@ class JamaWriteService:
                 "The Jama item changed after the preview. Prepare and confirm a new preview."
             )
         await client.patch_fields(item_id, payload["patches"])
-        names = [patch["path"].removeprefix("/fields/") for patch in payload["patches"]]
+        names = payload.get("changed_fields") or [
+            patch["path"].removeprefix("/fields/") for patch in payload["patches"]
+        ]
         logger.info("jama_fields_written", item_id=item_id, fields=names)
         return JamaWriteResult(item_id=item_id, status="written", fields=names)
 
@@ -234,6 +263,7 @@ def register_jama_write_tools(
         "Use exact field API names or unambiguous labels from jama_get_item_type and actual JSON values "
         "(picklists require Jama option IDs). Rich text is supplied as plain text and escaped to HTML. "
         "Never invent values for required safety fields. Show the complete item and before/after preview "
+        "and preserved_fields: existing required values are resubmitted unchanged, including false (No). "
         "to the user and request explicit confirmation. A preview expires in 10 minutes.",
     )
     async def jama_prepare_field_update(

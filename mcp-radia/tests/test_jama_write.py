@@ -16,7 +16,12 @@ from tests.jama_fixtures import ITEM_PAYLOAD, jama_settings, make_client
 pytestmark = pytest.mark.unit
 
 
-def fixture_client(*, patch_status=200, patch_message="Required safety field is missing."):
+def fixture_client(
+    *,
+    patch_status=200,
+    patch_message="Required safety field is missing.",
+    required_fields=None,
+):
     raw = copy.deepcopy(ITEM_PAYLOAD["data"])
     patches = []
 
@@ -43,9 +48,21 @@ def fixture_client(*, patch_status=200, patch_message="Required safety field is 
                                 "label": "Description",
                                 "fieldType": "RICHTEXT",
                             },
-                            {"name": "customField123", "label": "Custom label"},
+                            next(
+                                (
+                                    field
+                                    for field in (required_fields or [])
+                                    if field["name"] == "customField123"
+                                ),
+                                {"name": "customField123", "label": "Custom label"},
+                            ),
                             {"name": "missing$31", "label": "Missing field"},
                             {"name": "locked", "label": "Locked", "readOnly": True},
+                        ]
+                        + [
+                            field
+                            for field in (required_fields or [])
+                            if field["name"] != "customField123"
                         ]
                     }
                 },
@@ -204,12 +221,77 @@ async def test_missing_mandatory_fields_explain_jama_policy_in_tool_error(messag
         )
     assert result.is_error
     error = " ".join(content.text for content in result.content if content.type == "text")
-    assert "Jama reports missing mandatory fields:" in error
+    assert "Jama rejected mandatory-field validation for:" in error
     assert message.split("fields: ", 1)[1] in error
     assert "I cannot rewrite this item because Jama's own mandatory-field policies" in error
     assert "No changes were written." in error
     assert "cannot bypass this policy or guess field values" in error
     assert len(patches) == 1
+
+
+@pytest.mark.parametrize("flag", [False, True])
+@pytest.mark.parametrize("release", [115, 0])
+async def test_preserve_required_values_in_preview_and_confirmed_patch(flag, release):
+    definitions = [
+        {"name": name, "label": name, "required": True, "readOnly": False}
+        for name in ("release", "derived_requirement$31", "safety_requirement$31")
+    ] + [
+        {"name": "missing_required", "required": True},
+        {"name": "null_required", "required": True},
+        {"name": "locked", "required": True, "readOnly": True},
+    ]
+    client, _, raw, patches = fixture_client(required_fields=definitions)
+    values = {"release": release, "derived_requirement$31": flag, "safety_requirement$31": flag}
+    raw["fields"].update(values | {"null_required": None, "locked": "read-only"})
+    service = JamaWriteService(b"test")
+    preview = await service.prepare(client, 12345, {"description": "New"})
+    assert len(preview.changes) == 1
+    assert {field.field: field.after for field in preview.preserved_fields} == values
+    assert all(field.before == field.after for field in preview.preserved_fields)
+    assert patches == []
+    result = await service.confirm(client, preview.confirmation_token, True)
+    assert result.fields == ["description"]
+    assert patches[0][1:] == [
+        {"op": "replace", "path": f"/fields/{name}", "value": value}
+        for name, value in values.items()
+    ]
+    assert {name: raw["fields"][name] for name in values} == values
+    assert raw["fields"]["null_required"] is None
+    assert "missing_required" not in raw["fields"]
+
+
+async def test_invalid_required_metadata_fails_before_patch():
+    client, _, _, patches = fixture_client(required_fields=[{"name": "", "required": True}])
+    with pytest.raises(ValueError, match="invalid required field name"):
+        await JamaWriteService(b"test").prepare(client, 12345, {"description": "New"})
+    assert patches == []
+
+
+async def test_changed_preserved_checkbox_invalidates_confirmation():
+    client, _, raw, patches = fixture_client(
+        required_fields=[{"name": "safety_requirement$31", "required": True}]
+    )
+    raw["fields"]["safety_requirement$31"] = False
+    service = JamaWriteService(b"test")
+    preview = await service.prepare(client, 12345, {"description": "New"})
+    raw["fields"]["safety_requirement$31"] = True
+    with pytest.raises(ValueError, match="changed"):
+        await service.confirm(client, preview.confirmation_token, True)
+    assert patches == []
+
+
+async def test_explicitly_requested_required_value_is_not_replaced_by_preserved_value():
+    client, _, raw, patches = fixture_client(
+        required_fields=[
+            {"name": "customField123", "required": True},
+        ]
+    )
+    service = JamaWriteService(b"test")
+    preview = await service.prepare(client, 12345, {"customField123": False})
+    assert preview.preserved_fields == []
+    await service.confirm(client, preview.confirmation_token, True)
+    assert patches == [[{"op": "replace", "path": "/fields/customField123", "value": False}]]
+    assert raw["fields"]["customField123"] is False
 
 
 @pytest.mark.parametrize(
@@ -228,6 +310,6 @@ async def test_other_write_errors_are_not_mislabeled_as_missing_fields(status, m
         await client.patch_fields(
             12345, [{"op": "replace", "path": "/fields/name", "value": "New"}]
         )
-    assert "Jama reports missing mandatory fields:" not in str(error.value)
+    assert "Jama rejected mandatory-field validation for:" not in str(error.value)
     assert error.value.status_code == status
     assert len(patches) == 1

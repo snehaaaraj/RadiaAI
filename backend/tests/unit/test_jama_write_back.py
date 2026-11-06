@@ -7,6 +7,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from app.core.config import JamaSettings
+from app.core.exceptions import JamaServiceError
 from radia_ai.features.jama_requirement_reviewer.connectors.jama_client import (
     JamaApiCredentials,
     JamaClient,
@@ -31,10 +32,12 @@ class _FakeJamaClient(JamaClient):
             JamaApiCredentials("cid", "secret"),
         )
         self.patches: list[Any] = []
+        self.field_definitions: list[dict[str, Any]] = []
         self.item: dict[str, Any] = {
             "id": ITEM_ID,
             "documentKey": "SYS-REQ-1",
             "project": 1,
+            "itemType": 67,
             "modifiedDate": REVIEWED_MODIFIED_DATE,
             "fields": {
                 "name": "Response requirement",
@@ -52,6 +55,8 @@ class _FakeJamaClient(JamaClient):
         json: dict[str, Any] | list[Any] | None = None,
         content_type: str = "application/json",
     ) -> dict[str, Any]:
+        if path == "itemtypes/67" and method == "GET":
+            return {"data": {"fields": self.field_definitions}}
         assert path == f"items/{ITEM_ID}", path
         if method == "GET":
             return {"data": self.item}
@@ -100,6 +105,54 @@ def _write(client: TestClient, review_id: str) -> Any:
 def test_plain_text_to_jama_html_escapes_and_keeps_line_structure() -> None:
     html = plain_text_to_jama_html("The system shall stop < 50 m & hold.\nLine two\n\nPara two")
     assert html == "<p>The system shall stop &lt; 50 m &amp; hold.<br />Line two</p><p>Para two</p>"
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("flag", [False, True])
+@pytest.mark.parametrize("release", [115, 0])
+def test_jrr_preserves_required_boolean_and_release_values(
+    client: TestClient, fake_jama: _FakeJamaClient, flag: bool, release: int
+) -> None:
+    values = {
+        "release": release,
+        "derived_requirement$67": flag,
+        "safety_requirement$67": flag,
+        "cybersecurity_requirement$67": flag,
+    }
+    fake_jama.item["fields"].update(values)
+    fake_jama.field_definitions = [
+        {"name": name, "required": True, "readOnly": False} for name in values
+    ] + [
+        {"name": "description", "required": True},
+        {"name": "missing", "required": True},
+        {"name": "null_field", "required": True},
+        {"name": "rationale", "required": False},
+        {"name": "locked", "required": True, "readOnly": True},
+    ]
+    fake_jama.item["fields"]["null_field"] = None
+    fake_jama.item["fields"]["locked"] = "read-only"
+    review = _run_jama_review(client)
+    _decide(client, review["review_id"], decision="ready_to_replace")
+    response = _write(client, review["review_id"])
+    assert response.status_code == 200, response.json()
+    patches = fake_jama.patches[0]
+    assert patches[1:] == [
+        {"op": "replace", "path": f"/fields/{name}", "value": value}
+        for name, value in values.items()
+    ]
+    assert {name: fake_jama.item["fields"][name] for name in values} == values
+    assert "missing" not in fake_jama.item["fields"]
+    assert fake_jama.item["fields"]["null_field"] is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("definition", [None, {"name": "", "required": True}])
+def test_jrr_invalid_required_metadata_fails_before_patch(definition: Any) -> None:
+    jama = _FakeJamaClient()
+    jama.field_definitions = [definition]
+    with pytest.raises(JamaServiceError, match="invalid"):
+        jama.update_description(ITEM_ID, "Updated")
+    assert jama.patches == []
 
 
 @pytest.mark.unit

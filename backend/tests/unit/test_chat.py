@@ -625,6 +625,7 @@ def test_chat_returns_structured_preview_in_both_response_protocols(client, stre
         "name": "Item",
         "changes": [{"field": "name", "label": "Name", "before": "Old", "after": "New"}],
         "confirmation_token": "signed-preview",
+        "preserved_fields": [],
         "expires_at": 2000000000,
     }
 

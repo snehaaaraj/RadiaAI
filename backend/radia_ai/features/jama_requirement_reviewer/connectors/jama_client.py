@@ -435,19 +435,61 @@ class JamaClient:
     def update_description(self, item_id: int, description: str) -> JamaRequirement:
         """Replace only the Description field of an item and return the updated item.
 
-        Uses a JSON Patch so no other field (name, rationale, status, ...) is touched.
+        Resubmit existing required values unchanged; false is a valid checkbox No.
         Jama expects application/json, not application/json-patch+json.
         """
+        path = f"items/{item_id}"
+        raw = self._get(path).get("data")
+        if not isinstance(raw, dict) or raw.get("id") != item_id:
+            raise JamaServiceError("Jama did not return the requested item.", operation=path)
+        fields = raw.get("fields")
+        item_type = raw.get("itemType")
+        if not isinstance(fields, dict) or not isinstance(item_type, int):
+            raise JamaServiceError(
+                "Jama did not return fields and item type; cannot preserve required values.",
+                operation=path,
+            )
+        definition = self._get(f"itemtypes/{item_type}").get("data")
+        if not isinstance(definition, dict) or not isinstance(definition.get("fields"), list):
+            raise JamaServiceError(
+                "Jama did not return item-type field definitions; cannot preserve required values.",
+                operation=f"itemtypes/{item_type}",
+            )
+        patches: list[dict[str, Any]] = [
+            {
+                "op": "replace",
+                "path": "/fields/description",
+                "value": plain_text_to_jama_html(description),
+            }
+        ]
+        preserved: set[str] = set()
+        for field_definition in definition["fields"]:
+            if not isinstance(field_definition, dict):
+                raise JamaServiceError("Jama returned an invalid field definition.", operation=path)
+            name = field_definition.get("name")
+            if (
+                field_definition.get("required") is not True
+                or field_definition.get("readOnly") is True
+            ):
+                continue
+            if not isinstance(name, str) or not name:
+                raise JamaServiceError(
+                    "Jama returned an invalid required field name.", operation=path
+                )
+            if (
+                name == "description"
+                or name in preserved
+                or name not in fields
+                or fields[name] is None
+            ):
+                continue
+            preserved.add(name)
+            pointer = name.replace("~", "~0").replace("/", "~1")
+            patches.append({"op": "replace", "path": f"/fields/{pointer}", "value": fields[name]})
         self._request(
             "PATCH",
-            f"items/{item_id}",
-            json=[
-                {
-                    "op": "replace",
-                    "path": "/fields/description",
-                    "value": plain_text_to_jama_html(description),
-                }
-            ],
+            path,
+            json=patches,
         )
         return self.get_requirement(item_id)
 

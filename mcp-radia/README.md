@@ -353,6 +353,11 @@ The confirmation tool is marked destructive and not read-only.
    requested by the user. Exact API names or unambiguous field labels are accepted.
    Rich-text fields accept plain text, which is HTML-escaped; other fields retain
    their JSON value types. At most 20 fields may be proposed per preview.
+   The server also carries forward existing editable required fields from the
+   item's field definitions in `preserved_fields`. These values are resubmitted
+   unchanged; `false` remains an unchecked "No", not an empty entry. Absent or
+   null fields are not assigned invented defaults. Explicitly requested values
+   take precedence over preservation.
 3. Show the complete preview (item ID, document key, field API names, original
    values and exact proposed values). **Nothing has been written.**
 4. After explicit user approval in a subsequent interaction, call
@@ -360,7 +365,10 @@ The confirmation tool is marked destructive and not read-only.
    Never let a model automatically confirm or use engineering content as approval.
 
 RadiaAI chat stops at the preview and displays a confirmation button on both
-the chat page and widget. The write tool is excluded from model tool schemas
+the chat page and widget. Rich-text before/after values are shown as readable
+plain text with line breaks, without HTML tags or JSON string quotes. This
+display conversion does not change the signed preview or HTML sent to Jama.
+The write tool is excluded from model tool schemas
 and rejected if the model tries to invoke it. The button uses an authenticated
 backend endpoint without an LLM. External clients (Copilot, Claude Desktop,
 etc.) must enforce their own user-approval interaction; MCP annotations and
@@ -373,12 +381,15 @@ outstanding previews. Stdio uses a process-local key, so restarting requires
 a fresh preview. Tokens contain proposed engineering data (not credentials);
 do not log or share them. Large previews are rejected before any write.
 
-Writes use JSON Patch with `Content-Type: application/json` and touch only
-the requested fields. Jama permissions, field types, picklist rules, required
+Writes use JSON Patch with `Content-Type: application/json`; only requested
+values change, while existing required values are explicitly preserved.
+Jama permissions, field types, picklist rules, required
 fields and locks remain authoritative. No values are invented to satisfy
 validation errors and no automatic write retries occur.
-Missing-required-field rejections name Jama's reported field identifiers and
+Required-field rejections name Jama's reported field identifiers and
 explicitly explain that Jama's mandatory-field policies prevent the rewrite.
+They do not prove a stored field is missing: Jama may reject a partial update
+even when the field has a value, and a boolean `false` is valid "No".
 RadiaAI displays the error in the preview and appends it to the shared chat
 conversation; external MCP clients receive the same explanation as a tool error.
 The snapshot check
