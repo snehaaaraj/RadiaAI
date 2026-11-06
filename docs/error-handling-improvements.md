@@ -52,8 +52,8 @@ Using `application/json-patch+json` can cause HTTP 415.
 Both the reviewer's Description write and MCP chat writes read the item's
 field definitions and resubmit existing editable required fields unchanged.
 This preserves Release and unchecked boolean `false` ("No") values without
-inventing defaults for absent or null fields. Chat previews list these under
-"Required fields preserved unchanged", separately from requested changes.
+inventing defaults for absent or null fields. Chat previews show only requested
+changes; unchanged required values are preserved behind the scenes.
 Jama required-field error messages do not by themselves prove stored values
 are missing; inspect the raw item and field metadata before recommending a
 classification change. Jama's validation remains authoritative.

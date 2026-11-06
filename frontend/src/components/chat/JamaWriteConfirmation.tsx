@@ -88,25 +88,6 @@ export function JamaWriteConfirmation({
             </Box>
           </Box>
         ))}
-        {(preview.preserved_fields?.length ?? 0) > 0 && (
-          <Box>
-            <Typography fontWeight={700}>Required fields preserved unchanged</Typography>
-            <Typography variant="body2">
-              These existing values are included for Jama validation. No means an unchecked checkbox,
-              not a missing value.
-            </Typography>
-            {preview.preserved_fields?.map((field) => (
-              <Box key={field.field} sx={{ mt: 1 }}>
-                <Typography>{field.label} ({field.field})</Typography>
-                <Box component="pre" sx={{ whiteSpace: 'pre-wrap', overflowWrap: 'anywhere', m: 0 }}>
-                  {typeof field.after === 'boolean'
-                    ? `${field.after ? 'Yes' : 'No'} (unchanged)`
-                    : previewText(field.after)}
-                </Box>
-              </Box>
-            ))}
-          </Box>
-        )}
         {error && <Alert severity="error">{error}</Alert>}
         <Stack direction="row" spacing={1}>
           <Button variant="contained" disabled={disabled || writing || submitted.current}

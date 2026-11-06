@@ -368,6 +368,8 @@ RadiaAI chat stops at the preview and displays a confirmation button on both
 the chat page and widget. Rich-text before/after values are shown as readable
 plain text with line breaks, without HTML tags or JSON string quotes. This
 display conversion does not change the signed preview or HTML sent to Jama.
+The confirmation UI shows only requested changes; unchanged required values
+are preserved behind the scenes.
 The write tool is excluded from model tool schemas
 and rejected if the model tries to invoke it. The button uses an authenticated
 backend endpoint without an LLM. External clients (Copilot, Claude Desktop,

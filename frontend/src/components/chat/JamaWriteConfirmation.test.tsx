@@ -68,19 +68,27 @@ describe('Jama write confirmation', () => {
     ]);
   });
 
-  it('shows preserved required checkboxes as unchanged No without rewriting preview values', () => {
+  it('shows only requested changes while leaving preserved required values untouched', async () => {
     const preservedPreview = {
       ...preview,
       preserved_fields: [{
         field: 'safety_requirement$67', label: 'Safety Requirement', before: false, after: false,
       }],
     };
-    render(<JamaWriteConfirmation preview={preservedPreview} disabled={false}
-      onComplete={vi.fn()} onCancel={vi.fn()} />);
-    expect(screen.getByText('Required fields preserved unchanged')).toBeInTheDocument();
-    expect(screen.getByText('No (unchanged)')).toBeInTheDocument();
+    mocks.confirm.mockResolvedValue({ answer: 'Written' });
+    const onComplete = vi.fn();
+    const { container } = render(<JamaWriteConfirmation preview={preservedPreview} disabled={false}
+      onComplete={onComplete} onCancel={vi.fn()} />);
+    expect(screen.getByText('Description (description)')).toBeInTheDocument();
+    expect(Array.from(container.querySelectorAll('pre'), (element) => element.textContent))
+      .toEqual(['Old', 'New']);
+    expect(screen.queryByText('Required fields preserved unchanged')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Safety Requirement/)).not.toBeInTheDocument();
     expect(preservedPreview.preserved_fields[0].after).toBe(false);
     expect(mocks.confirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Confirm & write to Jama' }));
+    await waitFor(() => expect(onComplete).toHaveBeenCalled());
+    expect(mocks.confirm).toHaveBeenCalledExactlyOnceWith('signed');
   });
 
   it('cancels without making a write request', () => {

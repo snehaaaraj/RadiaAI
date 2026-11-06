@@ -534,7 +534,8 @@ and the item's current snapshot before sending a field-only PATCH. Jama's
 validation and permission rules remain in force.
 Existing editable required values are included unchanged, using item-type
 metadata; unchecked boolean `false` is preserved as "No". Chat exposes these
-as `preserved_fields`, separately from user-requested `changes`. The reviewer's
+as `preserved_fields` in the API, separately from user-requested `changes`;
+the confirmation UI displays only requested changes. The reviewer's
 Description write also preserves existing required values rather than sending
 only Description. Neither path invents defaults for absent or null fields.
 Writes are never automatically retried; ambiguous outcomes require checking
