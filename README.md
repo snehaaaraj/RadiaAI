@@ -11,7 +11,10 @@ to smoothly scroll to the end of the conversation and resume automatic scrolling
 Reduced-motion preferences use an immediate scroll instead.
 
 In Individual Requirement Review, the From Jama search text, selected requirement,
-and project filter are retained when switching input tabs. Clear Review resets them.
+and project filter are retained when switching input tabs. Clear Review and sign-out
+reset the saved form inputs; signing back in starts with an empty form.
+Selecting a Jama requirement automatically populates its project when available.
+You can still change the project filter manually afterward.
 
 ---
 

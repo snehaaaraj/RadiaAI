@@ -23,6 +23,7 @@ import { ReviewResultHero } from '@/radia_ai/features/jamaRequirementReviewer/co
 import { useRequirementReview } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useRequirementReview';
 import { useApplyFindingDisposition, useApplyRecommendationDecision, useWriteDecisionToJama } from '@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory';
 import {
+  REQUIREMENT_REVIEW_FORM_KEY,
   REQUIREMENT_REVIEW_RESULT_KEY,
   purgeLegacyReviewResults,
 } from '@/radia_ai/features/jamaRequirementReviewer/persistedReviewKeys';
@@ -77,7 +78,7 @@ const DISPOSITION_SAVED_KEY = 'requirement-review-disposition-saved';
 
 export default function RequirementReview() {
   const { state: formState, setState: setFormState, clear: clearFormState } = usePersistentState<RequirementReviewFormState>({
-    key: 'requirement-review-form-state',
+    key: REQUIREMENT_REVIEW_FORM_KEY,
     initialValue: DEFAULT_FORM_STATE,
   });
   const { state: persistedResult, setState: setPersistedResult, clear: clearPersistedResult } = usePersistentState<RequirementReviewResponse | null>({
@@ -153,7 +154,7 @@ export default function RequirementReview() {
   useEffect(() => {
     return () => {
       if (isDirtyRef.current) {
-        localStorage.removeItem('requirement-review-form-state');
+        localStorage.removeItem(REQUIREMENT_REVIEW_FORM_KEY);
         localStorage.removeItem(REQUIREMENT_REVIEW_RESULT_KEY);
         sessionStorage.removeItem(DISPOSITION_SAVED_KEY);
       }

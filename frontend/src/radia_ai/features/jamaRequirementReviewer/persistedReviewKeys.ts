@@ -1,5 +1,5 @@
 /**
- * Storage keys for persisted review results.
+ * Storage keys for persisted review forms and results.
  *
  * The version suffix is bumped whenever the review response shape changes. A
  * result cached by an older build is then ignored rather than rendered against
@@ -8,6 +8,7 @@
  */
 const RESULT_SCHEMA_VERSION = 'v2';
 
+export const REQUIREMENT_REVIEW_FORM_KEY = 'requirement-review-form-state';
 export const REQUIREMENT_REVIEW_RESULT_KEY = `requirement-review-result-${RESULT_SCHEMA_VERSION}`;
 export const DELTA_REVIEW_RESULT_KEY = `delta-review-result-${RESULT_SCHEMA_VERSION}`;
 
