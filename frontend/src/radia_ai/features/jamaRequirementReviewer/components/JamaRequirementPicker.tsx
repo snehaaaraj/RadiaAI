@@ -68,10 +68,13 @@ export function JamaRequirementPicker({
 
   // When a full requirement finishes loading, hand it up to the parent form.
   useEffect(() => {
-    if (requirementQuery.data) {
+    if (requirementQuery.data && requirementQuery.data.id === selectedRequirement?.id) {
+      if (requirementQuery.data.project_id != null && requirementQuery.data.project_id !== projectId) {
+        onStateChange({ ...state, projectId: requirementQuery.data.project_id });
+      }
       onRequirementSelected(requirementQuery.data);
     }
-    // onRequirementSelected is stable enough for this effect's purpose.
+    // Only sync on load; later manual project-filter changes must remain editable.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requirementQuery.data]);
 
@@ -167,6 +170,7 @@ export function JamaRequirementPicker({
         }}
         onChange={(_, value) => onStateChange({
           ...state,
+          projectId: value?.project_id ?? projectId,
           selectedRequirement: value,
           inputValue: value ? summaryLabel(value) : '',
         })}

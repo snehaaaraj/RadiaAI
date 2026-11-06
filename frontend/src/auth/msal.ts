@@ -11,6 +11,7 @@ import {
   type AuthenticationResult,
 } from '@azure/msal-browser';
 import { apiTokenRequest, authSettings, isAuthEnabled } from './authConfig';
+import { REQUIREMENT_REVIEW_FORM_KEY } from '@/radia_ai/features/jamaRequirementReviewer/persistedReviewKeys';
 
 export const msalInstance: PublicClientApplication | null = isAuthEnabled
   ? new PublicClientApplication({
@@ -66,6 +67,7 @@ export async function signIn(): Promise<void> {
 
 export async function signOut(): Promise<void> {
   if (!msalInstance) return;
+  window.localStorage.removeItem(REQUIREMENT_REVIEW_FORM_KEY);
   await msalInstance.logoutRedirect({ account: msalInstance.getActiveAccount() ?? undefined });
 }
 
