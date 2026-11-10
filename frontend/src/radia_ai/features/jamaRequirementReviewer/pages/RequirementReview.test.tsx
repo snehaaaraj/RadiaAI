@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { JamaRequirement } from '@/types/api';
+import { normalizeRequirementText } from '@/radia_ai/features/jamaRequirementReviewer/utils/requirementNormalization';
 import RequirementReview from './RequirementReview';
 
 const jama = vi.hoisted(() => ({
@@ -112,6 +113,64 @@ describe('Individual Requirement Review - retained Jama input', () => {
     expect(screen.getByRole('combobox', { name: 'Search Jama requirements' })).toHaveValue('');
     expect(screen.getByRole('combobox', { name: 'Jama project' })).not.toHaveTextContent('Aircraft');
     expect(screen.queryByLabelText('Requirement text from Jama (sent to AI)')).not.toBeInTheDocument();
+  });
+
+  it.each([7, null])('populates the project after selecting a pasted requirement name (search project ID: %s)', async (projectId) => {
+    jama.search.mockReturnValue({
+      data: { results: [{ ...requirement, project_id: projectId }] },
+    });
+    jama.requirement.mockReturnValue({ data: undefined });
+    const page = render(<RequirementReview />);
+    fireEvent.click(screen.getByRole('button', { name: 'From Jama' }));
+    const search = screen.getByRole('combobox', { name: 'Search Jama requirements' });
+    fireEvent.change(search, { target: { value: requirement.name } });
+    fireEvent.keyDown(search, { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: /REQ-42/ }));
+
+    if (projectId != null) {
+      expect(screen.getByRole('combobox', { name: 'Jama project' })).toHaveTextContent('Aircraft');
+    } else {
+      expect(screen.getByRole('combobox', { name: 'Jama project' })).not.toHaveTextContent('Aircraft');
+    }
+
+    jama.requirement.mockImplementation((id: number | null) => ({
+      data: id === requirement.id ? requirement : undefined,
+    }));
+    page.rerender(<RequirementReview />);
+    await waitFor(() => expect(screen.getByRole('combobox', { name: 'Jama project' }))
+      .toHaveTextContent('Aircraft'));
+    expect(screen.getByLabelText('Requirement text from Jama (sent to AI)'))
+      .toHaveValue(normalizeRequirementText(`Title: ${requirement.name}\n\nDescription: ${requirement.description}`));
+    expect(jama.search).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: 7 }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload file' }));
+    fireEvent.click(screen.getByRole('button', { name: 'From Jama' }));
+    expect(screen.getByRole('combobox', { name: 'Jama project' })).toHaveTextContent('Aircraft');
+
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Jama project' }));
+    fireEvent.click(screen.getByRole('option', { name: 'All projects' }));
+    expect(jama.search).toHaveBeenLastCalledWith(expect.objectContaining({ projectId: undefined }));
+    expect(screen.getByRole('combobox', { name: 'Jama project' })).not.toHaveTextContent('Aircraft');
+  });
+
+  it('keeps the project filter when clearing a requirement or selecting one without a project ID', async () => {
+    const requirementWithoutProject = { ...requirement, project_id: null };
+    jama.search.mockReturnValue({ data: { results: [requirementWithoutProject] } });
+    jama.requirement.mockImplementation((id: number | null) => ({
+      data: id === requirement.id ? requirementWithoutProject : undefined,
+    }));
+    render(<RequirementReview />);
+    fireEvent.click(screen.getByRole('button', { name: 'From Jama' }));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Jama project' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Aircraft' }));
+    const search = screen.getByRole('combobox', { name: 'Search Jama requirements' });
+    fireEvent.change(search, { target: { value: requirement.name } });
+    fireEvent.keyDown(search, { key: 'ArrowDown' });
+    fireEvent.click(await screen.findByRole('option', { name: /REQ-42/ }));
+    expect(screen.getByRole('combobox', { name: 'Jama project' })).toHaveTextContent('Aircraft');
+    fireEvent.click(screen.getByTitle('Clear'));
+    expect(search).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Jama project' })).toHaveTextContent('Aircraft');
   });
 
   it('restores older saved forms that have no Jama picker state', () => {
