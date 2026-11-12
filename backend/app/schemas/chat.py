@@ -86,7 +86,10 @@ class JamaWritePreview(BaseModel):
     document_key: str | None
     name: str
     changes: list[JamaFieldChange] = Field(min_length=1, max_length=20)
-    preserved_fields: list[JamaFieldChange] = Field(default_factory=list)
+    preserved_fields: list[JamaFieldChange] = Field(
+        default_factory=list,
+        description="Existing editable required values resubmitted unchanged, including false and zero.",
+    )
     confirmation_token: str = Field(min_length=1, max_length=18000)
     expires_at: int
 

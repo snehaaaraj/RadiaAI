@@ -84,6 +84,8 @@ describe('Jama write confirmation', () => {
       .toEqual(['Old', 'New']);
     expect(screen.queryByText('Required fields preserved unchanged')).not.toBeInTheDocument();
     expect(screen.queryByText(/Safety Requirement/)).not.toBeInTheDocument();
+    expect(screen.getByText(/Existing required field values will also be resubmitted unchanged/))
+      .toBeInTheDocument();
     expect(preservedPreview.preserved_fields[0].after).toBe(false);
     expect(mocks.confirm).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole('button', { name: 'Confirm & write to Jama' }));

@@ -75,6 +75,12 @@ export function JamaWriteConfirmation({
         <Alert severity="warning">
           Nothing has been written. Only the fields below will change. Preview expires in 10 minutes.
         </Alert>
+        {!!preview.preserved_fields?.length && (
+          <Alert severity="info">
+            Existing required field values will also be resubmitted unchanged.
+            Unchecked checkboxes remain No (false); missing values are not filled automatically.
+          </Alert>
+        )}
         {preview.changes.map((change) => (
           <Box key={change.field}>
             <Typography fontWeight={700}>{change.label} ({change.field})</Typography>

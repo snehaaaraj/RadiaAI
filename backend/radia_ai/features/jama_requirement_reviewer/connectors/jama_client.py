@@ -435,7 +435,8 @@ class JamaClient:
     def update_description(self, item_id: int, description: str) -> JamaRequirement:
         """Replace only the Description field of an item and return the updated item.
 
-        Resubmit existing required values unchanged; false is a valid checkbox No.
+        Resubmit existing editable required values unchanged, including false and zero.
+        Use object-member add (upsert): GET fields may be absent from the PATCH target.
         Jama expects application/json, not application/json-patch+json.
         """
         path = f"items/{item_id}"
@@ -457,35 +458,30 @@ class JamaClient:
             )
         patches: list[dict[str, Any]] = [
             {
-                "op": "replace",
+                "op": "add",
                 "path": "/fields/description",
                 "value": plain_text_to_jama_html(description),
             }
         ]
-        preserved: set[str] = set()
+        preserved = {"description"}
         for field_definition in definition["fields"]:
             if not isinstance(field_definition, dict):
                 raise JamaServiceError("Jama returned an invalid field definition.", operation=path)
-            name = field_definition.get("name")
             if (
                 field_definition.get("required") is not True
                 or field_definition.get("readOnly") is True
             ):
                 continue
+            name = field_definition.get("name")
             if not isinstance(name, str) or not name:
                 raise JamaServiceError(
                     "Jama returned an invalid required field name.", operation=path
                 )
-            if (
-                name == "description"
-                or name in preserved
-                or name not in fields
-                or fields[name] is None
-            ):
+            if name in preserved or name not in fields or fields[name] is None:
                 continue
             preserved.add(name)
             pointer = name.replace("~", "~0").replace("/", "~1")
-            patches.append({"op": "replace", "path": f"/fields/{pointer}", "value": fields[name]})
+            patches.append({"op": "add", "path": f"/fields/{pointer}", "value": fields[name]})
         self._request(
             "PATCH",
             path,

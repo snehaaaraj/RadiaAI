@@ -353,11 +353,17 @@ The confirmation tool is marked destructive and not read-only.
    requested by the user. Exact API names or unambiguous field labels are accepted.
    Rich-text fields accept plain text, which is HTML-escaped; other fields retain
    their JSON value types. At most 20 fields may be proposed per preview.
-   The server also carries forward existing editable required fields from the
-   item's field definitions in `preserved_fields`. These values are resubmitted
-   unchanged; `false` remains an unchecked "No", not an empty entry. Absent or
-   null fields are not assigned invented defaults. Explicitly requested values
-   take precedence over preservation.
+   Existing editable required values are also resubmitted unchanged and listed
+   separately in `preserved_fields`. This includes unchecked checkboxes (`false`),
+   zero values and picklist arrays; absent and null values are never defaulted.
+   Explicit requests take precedence over preservation. Read-only fields are omitted.
+   Field assignments use JSON Patch `add` at the field's object-member path: this
+   inserts or replaces that member, without appending to array-valued fields.
+   Unlike `replace`, it does not require the field to exist in Jama's writable
+   representation, which can differ from GET responses. See Jama's
+   [PATCH documentation](https://dev.jamasoftware.com/cookbook/).
+   Genuine mandatory-field validation errors still stop the write; the server
+   never retries by guessing values or clearing other fields.
 3. Show the complete preview (item ID, document key, field API names, original
    values and exact proposed values). **Nothing has been written.**
 4. After explicit user approval in a subsequent interaction, call

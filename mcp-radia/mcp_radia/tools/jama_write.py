@@ -35,7 +35,10 @@ class JamaWritePreview(BaseModel):
     document_key: str | None
     name: str
     changes: list[JamaFieldChange]
-    preserved_fields: list[JamaFieldChange] = Field(default_factory=list)
+    preserved_fields: list[JamaFieldChange] = Field(
+        default_factory=list,
+        description="Existing editable required values resubmitted unchanged, including false and zero.",
+    )
     confirmation_token: str
     expires_at: int
 
@@ -109,7 +112,11 @@ class JamaWriteService:
             if field.get("readOnly") is True:
                 raise ValueError(f"Field '{name}' is read-only.")
             seen.add(name)
-            if name == "description" or field.get("fieldType") in ("RICHTEXT", "RICH_TEXT"):
+            if (
+                name == "description"
+                or field.get("fieldType") in ("RICHTEXT", "RICH_TEXT")
+                or field.get("textType") == "RICHTEXT"
+            ):
                 if not isinstance(value, str):
                     raise ValueError(f"Field '{name}' requires plain text.")
                 value = (
@@ -127,7 +134,8 @@ class JamaWriteService:
             )
             patches.append(
                 {
-                    "op": "replace" if name in current else "add",
+                    # GET fields can be absent from Jama's PATCH target; add is an object upsert.
+                    "op": "add",
                     "path": f"/fields/{name}",
                     "value": value,
                 }
@@ -154,7 +162,7 @@ class JamaWriteService:
                 )
             )
             pointer = name.replace("~", "~0").replace("/", "~1")
-            patches.append({"op": "replace", "path": f"/fields/{pointer}", "value": value})
+            patches.append({"op": "add", "path": f"/fields/{pointer}", "value": value})
         expires = int(time.time()) + _TTL_SECONDS
         payload = _serialize(
             {
@@ -262,9 +270,10 @@ def register_jama_write_tools(
         description="Prepare, but DO NOT WRITE, changes to one Jama item's explicitly requested fields. "
         "Use exact field API names or unambiguous labels from jama_get_item_type and actual JSON values "
         "(picklists require Jama option IDs). Rich text is supplied as plain text and escaped to HTML. "
-        "Never invent values for required safety fields. Show the complete item and before/after preview "
-        "and preserved_fields: existing required values are resubmitted unchanged, including false (No). "
-        "to the user and request explicit confirmation. A preview expires in 10 minutes.",
+        "Never invent values for required safety fields. Only requested values change; existing "
+        "editable required values are resubmitted unchanged in preserved_fields, including false (No). "
+        "Show the before/after preview and explain preservation, then request explicit confirmation. "
+        "A preview expires in 10 minutes.",
     )
     async def jama_prepare_field_update(
         ctx: Context,

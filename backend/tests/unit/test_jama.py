@@ -196,7 +196,7 @@ def test_update_description_http_contract(
     assert patch_request.headers["content-type"] == "application/json"
     assert json.loads(patch_request.read()) == [
         {
-            "op": "replace",
+            "op": "add",
             "path": "/fields/description",
             "value": plain_text_to_jama_html("Updated"),
         }

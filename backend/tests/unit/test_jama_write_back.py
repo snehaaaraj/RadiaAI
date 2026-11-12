@@ -62,9 +62,31 @@ class _FakeJamaClient(JamaClient):
             return {"data": self.item}
         if method == "PATCH":
             self.patches.append(json)
+            target = {
+                key: value
+                for key, value in self.item["fields"].items()
+                if value is not None and value is not False
+            }
+            supplied = set()
             for op in json or []:
-                field_name = op["path"].removeprefix("/fields/")
-                self.item["fields"][field_name] = op["value"]
+                field_name = (
+                    op["path"].removeprefix("/fields/").replace("~1", "/").replace("~0", "~")
+                )
+                if op["op"] == "replace" and field_name not in target:
+                    raise JamaServiceError("no such path in target JSON document", operation=path)
+                target[field_name] = op["value"]
+                supplied.add(field_name)
+            for field in self.field_definitions:
+                name = field.get("name")
+                if (
+                    field.get("required") is True
+                    and field.get("readOnly") is not True
+                    and name in self.item["fields"]
+                    and self.item["fields"][name] is not None
+                    and name not in supplied
+                ):
+                    raise JamaServiceError(f"Mandatory field omitted: {name}", operation=path)
+            self.item["fields"].update(target)
             self.item["modifiedDate"] = f"2024-03-0{len(self.patches)}T00:00:00.000+0000"
             return {}
         raise AssertionError(f"Unexpected method {method}")
@@ -110,7 +132,7 @@ def test_plain_text_to_jama_html_escapes_and_keeps_line_structure() -> None:
 @pytest.mark.unit
 @pytest.mark.parametrize("flag", [False, True])
 @pytest.mark.parametrize("release", [115, 0])
-def test_jrr_preserves_required_boolean_and_release_values(
+def test_jrr_preserves_required_values_on_sparse_patch_target(
     client: TestClient, fake_jama: _FakeJamaClient, flag: bool, release: int
 ) -> None:
     values = {
@@ -118,6 +140,11 @@ def test_jrr_preserves_required_boolean_and_release_values(
         "derived_requirement$67": flag,
         "safety_requirement$67": flag,
         "cybersecurity_requirement$67": flag,
+        "verification_method$67": [673, 674],
+        "empty_selection$67": [],
+        "empty_text$67": "",
+        "required_richtext$67": "<p>Existing &amp; unchanged</p>",
+        "escaped/~field$67": 0,
     }
     fake_jama.item["fields"].update(values)
     fake_jama.field_definitions = [
@@ -136,13 +163,43 @@ def test_jrr_preserves_required_boolean_and_release_values(
     response = _write(client, review["review_id"])
     assert response.status_code == 200, response.json()
     patches = fake_jama.patches[0]
-    assert patches[1:] == [
-        {"op": "replace", "path": f"/fields/{name}", "value": value}
-        for name, value in values.items()
+    recommended = review["final_recommendation"]["recommended_description"]
+    assert patches == [
+        {
+            "op": "add",
+            "path": "/fields/description",
+            "value": plain_text_to_jama_html(recommended),
+        },
+        *[
+            {
+                "op": "add",
+                "path": "/fields/" + name.replace("~", "~0").replace("/", "~1"),
+                "value": value,
+            }
+            for name, value in values.items()
+        ],
     ]
     assert {name: fake_jama.item["fields"][name] for name in values} == values
     assert "missing" not in fake_jama.item["fields"]
     assert fake_jama.item["fields"]["null_field"] is None
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("old_value", [None, False])
+def test_jrr_description_can_be_set_when_missing_from_patch_target(old_value: Any) -> None:
+    jama = _FakeJamaClient()
+    jama.item["fields"]["description"] = old_value
+    result = jama.update_description(ITEM_ID, "Updated")
+    assert result.description == "Updated"
+    assert jama.patches == [
+        [
+            {
+                "op": "add",
+                "path": "/fields/description",
+                "value": "<p>Updated</p>",
+            }
+        ]
+    ]
 
 
 @pytest.mark.unit
@@ -171,7 +228,7 @@ def test_ready_to_replace_writes_the_final_recommendation_exactly(
     assert fake_jama.patches == [
         [
             {
-                "op": "replace",
+                "op": "add",
                 "path": "/fields/description",
                 "value": plain_text_to_jama_html(recommended),
             }

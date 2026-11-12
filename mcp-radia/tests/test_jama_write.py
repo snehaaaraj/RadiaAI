@@ -33,8 +33,39 @@ def fixture_client(
                     patch_status,
                     json={"meta": {"message": patch_message}},
                 )
+            # Jama's writable representation can omit values returned by GET.
+            target = {
+                key: value
+                for key, value in raw["fields"].items()
+                if value is not None and value is not False
+            }
+            supplied = set()
             for patch in patches[-1]:
-                raw["fields"][patch["path"].removeprefix("/fields/")] = patch["value"]
+                name = patch["path"].removeprefix("/fields/").replace("~1", "/").replace("~0", "~")
+                if patch["op"] == "replace" and name not in target:
+                    return httpx2.Response(
+                        400, json={"meta": {"message": "no such path in target JSON document"}}
+                    )
+                target[name] = patch["value"]
+                supplied.add(name)
+            for field in required_fields or []:
+                name = field.get("name")
+                if (
+                    field.get("required") is True
+                    and field.get("readOnly") is not True
+                    and name in raw["fields"]
+                    and raw["fields"][name] is not None
+                    and name not in supplied
+                ):
+                    return httpx2.Response(
+                        400,
+                        json={
+                            "meta": {
+                                "message": f"You must set the following required fields. fields: {name}"
+                            }
+                        },
+                    )
+            raw["fields"].update(target)
             raw["modifiedDate"] = "2026-11-06T12:00:00.000+0000"
             return httpx2.Response(200, json={"meta": {"status": "OK"}})
         if "itemtypes" in request.url.path:
@@ -109,7 +140,7 @@ async def test_prepare_does_not_write_and_confirm_changes_only_requested_fields(
         assert patches == [
             [
                 {
-                    "op": "replace",
+                    "op": "add",
                     "path": "/fields/description",
                     "value": "<p>Text &lt; &amp;</p>",
                 }
@@ -231,17 +262,35 @@ async def test_missing_mandatory_fields_explain_jama_policy_in_tool_error(messag
 
 @pytest.mark.parametrize("flag", [False, True])
 @pytest.mark.parametrize("release", [115, 0])
-async def test_preserve_required_values_in_preview_and_confirmed_patch(flag, release):
+async def test_description_write_preserves_required_values_on_sparse_patch_target(flag, release):
     definitions = [
         {"name": name, "label": name, "required": True, "readOnly": False}
-        for name in ("release", "derived_requirement$31", "safety_requirement$31")
+        for name in (
+            "release",
+            "derived_requirement$31",
+            "safety_requirement$31",
+            "verification_method$31",
+            "empty_selection$31",
+            "empty_text$31",
+            "required_richtext$31",
+            "escaped/~field$31",
+        )
     ] + [
         {"name": "missing_required", "required": True},
         {"name": "null_required", "required": True},
         {"name": "locked", "required": True, "readOnly": True},
     ]
     client, _, raw, patches = fixture_client(required_fields=definitions)
-    values = {"release": release, "derived_requirement$31": flag, "safety_requirement$31": flag}
+    values = {
+        "release": release,
+        "derived_requirement$31": flag,
+        "safety_requirement$31": flag,
+        "verification_method$31": [673, 674],
+        "empty_selection$31": [],
+        "empty_text$31": "",
+        "required_richtext$31": "<p>Existing &amp; unchanged</p>",
+        "escaped/~field$31": 0,
+    }
     raw["fields"].update(values | {"null_required": None, "locked": "read-only"})
     service = JamaWriteService(b"test")
     preview = await service.prepare(client, 12345, {"description": "New"})
@@ -251,9 +300,18 @@ async def test_preserve_required_values_in_preview_and_confirmed_patch(flag, rel
     assert patches == []
     result = await service.confirm(client, preview.confirmation_token, True)
     assert result.fields == ["description"]
-    assert patches[0][1:] == [
-        {"op": "replace", "path": f"/fields/{name}", "value": value}
-        for name, value in values.items()
+    assert patches == [
+        [
+            {"op": "add", "path": "/fields/description", "value": "<p>New</p>"},
+            *[
+                {
+                    "op": "add",
+                    "path": "/fields/" + name.replace("~", "~0").replace("/", "~1"),
+                    "value": value,
+                }
+                for name, value in values.items()
+            ],
+        ]
     ]
     assert {name: raw["fields"][name] for name in values} == values
     assert raw["fields"]["null_required"] is None
@@ -267,17 +325,41 @@ async def test_invalid_required_metadata_fails_before_patch():
     assert patches == []
 
 
-async def test_changed_preserved_checkbox_invalidates_confirmation():
+async def test_preserved_values_are_included_in_preview_size_limit():
     client, _, raw, patches = fixture_client(
-        required_fields=[{"name": "safety_requirement$31", "required": True}]
+        required_fields=[{"name": "required_text$31", "required": True}]
     )
-    raw["fields"]["safety_requirement$31"] = False
-    service = JamaWriteService(b"test")
-    preview = await service.prepare(client, 12345, {"description": "New"})
-    raw["fields"]["safety_requirement$31"] = True
-    with pytest.raises(ValueError, match="changed"):
-        await service.confirm(client, preview.confirmation_token, True)
+    raw["fields"]["required_text$31"] = "x" * 13000
+    with pytest.raises(ValueError, match="too large"):
+        await JamaWriteService(b"test").prepare(client, 12345, {"description": "New"})
     assert patches == []
+
+
+async def test_actual_jama_richtext_metadata_escapes_requested_text_only():
+    client, _, raw, patches = fixture_client(
+        required_fields=[
+            {
+                "name": "customField123",
+                "fieldType": "TEXT",
+                "textType": "RICHTEXT",
+                "required": True,
+            }
+        ]
+    )
+    raw["fields"]["customField123"] = "<p>Old</p>"
+    service = JamaWriteService(b"test")
+    preview = await service.prepare(client, 12345, {"customField123": "Stop < 50 & hold."})
+    assert preview.preserved_fields == []
+    await service.confirm(client, preview.confirmation_token, True)
+    assert patches == [
+        [
+            {
+                "op": "add",
+                "path": "/fields/customField123",
+                "value": "<p>Stop &lt; 50 &amp; hold.</p>",
+            }
+        ]
+    ]
 
 
 async def test_explicitly_requested_required_value_is_not_replaced_by_preserved_value():
@@ -290,8 +372,31 @@ async def test_explicitly_requested_required_value_is_not_replaced_by_preserved_
     preview = await service.prepare(client, 12345, {"customField123": False})
     assert preview.preserved_fields == []
     await service.confirm(client, preview.confirmation_token, True)
-    assert patches == [[{"op": "replace", "path": "/fields/customField123", "value": False}]]
+    assert patches == [[{"op": "add", "path": "/fields/customField123", "value": False}]]
     assert raw["fields"]["customField123"] is False
+
+
+@pytest.mark.parametrize("old_value", [False, None, "old"])
+async def test_explicit_update_handles_existing_or_omitted_patch_member(old_value):
+    client, _, raw, patches = fixture_client()
+    raw["fields"]["customField123"] = old_value
+    preview = await JamaWriteService(b"test").prepare(client, 12345, {"customField123": False})
+    await JamaWriteService(b"test").confirm(client, preview.confirmation_token, True)
+    assert patches == [[{"op": "add", "path": "/fields/customField123", "value": False}]]
+    assert raw["fields"]["customField123"] is False
+
+
+async def test_changed_preserved_checkbox_invalidates_confirmation():
+    client, _, raw, patches = fixture_client(
+        required_fields=[{"name": "safety_requirement$31", "required": True}]
+    )
+    raw["fields"]["safety_requirement$31"] = False
+    service = JamaWriteService(b"test")
+    preview = await service.prepare(client, 12345, {"description": "New"})
+    raw["fields"]["safety_requirement$31"] = True
+    with pytest.raises(ValueError, match="changed"):
+        await service.confirm(client, preview.confirmation_token, True)
+    assert patches == []
 
 
 @pytest.mark.parametrize(
