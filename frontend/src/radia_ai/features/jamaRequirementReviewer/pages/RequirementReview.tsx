@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
+import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Grid from '@mui/material/Grid2';
 import MenuItem from '@mui/material/MenuItem';
@@ -266,7 +267,13 @@ export default function RequirementReview() {
   };
 
   return (
-    <Stack spacing={3}>
+    <Stack
+      component="section"
+      aria-label="Individual requirement review workspace"
+      aria-busy={isPending}
+      spacing={3}
+      sx={isPending ? requirementReviewStyles.processingWorkspace : undefined}
+    >
       <Box>
         <Typography variant="h5" fontWeight={700}>
           Individual Requirement Review
@@ -411,6 +418,15 @@ export default function RequirementReview() {
             <Button variant="contained" disabled={!canSubmit || isPending} onClick={submitReview}>
               Run AI review
             </Button>
+            {isPending && (
+              <Stack direction="row" spacing={1} alignItems="center" role="status">
+                <CircularProgress size={20} aria-hidden="true"
+                  sx={{ '@media (prefers-reduced-motion: reduce)': { animation: 'none' } }} />
+                <Typography variant="body2" color="text.secondary">
+                  AI review in progress...
+                </Typography>
+              </Stack>
+            )}
           </Box>
         </Stack>
       </Paper>

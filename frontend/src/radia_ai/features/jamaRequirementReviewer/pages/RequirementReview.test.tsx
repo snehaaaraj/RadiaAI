@@ -9,6 +9,13 @@ const jama = vi.hoisted(() => ({
   requirement: vi.fn(),
 }));
 
+const reviewMutation = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  reset: vi.fn(),
+  isPending: false,
+  isError: false,
+}));
+
 vi.mock('@/radia_ai/features/jamaRequirementReviewer/hooks/useJama', () => ({
   JAMA_LINK_REQUIRED_CODES: new Set(),
   jamaErrorCode: () => undefined,
@@ -18,7 +25,7 @@ vi.mock('@/radia_ai/features/jamaRequirementReviewer/hooks/useJama', () => ({
 }));
 
 vi.mock('@/radia_ai/features/jamaRequirementReviewer/hooks/useRequirementReview', () => ({
-  useRequirementReview: () => ({ mutate: vi.fn(), reset: vi.fn(), isPending: false }),
+  useRequirementReview: () => reviewMutation,
 }));
 
 vi.mock('@/radia_ai/features/jamaRequirementReviewer/hooks/useReviewHistory', () => ({
@@ -54,6 +61,9 @@ const requirement: JamaRequirement = {
 
 describe('Individual Requirement Review - retained Jama input', () => {
   beforeEach(() => {
+    reviewMutation.isPending = false;
+    reviewMutation.isError = false;
+    reviewMutation.mutate.mockReset();
     localStorage.clear();
     sessionStorage.clear();
     jama.search.mockReset();
@@ -62,6 +72,35 @@ describe('Individual Requirement Review - retained Jama input', () => {
     jama.requirement.mockImplementation((id: number | null) => ({
       data: id === requirement.id ? requirement : undefined,
     }));
+  });
+
+  it('shows processing feedback only while the individual AI review is pending', () => {
+    const page = render(<RequirementReview />);
+    const workspace = screen.getByRole('region', { name: 'Individual requirement review workspace' });
+    expect(workspace).toHaveAttribute('aria-busy', 'false');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+
+    reviewMutation.isPending = true;
+    page.rerender(<RequirementReview />);
+    expect(workspace).toHaveAttribute('aria-busy', 'true');
+    expect(screen.getByRole('button', { name: 'Run AI review' })).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent('AI review in progress...');
+
+    reviewMutation.isPending = false;
+    page.rerender(<RequirementReview />);
+    expect(workspace).toHaveAttribute('aria-busy', 'false');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('clears processing feedback when the review fails', () => {
+    reviewMutation.isPending = true;
+    const page = render(<RequirementReview />);
+    reviewMutation.isPending = false;
+    reviewMutation.isError = true;
+    page.rerender(<RequirementReview />);
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Individual requirement review workspace' }))
+      .toHaveAttribute('aria-busy', 'false');
   });
 
   it('retains a pasted search name across input-tab switches, blur, and page remounts', async () => {
