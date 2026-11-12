@@ -297,13 +297,24 @@ az containerapp create -g $RG -n ca-worker --environment $ENVNAME `
 
 ### 8d. Frontend
 
-The frontend must be built **after** the backend URL is known (it is baked into the bundle).
+For the same-origin proxy configuration, build with `VITE_API_BASE_URL=/api/v1`
+and set the frontend container's runtime `BACKEND_URL` to the backend's HTTPS
+origin (no path or trailing slash). The nginx proxy preserves `/api/...` and
+uses the backend hostname for routing and TLS verification. To accommodate
+intermediate CAs, nginx permits a verification depth of three while keeping
+certificate verification enabled. The backend can
+then keep internal ingress in the same environment. No backend secrets belong
+in the frontend image. Changing `VITE_*` settings requires rebuilding the image;
+changing `BACKEND_URL` requires a new Container App revision.
+
+The frontend build needs the SPA registration and redirect URL; the backend URL
+is supplied at runtime through `BACKEND_URL`.
 `VITE_*` values are public; they are not secrets. Run from the repository root; the trailing
 `.` is the build context.
 
 ```powershell
 az acr build -r $ACR -t "radia-frontend:$TAG" -f frontend/Dockerfile `
-  --build-arg VITE_API_BASE_URL="$BACK_URL/api/v1" `
+  --build-arg VITE_API_BASE_URL="/api/v1" `
   --build-arg VITE_ENTRA_CLIENT_ID=<SPA app client id> `
   --build-arg VITE_ENTRA_TENANT_ID=eeb96edb-0303-4889-b4d8-6050ed38f182 `
   --build-arg VITE_ENTRA_API_SCOPE="api://<API app client id>/access_as_user" `
@@ -315,7 +326,8 @@ az containerapp create -g $RG -n ca-frontend --environment $ENVNAME `
   --registry-server $LOGIN --registry-identity $IDENT_ID `
   --user-assigned $IDENT_ID `
   --ingress external --target-port 8080 --transport http `
-  --min-replicas 1 --max-replicas 3 --cpu 0.25 --memory 0.5Gi
+  --min-replicas 1 --max-replicas 3 --cpu 0.25 --memory 0.5Gi `
+  --env-vars "BACKEND_URL=$BACK_URL"
 ```
 
 ## 9. Lock access to the offices and verify end to end
