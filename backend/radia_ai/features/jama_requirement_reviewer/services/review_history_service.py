@@ -156,7 +156,8 @@ class ReviewHistoryService:
         The text written is taken from the *stored* decision, never from the client:
         "Ready to replace" writes the final recommended Description exactly, and
         "Accept, but modify" writes the reviewer's modified Description exactly. A
-        rejected recommendation is never written. Only the Description field changes.
+        rejected recommendation is never written. The Jama version comment
+        identifies the review ID.
         """
         entry = self._repository.get_entry(review_id, owner_id=owner_id)
         if entry.jama_item_id is None:
@@ -191,7 +192,11 @@ class ReviewHistoryService:
                     },
                 )
 
-        updated = jama_service.update_requirement_description(entry.jama_item_id, description)
+        updated = jama_service.update_requirement_description(
+            entry.jama_item_id,
+            description,
+            comment=f"Modified by Radia AI via review ID - {review_id}",
+        )
         record = JamaWriteRecord(
             item_id=updated.id,
             document_key=updated.document_key,

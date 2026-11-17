@@ -60,8 +60,10 @@ class JamaService:
         logger.info("jama_requirement_read", item_id=item_id, document_key=requirement.document_key)
         return requirement
 
-    def update_requirement_description(self, item_id: int, description: str) -> JamaRequirement:
-        requirement = self._client.update_description(item_id, description)
+    def update_requirement_description(
+        self, item_id: int, description: str, *, comment: str | None = None
+    ) -> JamaRequirement:
+        requirement = self._client.update_description(item_id, description, comment=comment)
         logger.info(
             "jama_requirement_description_written",
             item_id=item_id,

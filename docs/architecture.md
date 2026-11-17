@@ -229,8 +229,9 @@ Writing is an explicit, decision-gated action:
    against the version captured by the review (or the most recent successful
    write). A changed source produces a conflict instead of overwriting newer
    work.
-4. Only the Jama Description field is changed. The write is made with the
-   signed-in user's linked credentials, so Jama applies that user's permissions.
+4. The Jama Description field is changed, and the new version is tagged with a
+   comment identifying the review ID. The write is made with the signed-in
+   user's linked credentials, so Jama applies that user's permissions.
 5. The successful write, decision, writer, time, Jama item, and written text are
    persisted with the review history.
 
@@ -768,7 +769,7 @@ Steps:
 | Microsoft Entra ID authentication and authorization | Implemented | SPA sign-in with MSAL; API validates Entra access tokens (RS256/JWKS, issuer, audience, expiry, tenant, scope) and enforces `Radia.User` / `Radia.Admin` app roles on every non-public endpoint. Local/test environments may use a synthetic user; deployed environments fail closed. See [authentication.md](./authentication.md). |
 | Per-user Jama access | Implemented | Each user links their own Jama API credentials (encrypted at rest); all Jama calls run as that user so Jama enforces their project permissions. Review history is private per user. |
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
-| Jama requirement selection and approved Description write-back | Implemented | Uses each user's linked Jama credentials; write-back requires a saved accepting decision, changes only Description, checks for intervening Jama edits, and records the result in review history. This does not implement bulk roundtrip or synchronization. |
+| Jama requirement selection and approved Description write-back | Implemented | Uses each user's linked Jama credentials; write-back requires a saved accepting decision, changes Description, comments the Jama version with the review ID, checks for intervening Jama edits, and records the result in review history. This does not implement bulk roundtrip or synchronization. |
 | MCP chat integration (Jama) | Implemented, disabled by default | Bounded tool-calling loop over a separately deployed `mcp-radia` server; server-side allowlist + schema validation + per-user Jama credential forwarding. |
 | Standalone MCP server tools | Implemented for Jama, Jira, Confluence; GENESYS unimplemented | Twelve read-only tools and one confirmed Jama field-write tool; Jira/Confluence remain read-only and are not allowed in Radia AI chat. Atlassian per-user linking remains on hold. |
 | Jama Roundtrip page | Placeholder | No bulk roundtrip, synchronization, or reporting implementation. |

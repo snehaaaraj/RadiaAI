@@ -432,12 +432,15 @@ class JamaClient:
             )
         return self._requirement_from_raw(cast(dict[str, Any], data))
 
-    def update_description(self, item_id: int, description: str) -> JamaRequirement:
+    def update_description(
+        self, item_id: int, description: str, *, comment: str | None = None
+    ) -> JamaRequirement:
         """Update Description, preserving required values and defaulting missing Release.
 
         Resubmit existing editable required values unchanged, including false and zero.
         Use object-member add (upsert): GET fields may be absent from the PATCH target.
-        Jama expects application/json, not application/json-patch+json.
+        Jama expects application/json, not application/json-patch+json. When provided,
+        comment is recorded on the new item version.
         """
         path = f"items/{item_id}"
         raw = self._get(path).get("data")
@@ -490,6 +493,7 @@ class JamaClient:
         self._request(
             "PATCH",
             path,
+            params={"comment": comment} if comment is not None else None,
             json=patches,
         )
         return self.get_requirement(item_id)

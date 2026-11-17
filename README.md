@@ -281,7 +281,8 @@ button, so there's always a single place to check ingestion health.
       the recommendation or reviewer-modified text; rejected recommendations
       cannot be written
 - [x] Detect a Jama item changed since review before writing, and record
-      successful writes in review history
+      successful writes in review history; identify each Jama version with its
+      review ID in the version comment
 
 This guarded write-back is part of the requirement-review workflow. The separate
 **Jama Roundtrip** page is still a placeholder; it does not provide bulk

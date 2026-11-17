@@ -32,6 +32,7 @@ class _FakeJamaClient(JamaClient):
             JamaApiCredentials("cid", "secret"),
         )
         self.patches: list[Any] = []
+        self.patch_params: list[dict[str, Any] | None] = []
         self.field_definitions: list[dict[str, Any]] = []
         self.releases: list[dict[str, Any]] = [{"id": 901, "name": "Unassigned", "project": 1}]
         self.item: dict[str, Any] = {
@@ -67,6 +68,7 @@ class _FakeJamaClient(JamaClient):
             return {"data": self.item}
         if method == "PATCH":
             self.patches.append(json)
+            self.patch_params.append(params)
             target = {
                 key: value
                 for key, value in self.item["fields"].items()
@@ -288,6 +290,9 @@ def test_ready_to_replace_writes_the_final_recommendation_exactly(
                 "value": plain_text_to_jama_html(recommended),
             }
         ]
+    ]
+    assert fake_jama.patch_params == [
+        {"comment": f"Modified by Radia AI via review ID - {review['review_id']}"}
     ]
     assert fake_jama.item["fields"]["rationale"] == "<p>Keep it quick.</p>"
     write = response.json()["data"]["jama_write"]

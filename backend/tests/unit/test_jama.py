@@ -173,12 +173,16 @@ def test_update_description_http_contract(
     monkeypatch.setattr(client, "_auth_headers", lambda _: {"Authorization": "Bearer token"})
 
     if patch_status == 200:
-        updated = client.update_description(101, "Updated")
+        updated = client.update_description(
+            101, "Updated", comment="Modified by Radia AI via review ID - rev-test"
+        )
         assert updated.id == 101
         assert [request.method for request in requests] == ["GET", "GET", "PATCH", "GET"]
     else:
         with pytest.raises(JamaServiceError) as error:
-            client.update_description(101, "Updated")
+            client.update_description(
+                101, "Updated", comment="Modified by Radia AI via review ID - rev-test"
+            )
         assert error.value.message == (
             f"Jama API returned HTTP {patch_status} for PATCH items/101. "
             "The requested field cannot be updated."
@@ -194,6 +198,9 @@ def test_update_description_http_contract(
 
     patch_request = next(request for request in requests if request.method == "PATCH")
     assert patch_request.headers["content-type"] == "application/json"
+    assert dict(patch_request.url.params) == {
+        "comment": "Modified by Radia AI via review ID - rev-test"
+    }
     assert json.loads(patch_request.read()) == [
         {
             "op": "add",
