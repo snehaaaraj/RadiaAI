@@ -291,9 +291,7 @@ def test_ready_to_replace_writes_the_final_recommendation_exactly(
             }
         ]
     ]
-    assert fake_jama.patch_params == [
-        {"comment": f"Modified by Radia AI via review ID - {review['review_id']}"}
-    ]
+    assert fake_jama.patch_params == [None]
     assert fake_jama.item["fields"]["rationale"] == "<p>Keep it quick.</p>"
     write = response.json()["data"]["jama_write"]
     assert write["item_id"] == ITEM_ID

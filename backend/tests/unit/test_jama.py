@@ -138,6 +138,8 @@ def test_update_description_http_contract(
         if request.url.path == "/rest/v1/itemtypes/67":
             return httpx.Response(200, json={"data": {"fields": []}})
         if request.method == "PATCH":
+            # Jama documents only returnItem here; unknown parameters may be silently ignored.
+            assert set(request.url.params) <= {"returnItem"}
             if request.headers["content-type"] != "application/json":
                 return httpx.Response(415, text="Unsupported Media Type")
             if patch_status == 200:
@@ -173,16 +175,12 @@ def test_update_description_http_contract(
     monkeypatch.setattr(client, "_auth_headers", lambda _: {"Authorization": "Bearer token"})
 
     if patch_status == 200:
-        updated = client.update_description(
-            101, "Updated", comment="Modified by Radia AI via review ID - rev-test"
-        )
+        updated = client.update_description(101, "Updated")
         assert updated.id == 101
         assert [request.method for request in requests] == ["GET", "GET", "PATCH", "GET"]
     else:
         with pytest.raises(JamaServiceError) as error:
-            client.update_description(
-                101, "Updated", comment="Modified by Radia AI via review ID - rev-test"
-            )
+            client.update_description(101, "Updated")
         assert error.value.message == (
             f"Jama API returned HTTP {patch_status} for PATCH items/101. "
             "The requested field cannot be updated."
@@ -198,9 +196,7 @@ def test_update_description_http_contract(
 
     patch_request = next(request for request in requests if request.method == "PATCH")
     assert patch_request.headers["content-type"] == "application/json"
-    assert dict(patch_request.url.params) == {
-        "comment": "Modified by Radia AI via review ID - rev-test"
-    }
+    assert dict(patch_request.url.params) == {}
     assert json.loads(patch_request.read()) == [
         {
             "op": "add",
