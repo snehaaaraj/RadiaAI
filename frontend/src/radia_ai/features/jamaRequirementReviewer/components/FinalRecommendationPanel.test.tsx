@@ -196,6 +196,33 @@ describe('FinalRecommendationPanel', () => {
       );
     });
 
+    it('disables saving and writing after the decision has been written to Jama', () => {
+      render(
+        <FinalRecommendationPanel
+          recommendation={buildRecommendation()}
+          findings={[buildFinding()]}
+          reviewId="rev-1"
+          onApplyDecision={vi.fn()}
+          jamaTarget={jamaTarget}
+          jamaWrite={{
+            item_id: 101,
+            document_key: 'SYS-REQ-1',
+            decision: 'ready_to_replace',
+            description: 'The system shall respond within 2 s.',
+            written_by: 'engineer@example.com',
+            written_at: '2026-01-01T00:00:00Z',
+            web_url: null,
+          }}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: 'Ready to replace', pressed: false }));
+
+      expect(screen.getByRole('button', { name: 'Save & write to Jama' })).toBeDisabled();
+      expect(screen.queryByTestId('quick-accept-chip')).not.toBeInTheDocument();
+      expect(screen.getByText('Written to Jama')).toBeInTheDocument();
+    });
+
     it('keeps the status chip a plain label when no decision can be made', () => {
       render(
         <FinalRecommendationPanel recommendation={buildRecommendation()} findings={[buildFinding()]} readOnly />

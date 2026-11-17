@@ -1,18 +1,24 @@
 import type { SxProps, Theme } from '@mui/material/styles';
-import radiaLogo from '@/assets/radia-circle-white background.png?inline';
+import lightRadiaLogo from '@/assets/radia-circle-white background.png?inline';
+import darkRadiaLogo from '@/assets/radia-circle-white lines.jpg?inline';
 
-const processingCursor = `url("data:image/svg+xml,${encodeURIComponent(
-  `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="white" stroke="#cbd5e1" stroke-width="2"/><image href="${radiaLogo}" x="8" y="8" width="24" height="24"/></svg>`,
-)}") 17 17, progress`;
+const processingWorkspace = (theme: Theme) => {
+  const logo = theme.palette.mode === 'dark' ? darkRadiaLogo : lightRadiaLogo;
+  const cursor = `url("data:image/svg+xml,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 40 40"><circle cx="20" cy="20" r="18" fill="${theme.palette.background.paper}" stroke="${theme.palette.primary.main}" stroke-width="2"/><image href="${logo}" x="8" y="8" width="24" height="24"/></svg>`,
+  )}") 17 17, progress`;
 
-export const requirementReviewStyles = {
-  processingWorkspace: {
+  return {
     '@media (hover: hover) and (pointer: fine)': {
       '&, & *': {
-        cursor: `${processingCursor} !important`,
+        cursor: `${cursor} !important`,
       },
     },
-  } satisfies SxProps<Theme>,
+  };
+};
+
+export const requirementReviewStyles = {
+  processingWorkspace,
   sectionPaper: {
     p: 2.5,
   } satisfies SxProps<Theme>,

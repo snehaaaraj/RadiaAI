@@ -152,7 +152,7 @@ export function FinalRecommendationPanel({
   const decisionPanelRef = useRef<HTMLDivElement | null>(null);
   // The "Ready to replace" status chip doubles as a shortcut to accept the recommendation.
   const canQuickAccept =
-    !readOnly && Boolean(onApplyDecision && reviewId) && recommendation.status === 'ready';
+    !readOnly && !jamaWrite && Boolean(onApplyDecision && reviewId) && recommendation.status === 'ready';
   const handleQuickAccept = () => {
     setSelectedDecision('ready_to_replace');
     if (jamaTarget) {
@@ -536,7 +536,7 @@ function RecommendationDecisionPanel({
           <Button
             variant="contained"
             size="small"
-            disabled={!canSubmit || isApplyingDecision || isWritingToJama}
+            disabled={!canSubmit || isApplyingDecision || isWritingToJama || Boolean(jamaWrite)}
             onClick={() => {
               if (willWriteToJama) {
                 setConfirmJamaOpen(true);
