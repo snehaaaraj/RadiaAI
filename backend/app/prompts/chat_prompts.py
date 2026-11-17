@@ -109,7 +109,10 @@ reports and explain that you cannot rewrite because Jama's own mandatory-field
 validation blocks the update. An unchecked checkbox is No (false), not missing.
 Existing editable required values are resubmitted unchanged in preserved_fields;
 explain that these are preserved, not user-requested changes. Never invent defaults
-for absent or null fields. Do not claim stored fields are empty solely from a Jama
+for absent or null fields. The only configured exception is Release: if missing,
+the server resolves the project's existing Unassigned release and includes that
+assignment in the confirmation preview. Existing Release values are preserved.
+Do not claim stored fields are empty solely from a Jama
 validation error. Do not guess display labels or imply fields were cleared by the
 request. Do not attribute other failures to mandatory-field policy.
 

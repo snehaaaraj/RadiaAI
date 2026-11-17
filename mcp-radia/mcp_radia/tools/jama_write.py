@@ -144,20 +144,27 @@ class JamaWriteService:
         for field in definitions:
             if not isinstance(field, dict):
                 raise ValueError("Jama returned an invalid field definition.")
-            if field.get("required") is not True or field.get("readOnly") is True:
+            if (field.get("required") is not True and field.get("name") != "release") or field.get(
+                "readOnly"
+            ) is True:
                 continue
             name = field.get("name")
             if not isinstance(name, str) or not name:
                 raise ValueError("Jama returned an invalid required field name.")
-            if name in seen or name not in current or current[name] is None:
+            if name in seen:
+                continue
+            value = current.get(name)
+            default_release = name == "release" and (value is None or value == "")
+            if default_release:
+                value = await client.get_unassigned_release(raw.get("project"))
+            elif value is None:
                 continue
             seen.add(name)
-            value = current[name]
-            preserved_fields.append(
+            (changes if default_release else preserved_fields).append(
                 JamaFieldChange(
                     field=name,
                     label=str(field.get("label") or name),
-                    before=value,
+                    before=current.get(name),
                     after=value,
                 )
             )
@@ -175,12 +182,14 @@ class JamaWriteService:
             }
         )
         if (
-            len(payload) > _MAX_PREVIEW_BYTES
+            len(changes) > 20
+            or len(payload) > _MAX_PREVIEW_BYTES
             or len(_serialize([change.model_dump() for change in changes + preserved_fields]))
             > _MAX_PREVIEW_BYTES
         ):
             raise ValueError(
-                "The proposed changes are too large. Prepare fewer or smaller field changes."
+                "The proposed changes are too large. Prepare fewer or smaller field changes, "
+                "allowing room for a missing Release assignment."
             )
         encoded = base64.urlsafe_b64encode(payload).decode()
         signature = hmac.new(self._key, encoded.encode(), hashlib.sha256).hexdigest()
@@ -272,6 +281,8 @@ def register_jama_write_tools(
         "(picklists require Jama option IDs). Rich text is supplied as plain text and escaped to HTML. "
         "Never invent values for required safety fields. Only requested values change; existing "
         "editable required values are resubmitted unchanged in preserved_fields, including false (No). "
+        "Exception: missing Release is assigned the project's existing Unassigned release and shown "
+        "in changes. Existing Release and explicitly requested Release values take precedence. "
         "Show the before/after preview and explain preservation, then request explicit confirmation. "
         "A preview expires in 10 minutes.",
     )

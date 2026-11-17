@@ -433,7 +433,7 @@ class JamaClient:
         return self._requirement_from_raw(cast(dict[str, Any], data))
 
     def update_description(self, item_id: int, description: str) -> JamaRequirement:
-        """Replace only the Description field of an item and return the updated item.
+        """Update Description, preserving required values and defaulting missing Release.
 
         Resubmit existing editable required values unchanged, including false and zero.
         Use object-member add (upsert): GET fields may be absent from the PATCH target.
@@ -469,25 +469,73 @@ class JamaClient:
                 raise JamaServiceError("Jama returned an invalid field definition.", operation=path)
             if (
                 field_definition.get("required") is not True
-                or field_definition.get("readOnly") is True
-            ):
+                and field_definition.get("name") != "release"
+            ) or field_definition.get("readOnly") is True:
                 continue
             name = field_definition.get("name")
             if not isinstance(name, str) or not name:
                 raise JamaServiceError(
                     "Jama returned an invalid required field name.", operation=path
                 )
-            if name in preserved or name not in fields or fields[name] is None:
+            if name in preserved:
+                continue
+            value = fields.get(name)
+            if name == "release" and (value is None or value == ""):
+                value = self.get_unassigned_release(raw.get("project"))
+            elif value is None:
                 continue
             preserved.add(name)
             pointer = name.replace("~", "~0").replace("/", "~1")
-            patches.append({"op": "add", "path": f"/fields/{pointer}", "value": fields[name]})
+            patches.append({"op": "add", "path": f"/fields/{pointer}", "value": value})
         self._request(
             "PATCH",
             path,
             json=patches,
         )
         return self.get_requirement(item_id)
+
+    def get_unassigned_release(self, project_id: int | None) -> int:
+        """Resolve the existing Unassigned release for this item's project."""
+        if not isinstance(project_id, int) or isinstance(project_id, bool) or project_id <= 0:
+            raise JamaServiceError("Cannot resolve Unassigned without a Jama project ID.")
+        start_at = 0
+        matches: list[int] = []
+        while True:
+            payload = self._get(
+                "releases",
+                params={"project": project_id, "startAt": start_at, "maxResults": 50},
+            )
+            releases = payload.get("data")
+            if not isinstance(releases, list):
+                raise JamaServiceError("Jama returned invalid releases.", operation="releases")
+            for release in releases:
+                if not isinstance(release, dict):
+                    raise JamaServiceError(
+                        "Jama returned an invalid release.", operation="releases"
+                    )
+                if release.get("name") != "Unassigned":
+                    continue
+                release_id = release.get("id")
+                if (
+                    not isinstance(release_id, int)
+                    or isinstance(release_id, bool)
+                    or release_id <= 0
+                    or release.get("project") != project_id
+                ):
+                    raise JamaServiceError(
+                        "Jama returned an invalid Unassigned release.", operation="releases"
+                    )
+                matches.append(release_id)
+            if len(releases) < 50:
+                break
+            start_at += len(releases)
+        if len(matches) != 1:
+            raise JamaServiceError(
+                "The project must have exactly one existing release named Unassigned; "
+                "no changes were written.",
+                operation="releases",
+            )
+        return matches[0]
 
     def get_current_user(self) -> JamaUserProfile:
         """Return the Jama user the current credentials authenticate as."""

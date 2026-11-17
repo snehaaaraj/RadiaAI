@@ -568,6 +568,44 @@ class JamaClient:
             )
         return data
 
+    async def get_unassigned_release(self, project_id: int | None) -> int:
+        """Resolve the existing Unassigned release for this item's project."""
+        if not isinstance(project_id, int) or isinstance(project_id, bool) or project_id <= 0:
+            raise ValueError("Cannot resolve Unassigned without a Jama project ID.")
+        start_at = 0
+        matches: list[int] = []
+        while True:
+            payload = await self._get(
+                "releases",
+                params={"project": project_id, "startAt": start_at, "maxResults": 50},
+            )
+            releases = payload.get("data")
+            if not isinstance(releases, list):
+                raise ValueError("Jama returned invalid releases.")
+            for release in releases:
+                if not isinstance(release, dict):
+                    raise ValueError("Jama returned an invalid release.")
+                if release.get("name") != "Unassigned":
+                    continue
+                release_id = release.get("id")
+                if (
+                    not isinstance(release_id, int)
+                    or isinstance(release_id, bool)
+                    or release_id <= 0
+                    or release.get("project") != project_id
+                ):
+                    raise ValueError("Jama returned an invalid Unassigned release.")
+                matches.append(release_id)
+            if len(releases) < 50:
+                break
+            start_at += len(releases)
+        if len(matches) != 1:
+            raise ValueError(
+                "The project must have exactly one existing release named Unassigned; "
+                "no changes were written."
+            )
+        return matches[0]
+
     async def patch_fields(self, item_id: int, patches: list[dict[str, Any]]) -> None:
         credentials = self._ensure_configured()
         client = self._get_client()

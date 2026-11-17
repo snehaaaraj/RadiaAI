@@ -33,6 +33,7 @@ class _FakeJamaClient(JamaClient):
         )
         self.patches: list[Any] = []
         self.field_definitions: list[dict[str, Any]] = []
+        self.releases: list[dict[str, Any]] = [{"id": 901, "name": "Unassigned", "project": 1}]
         self.item: dict[str, Any] = {
             "id": ITEM_ID,
             "documentKey": "SYS-REQ-1",
@@ -57,6 +58,10 @@ class _FakeJamaClient(JamaClient):
     ) -> dict[str, Any]:
         if path == "itemtypes/67" and method == "GET":
             return {"data": {"fields": self.field_definitions}}
+        if path == "releases" and method == "GET":
+            assert params and params["project"] == 1
+            start = params["startAt"]
+            return {"data": self.releases[start : start + 50]}
         assert path == f"items/{ITEM_ID}", path
         if method == "GET":
             return {"data": self.item}
@@ -121,6 +126,56 @@ def _decide(client: TestClient, review_id: str, **payload: Any) -> None:
 
 def _write(client: TestClient, review_id: str) -> Any:
     return client.post(f"/api/v1/review/history/{review_id}/jama-write")
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize("existing", ["missing", None, "", 115, 0])
+def test_release_default_is_limited_to_missing_release(existing: Any) -> None:
+    jama = _FakeJamaClient()
+    jama.field_definitions = [
+        {"name": "release", "required": True},
+        {"name": "missing_safety", "required": True},
+    ]
+    if existing != "missing":
+        jama.item["fields"]["release"] = existing
+    jama.update_description(ITEM_ID, "Updated")
+    expected = 901 if existing in ("missing", None, "") else existing
+    assert jama.item["fields"]["release"] == expected
+    assert "missing_safety" not in jama.item["fields"]
+    assert jama.patches[0][-1] == {
+        "op": "add",
+        "path": "/fields/release",
+        "value": expected,
+    }
+
+
+@pytest.mark.unit
+@pytest.mark.parametrize(
+    "releases",
+    [
+        [],
+        [
+            {"id": 1, "name": "Unassigned", "project": 1},
+            {"id": 2, "name": "Unassigned", "project": 1},
+        ],
+        [{"id": 1, "name": "Unassigned", "project": 2}],
+    ],
+)
+def test_unassigned_release_resolution_failure_never_writes(releases: Any) -> None:
+    jama = _FakeJamaClient()
+    jama.field_definitions = [{"name": "release", "required": True}]
+    jama.releases = releases
+    with pytest.raises(JamaServiceError):
+        jama.update_description(ITEM_ID, "Updated")
+    assert jama.patches == []
+
+
+@pytest.mark.unit
+def test_unassigned_release_is_resolved_on_later_page() -> None:
+    jama = _FakeJamaClient()
+    jama.releases = [{"id": i + 1, "name": f"Release {i}", "project": 1} for i in range(50)]
+    jama.releases.append({"id": 901, "name": "Unassigned", "project": 1})
+    assert jama.get_unassigned_release(1) == 901
 
 
 @pytest.mark.unit

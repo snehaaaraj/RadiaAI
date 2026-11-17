@@ -357,6 +357,11 @@ The confirmation tool is marked destructive and not read-only.
    separately in `preserved_fields`. This includes unchecked checkboxes (`false`),
    zero values and picklist arrays; absent and null values are never defaulted.
    Explicit requests take precedence over preservation. Read-only fields are omitted.
+   Release is the only defaulting exception: an existing value is preserved;
+   a missing/null/empty-string value is assigned the project's existing release
+   named `Unassigned`. The server resolves its actual numeric ID, never creates
+   a release or guesses an ID, and stops if the name is missing or ambiguous.
+   Chat shows this assignment in `changes` for confirmation, not `preserved_fields`.
    Field assignments use JSON Patch `add` at the field's object-member path: this
    inserts or replaces that member, without appending to array-valued fields.
    Unlike `replace`, it does not require the field to exist in Jama's writable

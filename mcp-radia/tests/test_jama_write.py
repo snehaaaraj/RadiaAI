@@ -21,11 +21,19 @@ def fixture_client(
     patch_status=200,
     patch_message="Required safety field is missing.",
     required_fields=None,
+    releases=None,
 ):
     raw = copy.deepcopy(ITEM_PAYLOAD["data"])
     patches = []
 
     def respond(request):
+        if request.url.path.endswith("/releases"):
+            assert request.url.params["project"] == "7"
+            available = (
+                [{"id": 901, "name": "Unassigned", "project": 7}] if releases is None else releases
+            )
+            start = int(request.url.params["startAt"])
+            return httpx2.Response(200, json={"data": available[start : start + 50]})
         if request.method == "PATCH":
             patches.append(json.loads(request.content))
             if patch_status != 200:
@@ -323,6 +331,73 @@ async def test_invalid_required_metadata_fails_before_patch():
     with pytest.raises(ValueError, match="invalid required field name"):
         await JamaWriteService(b"test").prepare(client, 12345, {"description": "New"})
     assert patches == []
+
+
+@pytest.mark.parametrize("existing", ["missing", None, "", 115, 0])
+async def test_release_fallback_is_previewed_and_preserves_existing_values(existing):
+    client, handler, raw, patches = fixture_client(
+        required_fields=[
+            {"name": "release", "label": "Release", "required": True},
+            {"name": "missing_safety", "required": True},
+        ]
+    )
+    if existing != "missing":
+        raw["fields"]["release"] = existing
+    service = JamaWriteService(b"test")
+    preview = await service.prepare(client, 12345, {"description": "New"})
+    expected = 901 if existing in ("missing", None, "") else existing
+    if expected == 901:
+        assert preview.changes[-1].field == "release"
+        assert preview.changes[-1].after == 901
+        assert preview.preserved_fields == []
+    else:
+        assert [change.field for change in preview.changes] == ["description"]
+        assert preview.preserved_fields[0].after == existing
+        assert not any(request.url.path.endswith("/releases") for request in handler.requests)
+    await service.confirm(client, preview.confirmation_token, True)
+    assert raw["fields"]["release"] == expected
+    assert "missing_safety" not in raw["fields"]
+    assert patches[0][-1] == {"op": "add", "path": "/fields/release", "value": expected}
+
+
+async def test_explicit_release_takes_precedence_over_fallback():
+    client, handler, raw, patches = fixture_client(
+        required_fields=[{"name": "release", "required": True}]
+    )
+    service = JamaWriteService(b"test")
+    preview = await service.prepare(client, 12345, {"release": 115})
+    await service.confirm(client, preview.confirmation_token, True)
+    assert raw["fields"]["release"] == 115
+    assert not any(request.url.path.endswith("/releases") for request in handler.requests)
+    assert patches == [[{"op": "add", "path": "/fields/release", "value": 115}]]
+
+
+@pytest.mark.parametrize(
+    "releases",
+    [
+        [],
+        [
+            {"id": 1, "name": "Unassigned", "project": 7},
+            {"id": 2, "name": "Unassigned", "project": 7},
+        ],
+        [{"id": 1, "name": "Unassigned", "project": 2}],
+    ],
+)
+async def test_invalid_unassigned_release_never_prepares_write(releases):
+    client, _, _, patches = fixture_client(
+        required_fields=[{"name": "release", "required": True}],
+        releases=releases,
+    )
+    with pytest.raises(ValueError):
+        await JamaWriteService(b"test").prepare(client, 12345, {"description": "New"})
+    assert patches == []
+
+
+async def test_unassigned_release_discovery_paginates():
+    releases = [{"id": i + 1, "name": f"Release {i}", "project": 7} for i in range(50)]
+    releases.append({"id": 901, "name": "Unassigned", "project": 7})
+    client, _, _, _ = fixture_client(releases=releases)
+    assert await client.get_unassigned_release(7) == 901
 
 
 async def test_preserved_values_are_included_in_preview_size_limit():
