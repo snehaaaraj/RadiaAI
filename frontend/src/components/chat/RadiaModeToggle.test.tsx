@@ -33,7 +33,7 @@ beforeEach(() => {
   Element.prototype.scrollIntoView = vi.fn();
 });
 
-describe.each(['page', 'widget'] as const)('Radia AI switch in the %s', (surface) => {
+describe.each(['page', 'widget'] as const)('Jama Connector switch in the %s', (surface) => {
   function renderChat() {
     const result = render(surface === 'page' ? <Chat /> : <ChatWidget />);
     if (surface === 'widget') {
@@ -44,7 +44,7 @@ describe.each(['page', 'widget'] as const)('Radia AI switch in the %s', (surface
 
   it('toggles locally, routes both modes, retains drafts, and restores after remount', () => {
     const { unmount } = renderChat();
-    const toggle = screen.getByRole('switch', { name: 'Radia AI mode' });
+    const toggle = screen.getByRole('switch', { name: 'Jama Connector mode' });
     expect(toggle).not.toBeChecked();
     expect(screen.getByText('OFF')).toBeVisible();
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Draft question' } });
@@ -62,9 +62,9 @@ describe.each(['page', 'widget'] as const)('Radia AI switch in the %s', (surface
     unmount();
     resetChatHistoryCache();
     renderChat();
-    expect(screen.getByRole('switch', { name: 'Radia AI mode' })).toBeChecked();
-    fireEvent.click(screen.getByRole('switch', { name: 'Radia AI mode' }));
-    expect(screen.getByRole('switch', { name: 'Radia AI mode' })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: 'Jama Connector mode' })).toBeChecked();
+    fireEvent.click(screen.getByRole('switch', { name: 'Jama Connector mode' }));
+    expect(screen.getByRole('switch', { name: 'Jama Connector mode' })).not.toBeChecked();
     fireEvent.change(screen.getByRole('textbox'), { target: { value: 'Standards question' } });
     fireEvent.keyDown(screen.getByRole('textbox'), { key: 'Enter' });
     expect(mocks.sendMessage).toHaveBeenLastCalledWith(
@@ -78,19 +78,19 @@ describe.each(['page', 'widget'] as const)('Radia AI switch in the %s', (surface
   it('disables the switch while a response is streaming', () => {
     mocks.isStreaming = true;
     renderChat();
-    expect(screen.getByRole('switch', { name: 'Radia AI mode' })).toBeDisabled();
+    expect(screen.getByRole('switch', { name: 'Jama Connector mode' })).toBeDisabled();
   });
 
   it('shows a hover hint for the current mode', async () => {
     renderChat();
-    const label = screen.getByText('Radia AI').closest('label');
+    const label = screen.getByText('Jama Connector').closest('label');
     expect(label).not.toBeNull();
-    if (!label) throw new Error('Radia AI toggle label is missing');
+    if (!label) throw new Error('Jama Connector toggle label is missing');
     fireEvent.mouseOver(label);
     expect(await screen.findByRole('tooltip'))
       .toHaveTextContent('Turn it on to connect to Jama contents');
 
-    fireEvent.click(screen.getByRole('switch', { name: 'Radia AI mode' }));
+    fireEvent.click(screen.getByRole('switch', { name: 'Jama Connector mode' }));
     expect(screen.getByRole('tooltip'))
       .toHaveTextContent('Turn it off to switch back to Radia Chatbot');
   });
@@ -98,9 +98,9 @@ describe.each(['page', 'widget'] as const)('Radia AI switch in the %s', (surface
 
 it('shares the selected mode between the page and widget', () => {
   render(<><Chat /><ChatWidget /></>);
-  fireEvent.click(screen.getByRole('switch', { name: 'Radia AI mode' }));
+  fireEvent.click(screen.getByRole('switch', { name: 'Jama Connector mode' }));
   fireEvent.click(screen.getByRole('button', { name: 'Open chat' }));
-  const toggles = screen.getAllByRole('switch', { name: 'Radia AI mode' });
+  const toggles = screen.getAllByRole('switch', { name: 'Jama Connector mode' });
   expect(toggles).toHaveLength(2);
   toggles.forEach((toggle) => expect(toggle).toBeChecked());
   fireEvent.click(toggles[1]);

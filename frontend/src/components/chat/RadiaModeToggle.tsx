@@ -39,7 +39,7 @@ export function RadiaModeToggle({ checked, disabled, onChange }: RadiaModeToggle
             <AutoAwesomeRoundedIcon sx={{ fontSize: 16 }} />
           </Box>
           <Typography component="span" variant="body2" fontWeight={700}>
-            Radia AI
+            Jama Connector
           </Typography>
           <Typography
             component="span"
@@ -89,7 +89,7 @@ export function RadiaModeToggle({ checked, disabled, onChange }: RadiaModeToggle
           checked={checked}
           disabled={disabled}
           onChange={(_, value) => onChange(value)}
-          inputProps={{ role: 'switch', 'aria-label': 'Radia AI mode' }}
+          inputProps={{ role: 'switch', 'aria-label': 'Jama Connector mode' }}
           sx={{
             width: 42,
             height: 26,
