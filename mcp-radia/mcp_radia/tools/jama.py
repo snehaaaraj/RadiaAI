@@ -5,7 +5,7 @@ connector failures into ``ToolError`` via the shared guard. All logic lives in
 :mod:`mcp_radia.connectors.jama`.
 """
 
-from typing import Annotated
+from typing import Annotated, Literal
 
 from mcp.server.mcpserver import Context, MCPServer
 from pydantic import Field
@@ -16,6 +16,7 @@ from mcp_radia.connectors.jama import (
     JamaClient,
     JamaItem,
     JamaProjectSummary,
+    JamaRelationshipsResult,
     JamaSearchResult,
 )
 from mcp_radia.logging import get_logger
@@ -45,7 +46,7 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             "Does NOT find items - you must already have the numeric id. To find an item "
             "from words, or from a document key like SRS-42, use jama_search first. Returns "
             "only this one item: it does not list the items nested under it (jama_get_children) "
-            "or the items traced to it (list_related_items). parent_id is the document-tree "
+            "or the items traced to it (jama_get_relationships). parent_id is the document-tree "
             "parent (containment), not a traceability relationship."
         ),
         annotations=READ_ONLY,
@@ -81,7 +82,7 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             "This is content search across MANY items. It does NOT follow links between "
             "items: a query naming one item returns items whose TEXT matches those words, "
             "not the items connected to it. For 'what is linked to / traced to / affected by "
-            "X' use list_related_items; for 'what is inside / underneath X' use "
+            "X' use jama_get_relationships; for 'what is inside / underneath X' use "
             "jama_get_children. Returns summaries only - call jama_get_item for full text."
         ),
         annotations=READ_ONLY,
@@ -142,7 +143,7 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             "\n"
             "This is CONTAINMENT ('what sits underneath this in the tree'), which is a "
             "different axis from TRACEABILITY ('what derives from / satisfies this') - for "
-            "traceability use list_related_items instead. Returns only ONE level and ONE "
+            "traceability use jama_get_relationships instead. Returns only ONE level and ONE "
             "page: grandchildren are not included, so recurse by calling this again on a "
             "child's id. Does not search by text - use jama_search for that."
         ),
@@ -171,6 +172,43 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             return await guard(
                 "jama_get_children",
                 lambda: scoped.get_children(item_id, start_at=start_at, max_results=max_results),
+            )
+        finally:
+            if owned:
+                await scoped.aclose()
+
+    @server.tool(
+        name="jama_get_relationships",
+        title="Get Jama upstream or downstream items",
+        description=(
+            "Read ONE PAGE of a Jama item's native upstream OR downstream traceability links. "
+            "Use its numeric item_id and direction='upstream' (items this item derives from) "
+            "or 'downstream' (items that derive from it). For both directions, call once per "
+            "direction and page each independently using next_start_at until it is null. "
+            "Returns related item summaries, not relationship type labels or relationship IDs; "
+            "call jama_get_item for full content. This is ONE HOP, not a recursive graph walk. "
+            "Use this for 'what is linked to / traced to / affected by this Jama item?'. "
+            "Do not confuse traceability with containment: folders' children and grandchildren "
+            "use jama_get_children. Resolve document keys with jama_search first; never guess "
+            "numeric IDs. Report which direction and pages were read; an unread page is not "
+            "evidence that no more links exist."
+        ),
+        annotations=READ_ONLY,
+    )
+    async def jama_get_relationships(
+        ctx: Context,
+        item_id: Annotated[int, Field(gt=0, description="Numeric Jama item id.")],
+        direction: Literal["upstream", "downstream"],
+        start_at: Annotated[int, Field(ge=0, description="Zero-based page offset.")] = 0,
+        max_results: Annotated[int, Field(ge=1, le=MAX_PAGE_SIZE)] = MAX_PAGE_SIZE,
+    ) -> JamaRelationshipsResult:
+        scoped, owned = jama_client_for_request(ctx, client)
+        try:
+            return await guard(
+                "jama_get_relationships",
+                lambda: scoped.get_relationships(
+                    item_id, direction=direction, start_at=start_at, max_results=max_results
+                ),
             )
         finally:
             if owned:
@@ -218,7 +256,13 @@ def register_jama_tools(server: MCPServer, client: JamaClient) -> list[str]:
             if owned:
                 await scoped.aclose()
 
-    names = ["jama_get_item", "jama_search", "jama_get_children", "jama_list_projects"]
+    names = [
+        "jama_get_item",
+        "jama_search",
+        "jama_get_children",
+        "jama_get_relationships",
+        "jama_list_projects",
+    ]
     logger.info(
         "jama_tools_registered",
         tools=names,

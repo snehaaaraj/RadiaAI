@@ -3,12 +3,101 @@
 A standalone [Model Context Protocol](https://modelcontextprotocol.io) server exposing
 RadiaAI's engineering systems of record, with explicitly confirmed Jama field writes.
 
-> **Status: Phases 0-2, 4, and 5 implemented.** The server exposes **12 read-only
+> **Status: Phases 0-2, 4, and 5 implemented.** The server exposes **13 read-only
 > tools and one confirmed-write tool** for Jama, Jira, Confluence, and cross-system linking. Vitech GENESYS
 > remains a [placeholder](#vitech-genesys--placeholder) and registers no tools.
 > Radia AI chat can optionally use the Jama tools; Jira/Confluence tools are not
 > currently in the chat allowlist. See [the architecture guide](../docs/architecture.md)
 > for the distinction between the standalone MCP surface and the chat integration.
+
+## Claude Desktop: simple Jama installation (Windows and macOS)
+
+Use the **Radia Jama desktop extension** for colleagues who should not need a
+checkout, terminal commands, a Python installation, or hand-edited JSON. The same
+`.mcpb` bundle supports Windows and macOS using Claude Desktop's managed UV
+runtime. It requires a current Claude Desktop version with MCPB 0.4 / UV
+extension support; organization policy must also permit local extensions.
+An older client must be updated, rather than installing Python manually.
+
+### For colleagues
+
+1. Get `radia-jama-0.1.0.mcpb` from your RadiaAI maintainer.
+2. Open it with Claude Desktop and approve installing **Radia Jama**. If file
+   association is unavailable, use Claude's Settings > Extensions > Advanced
+   settings > Install Extension and select the file (labels may vary by version).
+3. In the extension's configuration form, enter:
+   - **Jama URL:** the HTTPS instance root, e.g. `https://yourorg.jamacloud.com`.
+     Do not include `/rest` or an item URL.
+   - **Your Jama OAuth client ID** and **client secret:** your own API
+     credentials, not your email/password. Ask your Jama administrator how to
+     obtain them if API credentials are unavailable.
+4. Save/enable the extension. Claude manages Python 3.13 and the locked
+   dependencies; the first launch needs internet access to download them.
+5. Ask Claude: **"Use Radia Jama to list the Jama projects I can access."**
+   This checks authentication and read access without changing anything.
+
+Claude collects both credential fields as **sensitive configuration**, using its
+host-managed secure storage. They are passed only to the local server's process
+environment, never written into this bundle or supplied as command-line
+arguments. Do not paste credentials into a conversation. Local software with
+access to your account/process can still access process credentials.
+Linking an account in the RadiaAI website does not configure this extension.
+
+Your computer connects directly to Jama. Connect to your company VPN when
+needed. TLS verification is always enabled; for private certificate authorities,
+have IT configure the local trust store instead of disabling verification.
+Startup errors appear in Claude's extension logs. Authentication/permission
+errors from the connection check appear as tool errors; correct credentials in
+the extension's configuration and restart it. Never send secrets with support logs.
+
+### What colleagues can do
+
+- List projects, search items, read item details and children, and inspect item
+  types and picklists.
+- Read native upstream/downstream traceability using `jama_get_relationships`.
+  Request each direction separately and follow `next_start_at` until null for
+  all pages. These are one-hop links, not containment children/grandchildren or
+  relationship type/ID records. Claude can follow additional hops with more calls.
+- Update **existing item fields**: Claude prepares a before/after preview in its
+  own conversation, then must wait for an explicit approval in a later message
+  before calling the confirm tool. Jama permissions still govern every operation.
+- No item creation/deletion, standards documents, RAG, Jira, Confluence, GENESYS,
+  or dependency on the RadiaAI web backend is included in this desktop entry point.
+
+Keep Claude's approval requirement enabled for `jama_confirm_field_update`
+rather than granting unattended write access. The MCP preview token validates
+the account, expiry and snapshot; it does not independently prove a human approved
+the change. Confirmation in an external client is that client's responsibility.
+Previews expire after 10 minutes and become invalid when the local server
+restarts. On an uncertain write outcome, check Jama rather than retrying blindly.
+
+### For maintainers: build and distribute
+
+From `mcp-radia`, with Python 3.12+:
+
+```text
+python build_desktop.py
+npx --yes @anthropic-ai/mcpb@2.1.2 validate manifest.json
+```
+
+The output is `dist/radia-jama-0.1.0.mcpb`. The build uses an explicit allowlist:
+the manifest, package metadata, dependency lock, README, desktop launcher and
+runtime Python source. It excludes `.env`, virtualenvs, caches, tests and other
+workspace files. **Do not zip the entire working directory for distribution.**
+The bundle contains the MCP source, but colleagues do not need to work with it.
+No shared Azure credentials or HTTP service token is needed.
+
+`manifest.json` and `pyproject.toml` versions must match; also update
+`mcp_radia/__init__.py` when releasing. When dependencies change, regenerate
+`uv.lock` using `uv lock`, test, and rebuild. The launcher uses `uv run --locked`
+so installation cannot silently resolve a different dependency set.
+
+This local build is unsigned and is not published or automatically updated.
+Use your organization's trusted distribution channel; if signing is required,
+sign the bundle with your organization's certificate using `mcpb sign`.
+Installing an updated bundle is a manual maintainer/user action. Pilot the
+installation on both target platforms and a non-production Jama project before
+team rollout. Unit/protocol tests do not replace testing inside Claude Desktop.
 
 ## Relationship to the rest of this repo
 
@@ -334,6 +423,7 @@ The confirmation tool is marked destructive and not read-only.
 | `jama_get_item`        | `item_id` (required)                                             | Full item + custom fields     |
 | `jama_search`          | `query`, `project_id`, `item_type_id`, `start_at`, `max_results` | Summaries + total             |
 | `jama_get_children`    | `item_id` (required), `start_at`, `max_results`                  | Direct children + total       |
+| `jama_get_relationships` | `item_id`, `direction` (`upstream`/`downstream`), `start_at`, `max_results` | Related item summaries + total (if supplied) + next offset |
 | `jama_list_projects`   | None                                                          | Visible projects              |
 | `jama_get_item_type`   | `item_type_id`                                                 | Field API names, labels, types |
 | `jama_get_picklist`    | `picklist_id`                                                  | Actual picklist option IDs    |
@@ -344,6 +434,26 @@ The confirmation tool is marked destructive and not read-only.
 | `confluence_get_page`  | `page_id` (required)                                             | Page + body as text           |
 | `confluence_search`    | `query`, `space_key`, `content_type`, `cql`, `start`, `limit`    | Hits + total                  |
 | `list_related_items`   | `system`, `item_id` (required), `include_text_references`        | Related items + notes         |
+
+### Jama relationship reads in Claude and RadiaAI Chat
+
+`jama_get_relationships` is available in the Jama-only desktop extension and
+the full MCP server. For example, ask: **"Read both upstream and downstream
+relationships for item 12345, including all pages."** Every response has a
+`direction` and `next_start_at`; null means no next page. If Jama omits its total,
+`total` is null, and a full page conservatively offers a next offset.
+Permission failures and malformed responses are errors, never empty-link results.
+
+RadiaAI Chat already supports relationship reads through
+`list_related_items(system="jama", item_id="12345")`. The new dedicated tool
+adds explicit direction selection and pagination beyond that older tool's
+first-page-per-direction lookup. It is included in the backend's default
+allowlist. Existing deployments with an explicit `MCP_ALLOWED_TOOLS` must add
+`jama_get_relationships`, deploy the updated MCP server and backend, and restart
+the backend to refresh its cached tool discovery. Use the Chat **Radia AI** mode,
+enable MCP, and link your own Jama account in RadiaAI Settings.
+Chat has per-turn time/tool limits; it must report partial results if it cannot
+read every page. The Claude desktop package uses its separately configured account.
 
 ### Confirmed Jama field writes
 

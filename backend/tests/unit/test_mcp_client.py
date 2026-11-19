@@ -235,6 +235,54 @@ async def test_list_related_items_forwards_the_users_jama_credentials() -> None:
     }
 
 
+@pytest.mark.parametrize("direction", ["upstream", "downstream"])
+async def test_paginated_relationship_tool_is_allowed_and_forwards_user_identity(
+    monkeypatch: pytest.MonkeyPatch, direction: str
+) -> None:
+    monkeypatch.delenv("MCP_ALLOWED_TOOLS", raising=False)
+    settings = MCPSettings(
+        _env_file=None,
+        enabled=True,
+        server_url="https://mcp-radia.internal/mcp",
+        service_token="test-token",
+    )
+    assert "list_related_items" in settings.allowed_tools
+    assert "jama_get_relationships" in settings.allowed_tools
+    descriptor = MCPToolDescriptor(
+        name="jama_get_relationships",
+        description="Read paginated Jama traceability links.",
+        input_schema={
+            "type": "object",
+            "properties": {
+                "item_id": {"type": "integer", "minimum": 1},
+                "direction": {"type": "string", "enum": ["upstream", "downstream"]},
+                "start_at": {"type": "integer", "minimum": 0},
+            },
+            "required": ["item_id", "direction"],
+        },
+    )
+    fake = FakeTransport(tools=[descriptor])
+    adapter = _adapter_with_fake_transport(settings, fake)
+    assert [tool.name for tool in await adapter.available_tools()] == ["jama_get_relationships"]
+    arguments: dict[str, object] = {"item_id": 12345, "direction": direction, "start_at": 50}
+    await adapter.call_tool(
+        "jama_get_relationships",
+        arguments,
+        jama_client_id="user-cid",
+        jama_client_secret="user-secret",
+    )
+    assert fake.calls == [
+        (
+            "jama_get_relationships",
+            arguments,
+            {
+                "X-Radia-Jama-Client-Id": "user-cid",
+                "X-Radia-Jama-Client-Secret": "user-secret",
+            },
+        )
+    ]
+
+
 async def test_a_tool_level_error_result_raises_an_execution_error() -> None:
     fake = FakeTransport(
         tools=[MCPToolDescriptor(name="jama_get_item", description="", input_schema={})],

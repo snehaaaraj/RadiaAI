@@ -389,6 +389,7 @@ class MCPSettings(BaseSettings):
             "jama_get_item",
             "jama_search",
             "jama_get_children",
+            "jama_get_relationships",
             "jama_list_projects",
             "jama_get_item_type",
             "jama_get_picklist",

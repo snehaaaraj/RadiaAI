@@ -95,6 +95,14 @@ _MCP_TOOL_RULE = """
 
 ## Using the tools
 
+For Jama upstream/downstream traceability, prefer jama_get_relationships when offered.
+Query each requested direction separately and follow next_start_at until it is null.
+These are one-hop traceability links, not document-tree children or grandchildren
+(use jama_get_children for containment). If a time/tool budget prevents reading every
+page, explicitly say the result is partial; never claim it is the full relationship list.
+If only list_related_items is offered, it can read Jama relationships, but do not
+assume its one-hop results cover all pages.
+
 For a user's explicit request to change Jama item fields, use jama_get_item and
 jama_get_item_type and jama_get_picklist to resolve the exact item, field names and values, then
 jama_prepare_field_update. Prepare only the fields the user named. Never infer

@@ -44,6 +44,7 @@ async def test_both_jama_tools_are_advertised() -> None:
         "jama_get_item",
         "jama_search",
         "jama_get_children",
+        "jama_get_relationships",
         "jama_list_projects",
         "jama_get_item_type",
         "jama_get_picklist",
@@ -186,6 +187,7 @@ async def test_tools_are_still_listed_when_jama_is_unconfigured() -> None:
         "jama_get_item",
         "jama_search",
         "jama_get_children",
+        "jama_get_relationships",
         "jama_list_projects",
         "jama_get_item_type",
         "jama_get_picklist",
@@ -271,5 +273,5 @@ async def test_get_children_description_distinguishes_it_from_the_linking_tool()
         tools = {t.name: t for t in (await session.list_tools()).tools}
 
     description = (tools["jama_get_children"].description or "").lower()
-    assert "list_related_items" in description
+    assert "jama_get_relationships" in description
     assert "containment" in description

@@ -36,7 +36,7 @@ The tool layer permits PATCH only after an account-bound preview is confirmed.
 import asyncio
 import re
 import time
-from typing import Any
+from typing import Any, Literal
 
 import httpx2
 from pydantic import BaseModel, Field
@@ -227,6 +227,20 @@ class JamaRelatedItem(BaseModel):
         description="'upstream' (this item derives from it) or 'downstream' (derives from this)."
     )
     item: JamaItemSummary = Field(description="The item on the other end.")
+
+
+class JamaRelationshipsResult(BaseModel):
+    """One page of native traceability links in a single direction."""
+
+    item_id: int
+    direction: Literal["upstream", "downstream"]
+    results: list[JamaItemSummary]
+    total: int | None = Field(description="Jama's total, or null when no total was supplied.")
+    start_at: int
+    max_results: int
+    next_start_at: int | None = Field(
+        description="Request this offset for the next page; null means this direction is complete."
+    )
 
 
 class JamaChildrenResult(BaseModel):
@@ -692,6 +706,70 @@ class JamaClient:
             )
         logger.info("jama_related_items_fetched", item_id=item_id, count=len(related))
         return related
+
+    async def get_relationships(
+        self,
+        item_id: int,
+        *,
+        direction: Literal["upstream", "downstream"],
+        start_at: int = 0,
+        max_results: int = MAX_PAGE_SIZE,
+    ) -> JamaRelationshipsResult:
+        """Read a bounded page of upstream or downstream related items, not containment."""
+        if direction not in ("upstream", "downstream"):
+            raise ValueError("Direction must be upstream or downstream.")
+        capped = max(1, min(max_results, MAX_PAGE_SIZE))
+        offset = max(0, start_at)
+        path = f"items/{item_id}/{direction}related"
+        payload = await self._get(path, params={"startAt": offset, "maxResults": capped})
+        rows = payload.get("data")
+        if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
+            raise ConnectorServiceError(
+                "Jama relationships returned an unexpected 'data' shape (expected item objects).",
+                system=SYSTEM,
+                operation=path,
+            )
+        meta = payload.get("meta", {})
+        page_info = meta.get("pageInfo", {}) if isinstance(meta, dict) else None
+        if not isinstance(page_info, dict):
+            raise ConnectorServiceError(
+                "Jama relationships returned malformed pagination metadata.",
+                system=SYSTEM,
+                operation=path,
+            )
+        total = page_info.get("totalResults")
+        actual_start = page_info.get("startIndex", offset)
+        if (
+            (total is not None and (type(total) is not int or total < 0))
+            or type(actual_start) is not int
+            or actual_start != offset
+        ):
+            raise ConnectorServiceError(
+                "Jama relationships returned invalid or inconsistent pagination metadata.",
+                system=SYSTEM,
+                operation=path,
+            )
+        next_offset = actual_start + len(rows)
+        has_more = next_offset < total if total is not None else len(rows) == capped
+        if has_more and not rows:
+            raise ConnectorServiceError(
+                "Jama returned an empty relationship page before the reported total was reached.",
+                system=SYSTEM,
+                operation=path,
+            )
+        results = [self._summary_from_raw(row) for row in rows]
+        logger.info(
+            "jama_relationships_fetched", item_id=item_id, direction=direction, count=len(results)
+        )
+        return JamaRelationshipsResult(
+            item_id=item_id,
+            direction=direction,
+            results=results,
+            total=total,
+            start_at=actual_start,
+            max_results=capped,
+            next_start_at=next_offset if has_more else None,
+        )
 
     async def get_children(
         self,

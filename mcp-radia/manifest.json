@@ -1,0 +1,69 @@
+{
+  "manifest_version": "0.4",
+  "name": "radia-jama",
+  "display_name": "Radia Jama",
+  "version": "0.1.0",
+  "description": "Read Jama requirements and update existing item fields with explicit confirmation.",
+  "long_description": "Connect Claude Desktop to your own Jama Connect account. Search projects and requirements, read item fields and picklists, and prepare field updates for your approval. Ask Claude to list your Jama projects to check the connection. Updates require a before/after preview and your explicit confirmation in a subsequent message. This extension does not include standards documents, RAG, Jira, Confluence, or GENESYS.",
+  "author": {
+    "name": "RadiaAI"
+  },
+  "server": {
+    "type": "uv",
+    "entry_point": "desktop/server.py",
+    "mcp_config": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--directory",
+        "${__dirname}",
+        "--python",
+        "3.13",
+        "--locked",
+        "--no-dev",
+        "desktop/server.py"
+      ],
+      "env": {
+        "JAMA_BASE_URL": "${user_config.jama_base_url}",
+        "JAMA_CLIENT_ID": "${user_config.jama_client_id}",
+        "JAMA_CLIENT_SECRET": "${user_config.jama_client_secret}"
+      }
+    }
+  },
+  "compatibility": {
+    "platforms": ["darwin", "win32"]
+  },
+  "user_config": {
+    "jama_base_url": {
+      "type": "string",
+      "title": "Jama URL",
+      "description": "Your organization's Jama instance root, such as https://yourorg.jamacloud.com. Do not include /rest or an item URL. Your computer must be able to reach it; connect to your company VPN if required.",
+      "required": true
+    },
+    "jama_client_id": {
+      "type": "string",
+      "title": "Your Jama OAuth client ID",
+      "description": "Your own Jama API client ID, not your email address. Ask your Jama administrator if you do not have API credentials.",
+      "required": true,
+      "sensitive": true
+    },
+    "jama_client_secret": {
+      "type": "string",
+      "title": "Your Jama OAuth client secret",
+      "description": "Your own Jama API client secret, not your Jama password. Claude stores this as sensitive configuration; do not paste it into a conversation.",
+      "required": true,
+      "sensitive": true
+    }
+  },
+  "tools": [
+    { "name": "jama_list_projects", "description": "List accessible Jama projects and check your connection." },
+    { "name": "jama_search", "description": "Search Jama requirements and other items." },
+    { "name": "jama_get_item", "description": "Read a Jama item's details." },
+    { "name": "jama_get_children", "description": "Read children of a Jama container." },
+    { "name": "jama_get_relationships", "description": "Read paginated upstream or downstream Jama traceability links." },
+    { "name": "jama_get_item_type", "description": "Read real field definitions for an item type." },
+    { "name": "jama_get_picklist", "description": "Read valid picklist values." },
+    { "name": "jama_prepare_field_update", "description": "Preview requested field changes without writing." },
+    { "name": "jama_confirm_field_update", "description": "Write a prepared update after explicit user approval." }
+  ]
+}

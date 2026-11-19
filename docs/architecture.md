@@ -493,6 +493,23 @@ per-user Atlassian account linking is not implemented. Direct MCP deployments
 can configure the server's shared Atlassian credentials separately; see its
 README. Vitech GENESYS remains unimplemented.
 
+Jama traceability was already available to chat through `list_related_items`.
+The dedicated `jama_get_relationships(item_id, direction, start_at, max_results)`
+tool is also available in chat's default allowlist and in the Claude desktop
+package. It reads one upstream/downstream page at a time; follow `next_start_at`
+until null in each direction. These are related item summaries, not relationship
+type records or containment children. Explicit deployment allowlists must add
+`jama_get_relationships`; deploy both services and restart the backend to refresh
+tool discovery. Per-turn chat limits may require continuing large traversals in
+another turn, with partial coverage stated explicitly.
+
+For individual Claude Desktop users, the separate **Radia Jama** MCPB package
+provides a Jama-only local entry point on Windows and macOS. Claude collects the
+user's own Jama OAuth credentials as sensitive extension settings and manages
+Python/dependencies through its UV runtime. It calls Jama directly, does not use
+the RadiaAI backend or its linked accounts, and does not expose standards/RAG.
+See [desktop installation and packaging](../mcp-radia/README.md#claude-desktop-simple-jama-installation-windows-and-macos).
+
 The two pipelines are never mixed. Users opt in per conversation using the
 **Radia AI** switch at the right of the Chat header (on both the page and widget).
 Turning it on switches the conversation to **RadiaAI mode**
@@ -671,7 +688,7 @@ Steps:
    MCP_ENABLED=true
    MCP_SERVER_URL=https://mcp-radia-yourname.vercel.app/mcp
    MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
-   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_list_projects,list_related_items
+   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_get_relationships,jama_list_projects,list_related_items
    ```
    Redeploy the backend (or restart it locally) so the new variables take effect.
 3. **Verify the handshake and tool discovery**: turn on the Radia AI switch in the chat, then ask a
@@ -707,7 +724,7 @@ Steps:
    MCP_ENABLED=true
    MCP_SERVER_URL=http://127.0.0.1:8081/mcp
    MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
-   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_list_projects,list_related_items
+   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_get_relationships,jama_list_projects,list_related_items
    ```
 4. **Verify the handshake and tool discovery**: start the backend, then turn on
    the Radia AI switch in the chat, then ask a Jama-shaped question (e.g. "What does Jama item 12345 say?"). A
@@ -779,7 +796,7 @@ Steps:
 | Workspace and launchpad UX | Implemented | Provides the current frontend navigation and review workflows. |
 | Jama requirement selection and approved Description write-back | Implemented | Uses each user's linked Jama credentials; write-back requires a saved accepting decision, changes only Description, checks for intervening Jama edits, and records the result in review history. Version-column review-ID comments are not implemented. This does not implement bulk roundtrip or synchronization. |
 | MCP chat integration (Jama) | Implemented, disabled by default | Bounded tool-calling loop over a separately deployed `mcp-radia` server; server-side allowlist + schema validation + per-user Jama credential forwarding. |
-| Standalone MCP server tools | Implemented for Jama, Jira, Confluence; GENESYS unimplemented | Twelve read-only tools and one confirmed Jama field-write tool; Jira/Confluence remain read-only and are not allowed in Radia AI chat. Atlassian per-user linking remains on hold. |
+| Standalone MCP server tools | Implemented for Jama, Jira, Confluence; GENESYS unimplemented | Thirteen read-only tools and one confirmed Jama field-write tool, including paginated Jama upstream/downstream reads in both chat and the desktop package; Jira/Confluence remain read-only and are not allowed in Radia AI chat. Atlassian per-user linking remains on hold. |
 | Jama Roundtrip page | Placeholder | No bulk roundtrip, synchronization, or reporting implementation. |
 
 ## 14. Summary
