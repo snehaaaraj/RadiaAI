@@ -1,5 +1,6 @@
 """Violet tools exercised through real in-memory MCP framing."""
 
+import json
 from typing import Any
 
 import anyio
@@ -149,3 +150,79 @@ async def test_unconfigured_violet_tool_explains_which_setting_is_missing() -> N
 
     assert result.is_error is True
     assert "VIOLET_API_KEY" in result.content[0].text
+
+
+async def test_schema_defaults_to_entities_without_global_application_noise() -> None:
+    fake = FakeVioletTransport(
+        result={
+            "data": {
+                "applications": [{"name": "app"}] * 131,
+                "entitySchemas": [{"name": "Jira Issue"}],
+            }
+        }
+    )
+    async with connected_client(_server(fake)) as session:
+        result = await session.call_tool(
+            "violet_get_schema_model", {"application": "Jira", "include_properties": False}
+        )
+    assert result.is_error is not True
+    page = result.structured_content
+    assert page is not None
+    assert page["items"] == [{"name": "Jira Issue"}]
+    assert page["total"] == 1
+    assert page["next_offset"] is None
+    assert "applications" not in page
+    assert fake.calls == [("getSchemaModel", {"application": "Jira", "includeProperties": False})]
+
+
+async def test_schema_pages_preserve_every_item_and_bound_serialized_response() -> None:
+    entries = [{"name": f"Schema {i}", "description": "x" * 1200} for i in range(7)]
+    fake = FakeVioletTransport(result={"data": {"entitySchemas": entries}})
+    collected = []
+    offset = 0
+    async with connected_client(_server(fake)) as session:
+        for _ in range(len(entries)):
+            result = await session.call_tool("violet_get_schema_model", {"offset": offset})
+            assert result.is_error is not True
+            page = result.structured_content
+            assert page is not None
+            assert len(json.dumps(page)) < 4100
+            wire = json.dumps(result.model_dump(mode="json", by_alias=True)).encode()
+            assert len(wire) < 32_000
+            collected.extend(page["items"])
+            if page["next_offset"] is None:
+                break
+            assert page["next_offset"] > offset
+            offset = page["next_offset"]
+    assert collected == entries
+
+
+async def test_schema_can_select_application_section_and_limit() -> None:
+    fake = FakeVioletTransport(result={"data": {"applications": ["A", "B", "C"]}})
+    async with connected_client(_server(fake)) as session:
+        result = await session.call_tool(
+            "violet_get_schema_model", {"section": "applications", "offset": 1, "limit": 1}
+        )
+    assert result.is_error is not True
+    assert result.structured_content is not None
+    assert result.structured_content["items"] == ["B"]
+    assert result.structured_content["next_offset"] == 2
+    assert fake.calls == [("getSchemaModel", {})]
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        {},
+        {"data": {"entitySchemas": "invalid"}},
+        {"data": {"entitySchemas": [{"description": "x" * 5000}]}},
+    ],
+)
+async def test_invalid_or_oversized_schema_is_explicit_error_not_empty_results(
+    data: dict[str, Any],
+) -> None:
+    fake = FakeVioletTransport(result=data)
+    async with connected_client(_server(fake)) as session:
+        result = await session.call_tool("violet_get_schema_model", {})
+    assert result.is_error is True
+    assert "absence" in result.content[0].text

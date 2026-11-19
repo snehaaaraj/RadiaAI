@@ -233,10 +233,33 @@ async def test_tool_context_budget_is_expanded_only_for_violet_instructions(
         jama_client_secret=None,
     )
     budget = 48_000 if tool_name == "violet_get_instructions" else 6000
-    assert result == text[:budget]
+    if tool_name.startswith("violet_") and len(text) > budget:
+        assert "[TRUNCATED:" in result
+        assert "Do not infer missing data" in result
+    else:
+        assert result == text[:budget]
     assert len(result) == expected_chars
     assert source is None
     assert success
+
+
+async def test_schema_context_prefers_complete_structured_page_over_verbose_text() -> None:
+    name = "violet_get_schema_model"
+    page = {"section": "entitySchemas", "items": [{"name": "Jira Issue"}], "next_offset": None}
+    transport = FakeTransport(
+        tools=[MCPToolDescriptor(name=name, description="", input_schema={})],
+        result=MCPToolCallResult(text="x" * 10_000, is_error=False, structured_content=page),
+    )
+    text, _, success = await _execute_one_tool_call(
+        _tool_call("schema", name, {}),  # type: ignore[arg-type]
+        mcp_client=_adapter_with_fake_transport(_settings(allowed_tools=[name]), transport),
+        trusted_source_hosts=frozenset(),
+        jama_client_id=None,
+        jama_client_secret=None,
+    )
+    assert success
+    assert json.loads(text) == page
+    assert "TRUNCATED" not in text
 
 
 async def test_falls_back_to_plain_completion_when_no_tools_are_available() -> None:

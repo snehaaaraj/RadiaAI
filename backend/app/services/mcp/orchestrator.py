@@ -330,9 +330,17 @@ async def _execute_one_tool_call(
     text = result.text or (
         json.dumps(result.structured_content) if result.structured_content else ""
     )
+    if name == "violet_get_schema_model" and result.structured_content is not None:
+        text = json.dumps(result.structured_content, ensure_ascii=True)
     max_chars = (
         _MAX_VIOLET_INSTRUCTIONS_CHARS
         if name == "violet_get_instructions"
         else _MAX_TOOL_RESULT_CHARS
     )
+    if name.startswith("violet_") and len(text) > max_chars:
+        warning = (
+            "\n[TRUNCATED: incomplete Violet result. Do not infer missing data. "
+            "Retry with narrower filters, a smaller limit, or the next schema page.]"
+        )
+        return text[: max_chars - len(warning)] + warning, source, True
     return text[:max_chars], source, True
