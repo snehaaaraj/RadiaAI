@@ -200,6 +200,21 @@ and 6,000-character model-context cap. Deploy the updated backend as well as the
 MCP service; increasing `MCP_MAX_RESPONSE_BYTES` alone does not remove the normal
 model-context truncation.
 
+`violet_get_schema_model` returns a bounded section/page rather than the entire
+catalogue. It defaults to `section="entitySchemas"`; other sections are
+`applications`, `relationshipSpecifications`, and `allRelationshipTypes`.
+Use `application`/`schema_name` filters and `include_properties=false` to narrow
+large results. `offset` (default 0) and `limit` (default 5, maximum 20) page the
+selected section. Follow `next_offset` until null; `total` counts that section's
+entries, not workspace entities. Pagination refetches the upstream model, so
+concurrent workspace changes can affect subsequent pages. An oversized single
+item fails explicitly instead of looking like an empty page.
+
+The backend uses the compact structured schema page and explicitly labels
+overlong Violet context as truncated. Partial results are not evidence that an
+application, schema, or issue is absent. Deploy both MCP and backend updates
+for this behavior.
+
 | Variable             | Default                              | Purpose |
 | -------------------- | ------------------------------------ | ------- |
 | `VIOLET_SERVER_URL`  | `https://mcp.violetgov.com/mcp`     | VioletGov MCP endpoint; use `https://mcp.violetlabs.com/mcp` for standard Violet |

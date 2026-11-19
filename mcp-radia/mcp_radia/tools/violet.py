@@ -1,7 +1,8 @@
 """Read-only Violet tools backed by the remote MCP connector."""
 
+import json
 import time
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from mcp.server.mcpserver import MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
@@ -144,7 +145,9 @@ def register_violet_tools(server: MCPServer, client: VioletMCPClient) -> list[st
         title="Get Violet data model",
         description=(
             "Inspect Violet's accessible entity schemas and property names. Use application "
-            "and schema filters to keep results focused. Read-only."
+            "and schema filters to keep results focused. Returns one bounded section, "
+            "default entitySchemas. Follow next_offset until null before claiming a schema "
+            "is absent. Use section=applications to discover application names. Read-only."
         ),
         annotations=READ_ONLY,
     )
@@ -158,6 +161,11 @@ def register_violet_tools(server: MCPServer, client: VioletMCPClient) -> list[st
         include_properties: Annotated[
             bool | None, Field(default=None, description="Include property names.")
         ] = None,
+        section: Literal[
+            "entitySchemas", "applications", "relationshipSpecifications", "allRelationshipTypes"
+        ] = "entitySchemas",
+        offset: Annotated[int, Field(default=0, ge=0, description="Section item offset.")] = 0,
+        limit: Annotated[int, Field(default=5, ge=1, le=20, description="Maximum page items.")] = 5,
     ) -> dict[str, Any]:
         arguments = {
             key: value
@@ -168,7 +176,37 @@ def register_violet_tools(server: MCPServer, client: VioletMCPClient) -> list[st
             }.items()
             if value is not None
         }
-        return await _call(client, "violet_get_schema_model", "getSchemaModel", arguments)
+        result = await _call(client, "violet_get_schema_model", "getSchemaModel", arguments)
+        data = result.get("data")
+        if not isinstance(data, dict) or not isinstance(data.get(section), list):
+            raise ToolError(
+                "Violet returned an unexpected schema section shape; no absence inferred."
+            )
+        entries = data[section]
+        page: dict[str, Any] = {
+            "section": section,
+            "items": [],
+            "total": len(entries),
+            "offset": offset,
+            "next_offset": None,
+            "notice": "Only this section/page is shown. Follow next_offset until null.",
+        }
+        for entry in entries[offset : offset + limit]:
+            candidate = {**page, "items": [*page["items"], entry]}
+            # Leave room for pagination metadata within the normal chat context budget.
+            if len(json.dumps(candidate, ensure_ascii=True)) > 4000:
+                if not page["items"]:
+                    raise ToolError(
+                        "A Violet schema item exceeds the page budget. Retry with "
+                        "include_properties=false and application/schema_name filters. "
+                        "No absence can be inferred from this error."
+                    )
+                break
+            page = candidate
+        end = offset + len(page["items"])
+        if end < len(entries):
+            page["next_offset"] = end
+        return page
 
     @server.tool(
         name="violet_get_relationship_model",
