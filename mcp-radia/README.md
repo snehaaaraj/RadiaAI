@@ -186,6 +186,41 @@ enforces what that person can read:
 - **stdio (local GitHub Copilot / Claude Desktop).** Set `JAMA_CLIENT_ID` / `JAMA_CLIENT_SECRET`
   to *your own* Jama OAuth client. Only the stdio entry point loads them.
 
+### Violet (`VIOLET_*`) — read-only
+
+The MCP service acts as a client of Violet's remote MCP endpoint and exposes a curated set of
+`violet_*` tools alongside the existing tools. Violet is optional: without an API key, its tools
+remain discoverable but return a configuration error when called. Violet connection failures do
+not prevent Jama, Jira, or Confluence calls from working.
+
+| Variable             | Default                              | Purpose |
+| -------------------- | ------------------------------------ | ------- |
+| `VIOLET_SERVER_URL`  | `https://mcp.violetlabs.com/mcp`     | Violet MCP endpoint; use `https://mcp.violetgov.com/mcp` for VioletGov |
+| `VIOLET_AUTH_MODE`   | `apikey`                             | Pilot API-key mode; OAuth is not implemented |
+| `VIOLET_API_KEY`     | *empty*                              | API key created in Violet under **Settings > API Keys** |
+| `VIOLET_TIMEOUT_SECONDS` | `20`                             | MCP initialization/call timeout |
+
+For local use:
+
+1. In the intended Violet workspace, create a user API key at **Settings > API Keys**.
+2. Copy `.env.example` to `.env` and set `VIOLET_API_KEY` there. Keep `.env` untracked; never
+   paste the key into chat, commit it, or put it in `backend/.env`.
+3. Run `npx @modelcontextprotocol/inspector mcp-radia stdio` from this directory. The inspector
+   should list `violet_*` tools; call `violet_list_programs` or `violet_explore_entities` to verify
+   read access.
+
+This pilot API key acts as its owning Violet user in its workspace for every Radia request. It
+does not carry each Radia user's independent Violet permissions. Azure deployments should store
+the key in Key Vault and inject it into the MCP Container App as a secret. The MCP wrappers expose
+read-only Violet calls; they do not expose Violet's `handleChatMessage` meta-tool or any write
+operation.
+
+Violet's public MCP documentation recommends OAuth and documents interactive sign-in plus
+workspace selection, but does not publish the custom-client authorization/token/refresh details.
+Per-user OAuth linking is therefore deferred until Violet confirms those details. See the [Violet
+MCP guide](https://docs.violetlabs.com/ai/mcp.md) and its [security
+overview](https://docs.violetlabs.com/resources/security-and-compliance/mcp-security-and-architecture.md).
+
 ### Atlassian Cloud — Jira + Confluence (`ATLASSIAN_*`)
 
 | Variable                    | Default | Purpose                                      |
@@ -276,9 +311,9 @@ carry it as `Authorization: Bearer <token>`; anything else gets a `401`, logged 
 npx @modelcontextprotocol/inspector mcp-radia stdio
 ```
 
-The inspector should show the registered Jama, Jira, Confluence, and linking
-tools. An unconfigured connector still appears in discovery, but its calls fail
-with a configuration message.
+The inspector should show the registered Jama, Jira, Confluence, linking, and
+read-only Violet tools. An unconfigured connector still appears in discovery,
+but its calls fail with a configuration message.
 
 ## Test
 

@@ -1,0 +1,44 @@
+name: MCP Radia CI
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - "mcp-radia/**"
+      - ".github/workflows/mcp-radia-ci.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "mcp-radia/**"
+      - ".github/workflows/mcp-radia-ci.yml"
+
+defaults:
+  run:
+    working-directory: mcp-radia
+
+jobs:
+  verify:
+    name: Test, lint, and type-check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: mcp-radia/pyproject.toml
+
+      - name: Install MCP service and development dependencies
+        run: pip install -e ".[dev]"
+
+      - name: Run unit tests
+        run: python -m pytest -m unit
+
+      - name: Ruff - lint
+        run: ruff check .
+
+      - name: mypy - type check
+        run: mypy mcp_radia

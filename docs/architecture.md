@@ -481,17 +481,22 @@ depends on this index being populated: with an empty index, reviews return
 
 ## 10.1 MCP (Model Context Protocol) engineering-data chat integration
 
-Chat can optionally ground an answer in live Jama data and prepare confirmed field updates
-on the separately deployed [`mcp-radia`](../mcp-radia/README.md) server, instead
-of relying only on the indexed-document RAG pipeline above. **Disabled by
-default** (`MCP_ENABLED=false`); when disabled, chat behaves exactly as described
-in section 10.
+Chat can optionally ground an answer in live Jama and Violet data and prepare
+confirmed Jama field updates on the separately deployed
+[`mcp-radia`](../mcp-radia/README.md) server, instead of relying only on the
+indexed-document RAG pipeline above. **Disabled by default** (`MCP_ENABLED=false`);
+when disabled, chat behaves exactly as described in section 10.
 
 The standalone MCP server also implements Jira and Confluence tools, but Radia AI
-chat does not allow them: the chat allowlist is configured for Jama, and
-per-user Atlassian account linking is not implemented. Direct MCP deployments
-can configure the server's shared Atlassian credentials separately; see its
-README. Vitech GENESYS remains unimplemented.
+chat does not allow them: per-user Atlassian account linking is not implemented.
+Direct MCP deployments can configure the server's shared Atlassian credentials
+separately; see its README. Vitech GENESYS remains unimplemented.
+
+The MCP service connects to Violet's remote MCP server and exposes a curated,
+read-only `violet_*` tool set. The API-key pilot uses the Violet identity and
+workspace that own `VIOLET_API_KEY` for every Radia user; it does not yet
+provide per-user Violet identity. OAuth linking is deferred until Violet
+confirms the custom-client authorization and refresh-token details.
 
 Jama traceability was already available to chat through `list_related_items`.
 The dedicated `jama_get_relationships(item_id, direction, start_at, max_results)`
@@ -537,7 +542,8 @@ Browser (signed-in user)
        -> calls mcp-radia over Streamable HTTP (service bearer token; network
           isolation depends on the deployment path)
        -> mcp-radia calls Jama as the signed-in user's own linked account, if linked
-          (jama_* tools and list_related_items alike)
+       -> mcp-radia calls Violet over Streamable HTTP using its configured API key
+          (all users share that key's Violet user/workspace permissions)
   -> grounded answer (+ sources, used_mcp) returned to the chat UI, unchanged SSE/JSON shape
 ```
 
@@ -594,6 +600,14 @@ overall deadline, never executes a tool outside the allowlist regardless of what
   account in RadiaAI Settings. (Run locally over stdio, mcp-radia instead uses the
   developer's own `JAMA_CLIENT_ID`/`JAMA_CLIENT_SECRET`; those are never read over
   HTTP.)
+- The Violet API-key pilot stores `VIOLET_API_KEY` only on mcp-radia (local
+  `mcp-radia/.env` or an Azure Container Apps secret sourced from Key Vault).
+  Violet therefore authorizes all Radia chat users as that key's owner, limited
+  to the key's Violet workspace and permissions. Do not treat this as per-user
+  access. OAuth/per-user linking is not implemented; Violet's public
+  [MCP guide](https://docs.violetlabs.com/ai/mcp.md) documents workspace-selecting
+  sign-in for MCP clients but not the authorization/token endpoints, redirect
+  registration, or refresh-token flow a custom client needs.
 - mcp-radia itself requires a shared service-to-service bearer token
   (`MCP_SERVICE_TOKEN` / mcp-radia's `MCP_RADIA_SERVICE_TOKEN`) on every request.
   **Deployment-dependent network exposure:** the Azure Container Apps template
@@ -688,7 +702,7 @@ Steps:
    MCP_ENABLED=true
    MCP_SERVER_URL=https://mcp-radia-yourname.vercel.app/mcp
    MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
-   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_get_relationships,jama_list_projects,list_related_items
+   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_get_relationships,jama_list_projects,list_related_items,violet_get_instructions,violet_explore_entities,violet_get_explore_column_values,violet_get_schema_model,violet_get_relationship_model,violet_get_entity_relationships,violet_get_entities_by_ids,violet_list_programs,violet_list_requirements,violet_get_requirement
    ```
    Redeploy the backend (or restart it locally) so the new variables take effect.
 3. **Verify the handshake and tool discovery**: turn on the Radia AI switch in the chat, then ask a
@@ -724,7 +738,7 @@ Steps:
    MCP_ENABLED=true
    MCP_SERVER_URL=http://127.0.0.1:8081/mcp
    MCP_SERVICE_TOKEN=<same value as mcp-radia's MCP_RADIA_SERVICE_TOKEN>
-   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_get_relationships,jama_list_projects,list_related_items
+   MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_get_relationships,jama_list_projects,list_related_items,violet_get_instructions,violet_explore_entities,violet_get_explore_column_values,violet_get_schema_model,violet_get_relationship_model,violet_get_entity_relationships,violet_get_entities_by_ids,violet_list_programs,violet_list_requirements,violet_get_requirement
    ```
 4. **Verify the handshake and tool discovery**: start the backend, then turn on
    the Radia AI switch in the chat, then ask a Jama-shaped question (e.g. "What does Jama item 12345 say?"). A

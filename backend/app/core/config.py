@@ -342,9 +342,9 @@ class MCPSettings(BaseSettings):
     Configuration for the Model Context Protocol (MCP) chat integration.
 
     Lets the chat pipeline call approved tools on the ``mcp-radia`` server
-    (Jama today; Jira/Confluence remain on hold). Disabled by default: the
-    feature only activates once an operator has verified the deployment's
-    authentication and network isolation, per docs/architecture.md.
+    (Jama and read-only Violet tools; Jira/Confluence remain on hold). Disabled
+    by default: the feature only activates once an operator has verified the
+    deployment's authentication and network isolation, per docs/architecture.md.
     """
 
     model_config = SettingsConfigDict(env_prefix="MCP_", env_file=_ENV_FILE, extra="ignore")
@@ -396,6 +396,16 @@ class MCPSettings(BaseSettings):
             "jama_prepare_field_update",
             "jama_confirm_field_update",
             "list_related_items",
+            "violet_get_instructions",
+            "violet_explore_entities",
+            "violet_get_explore_column_values",
+            "violet_get_schema_model",
+            "violet_get_relationship_model",
+            "violet_get_entity_relationships",
+            "violet_get_entities_by_ids",
+            "violet_list_programs",
+            "violet_list_requirements",
+            "violet_get_requirement",
         ],
         description=(
             "Server-side allowlist. A tool mcp-radia advertises but that is not listed here "

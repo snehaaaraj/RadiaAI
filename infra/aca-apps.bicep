@@ -14,6 +14,13 @@ param backendImage string
 param mcpImage string
 param ingestionWorkerImage string
 
+@description('Violet MCP endpoint. Use the VioletGov endpoint for a VioletGov tenant.')
+param violetServerUrl string = 'https://mcp.violetlabs.com/mcp'
+
+@description('Violet user API key for the read-only pilot. Leave empty to deploy Violet unconfigured.')
+@secure()
+param violetApiKey string = ''
+
 @description('Enable internet-reachable ingress for the frontend. The backend and MCP stay internal.')
 param enablePublicFrontend bool = true
 
@@ -128,6 +135,12 @@ resource mcpApp 'Microsoft.App/containerApps@2026-07-01' = {
         transport: 'http'
         allowInsecure: false
       }
+      secrets: empty(violetApiKey) ? [] : [
+        {
+          name: 'violet-api-key'
+          value: violetApiKey
+        }
+      ]
       registries: [
         {
           server: containerRegistry.properties.loginServer
@@ -148,13 +161,17 @@ resource mcpApp 'Microsoft.App/containerApps@2026-07-01' = {
             cpu: json('0.5')
             memory: '1Gi'
           }
-          env: [
+          env: concat([
             { name: 'MCP_RADIA_ENVIRONMENT', value: 'production' }
             { name: 'MCP_RADIA_LOG_LEVEL', value: 'INFO' }
             { name: 'MCP_RADIA_HOST', value: '0.0.0.0' }
             { name: 'MCP_RADIA_PORT', value: '8081' }
             { name: 'MCP_RADIA_HTTP_PATH', value: '/mcp' }
-          ]
+            { name: 'VIOLET_SERVER_URL', value: violetServerUrl }
+            { name: 'VIOLET_AUTH_MODE', value: 'apikey' }
+          ], empty(violetApiKey) ? [] : [
+            { name: 'VIOLET_API_KEY', secretRef: 'violet-api-key' }
+          ])
           probes: [
             {
               type: 'Startup'

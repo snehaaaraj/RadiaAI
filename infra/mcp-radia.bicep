@@ -17,6 +17,13 @@ param acrPullIdentityId string = ''
 @secure()
 param mcpServiceToken string
 
+@description('Violet MCP endpoint. Use the VioletGov endpoint for a VioletGov tenant.')
+param violetServerUrl string = 'https://mcp.violetlabs.com/mcp'
+
+@description('Violet user API key for the read-only pilot. Leave empty to deploy Violet unconfigured.')
+@secure()
+param violetApiKey string = ''
+
 @description('Jama Connect instance root URL, e.g. https://yourorg.jamacloud.com. Leave empty to deploy with Jama unconfigured.')
 param jamaBaseUrl string = ''
 
@@ -101,12 +108,17 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
               identity: acrPullIdentityId
             }
           ]
-      secrets: [
+      secrets: concat([
         {
           name: 'mcp-service-token'
           value: mcpServiceToken
         }
-      ]
+      ], empty(violetApiKey) ? [] : [
+        {
+          name: 'violet-api-key'
+          value: violetApiKey
+        }
+      ])
     }
     template: {
       scale: {
@@ -121,17 +133,22 @@ resource containerApp 'Microsoft.App/containerApps@2024-03-01' = {
             cpu: json('0.5')
             memory: '1Gi'
           }
-          env: [
+          env: concat([
             { name: 'MCP_RADIA_ENVIRONMENT', value: 'production' }
             { name: 'MCP_RADIA_LOG_LEVEL', value: 'INFO' }
             { name: 'MCP_RADIA_HOST', value: '0.0.0.0' }
             { name: 'MCP_RADIA_PORT', value: '8081' }
             { name: 'MCP_RADIA_HTTP_PATH', value: '/mcp' }
             { name: 'MCP_RADIA_SERVICE_TOKEN', secretRef: 'mcp-service-token' }
+            { name: 'VIOLET_SERVER_URL', value: violetServerUrl }
+            { name: 'VIOLET_AUTH_MODE', value: 'apikey' }
+          ], empty(violetApiKey) ? [] : [
+            { name: 'VIOLET_API_KEY', secretRef: 'violet-api-key' }
+          ], [
             // No Jama credentials: every Jama call runs as the signed-in user,
             // whose linked OAuth client the backend forwards per request.
             { name: 'JAMA_BASE_URL', value: jamaBaseUrl }
-          ]
+          ])
           probes: [
             {
               // The MCP endpoint itself requires the bearer token and expects
