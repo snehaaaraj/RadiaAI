@@ -39,7 +39,11 @@ def desktop_env(monkeypatch):
 
 async def test_desktop_exposes_exactly_the_manifest_jama_tools(desktop_env):
     manifest = json.loads((PROJECT / "manifest.json").read_text(encoding="utf-8"))
-    async with connected_client(desktop.build_desktop_server()) as session:
+    server = desktop.build_desktop_server()
+    assert server.title == "Radia MCP"
+    assert manifest["display_name"] == "Radia MCP"
+    assert manifest["name"] == "radia-jama"
+    async with connected_client(server) as session:
         tools = (await session.list_tools()).tools
 
     assert {tool.name for tool in tools} == JAMA_TOOLS
@@ -87,7 +91,7 @@ def test_desktop_rejects_unsafe_or_nonroot_urls(desktop_env, monkeypatch, capsys
     assert desktop.main() == 1
     output = capsys.readouterr()
     assert output.out == ""
-    assert "Radia Jama setup error" in output.err
+    assert "Radia MCP setup error" in output.err
     assert "desktop-test-secret" not in output.err
     assert "user:password" not in output.err
     assert "token=secret" not in output.err

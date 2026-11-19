@@ -12,7 +12,7 @@ RadiaAI's engineering systems of record, with explicitly confirmed Jama field wr
 
 ## Claude Desktop: simple Jama installation (Windows and macOS)
 
-Use the **Radia Jama desktop extension** for colleagues who should not need a
+Use the **Radia MCP desktop extension** for colleagues who should not need a
 checkout, terminal commands, a Python installation, or hand-edited JSON. The same
 `.mcpb` bundle supports Windows and macOS using Claude Desktop's managed UV
 runtime. It requires a current Claude Desktop version with MCPB 0.4 / UV
@@ -22,7 +22,7 @@ An older client must be updated, rather than installing Python manually.
 ### For colleagues
 
 1. Get `radia-jama-0.1.0.mcpb` from your RadiaAI maintainer.
-2. Open it with Claude Desktop and approve installing **Radia Jama**. If file
+2. Open it with Claude Desktop and approve installing **Radia MCP**. If file
    association is unavailable, use Claude's Settings > Extensions > Advanced
    settings > Install Extension and select the file (labels may vary by version).
 3. In the extension's configuration form, enter:
@@ -33,7 +33,7 @@ An older client must be updated, rather than installing Python manually.
      obtain them if API credentials are unavailable.
 4. Save/enable the extension. Claude manages Python 3.13 and the locked
    dependencies; the first launch needs internet access to download them.
-5. Ask Claude: **"Use Radia Jama to list the Jama projects I can access."**
+5. Ask Claude: **"Use Radia MCP to list the Jama projects I can access."**
    This checks authentication and read access without changing anything.
 
 Claude collects both credential fields as **sensitive configuration**, using its
@@ -98,6 +98,40 @@ sign the bundle with your organization's certificate using `mcpb sign`.
 Installing an updated bundle is a manual maintainer/user action. Pilot the
 installation on both target platforms and a non-production Jama project before
 team rollout. Unit/protocol tests do not replace testing inside Claude Desktop.
+
+## VS Code / GitHub Copilot: install without the repository
+
+The **Radia MCP VS Code extension** packages the same nine Jama tools as the
+Claude desktop entry point. Install UV once, install the VSIX, and run a guided
+account setup; no repository checkout, separate Python installation or RadiaAI
+web backend is needed.
+
+1. Install [UV](https://docs.astral.sh/uv/getting-started/installation/) using your
+   IT-approved method, then restart VS Code.
+2. In VS Code, choose **Extensions > ... > Install from VSIX...** and select
+   `radia-jama-vscode-0.1.0.vsix`.
+3. Open a trusted local folder and run **Radia MCP: Connect or Update Account**
+   from the Command Palette.
+4. Enter your HTTPS Jama instance root, personal OAuth client ID and secret.
+   The extension uses VS Code SecretStorage, not a local `.env` or MCP JSON file.
+5. Start **Radia MCP** with **MCP: List Servers**, approve trust, and ask Copilot
+   Agent: **"Use Radia MCP to list the projects I can access."**
+
+UV downloads Python 3.13 and locked dependencies on first launch. Both desktop
+Windows and macOS are supported by the same VSIX; UV must be installed locally.
+Keep approval enabled for the field-write confirmation tool. An already configured
+Radia server may appear alongside this one; disable duplicates.
+
+For installation, credential rotation/removal, policies, platform limitations and
+maintainer build commands, see the [VS Code extension guide](vscode/README.md).
+The local VSIX is unpublished; distribute it through your trusted channel.
+The installed server source and runtime no longer refer to this checkout.
+
+The display name is **Radia MCP** in both clients. Internal package/provider IDs,
+VS Code command IDs and the SecretStorage key retain `radia-jama`/`radiaJama`
+for compatibility with existing installs and saved credentials. Bundle filenames
+also retain their original names. Reinstall the rebuilt package and reload the
+client to see the new labels; no account migration is required.
 
 ## Relationship to the rest of this repo
 

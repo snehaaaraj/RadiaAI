@@ -1,7 +1,7 @@
 {
   "manifest_version": "0.4",
   "name": "radia-jama",
-  "display_name": "Radia Jama",
+  "display_name": "Radia MCP",
   "version": "0.1.0",
   "description": "Read Jama requirements and update existing item fields with explicit confirmation.",
   "long_description": "Connect Claude Desktop to your own Jama Connect account. Search projects and requirements, read item fields and picklists, and prepare field updates for your approval. Ask Claude to list your Jama projects to check the connection. Updates require a before/after preview and your explicit confirmation in a subsequent message. This extension does not include standards documents, RAG, Jira, Confluence, or GENESYS.",

@@ -508,12 +508,21 @@ type records or containment children. Explicit deployment allowlists must add
 tool discovery. Per-turn chat limits may require continuing large traversals in
 another turn, with partial coverage stated explicitly.
 
-For individual Claude Desktop users, the separate **Radia Jama** MCPB package
+For individual Claude Desktop users, the separate **Radia MCP** MCPB package
 provides a Jama-only local entry point on Windows and macOS. Claude collects the
 user's own Jama OAuth credentials as sensitive extension settings and manages
 Python/dependencies through its UV runtime. It calls Jama directly, does not use
 the RadiaAI backend or its linked accounts, and does not expose standards/RAG.
 See [desktop installation and packaging](../mcp-radia/README.md#claude-desktop-simple-jama-installation-windows-and-macos).
+
+The [Radia MCP VS Code extension](../mcp-radia/vscode/README.md) provides the same
+Jama-only local entry point in a VSIX. Users install UV once, then enter their own
+credentials through an explicit setup command. The extension stores the connection
+in VS Code SecretStorage and publishes a complete MCP server definition through
+the editor API, without interactive discovery or plaintext configuration files.
+The VSIX includes runtime source and a dependency lock, not the repository's
+environment. UV manages Python/dependencies in local extension storage. This
+integration requires the local VS Code extension host, not a remote/cloud agent.
 
 The two pipelines are never mixed. Users opt in per conversation using the
 **Radia AI** switch at the right of the Chat header (on both the page and widget).

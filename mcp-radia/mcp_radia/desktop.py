@@ -44,7 +44,7 @@ def build_desktop_server() -> MCPServer:
     )
     if not credentials.is_complete:
         raise ValueError(
-            "Enter your own Jama OAuth client ID and secret in the Radia Jama extension settings."
+            "Enter your own Jama OAuth client ID and secret in the Radia MCP extension settings."
         )
 
     # Pydantic's generated signature omits BaseSettings' supported _env_file override.
@@ -61,7 +61,7 @@ def build_desktop_server() -> MCPServer:
     )
     server = MCPServer(
         name=SERVER_NAME,
-        title="Radia Jama",
+        title="Radia MCP",
         version=__version__,
         instructions=(
             INSTRUCTIONS
@@ -81,7 +81,7 @@ def main() -> int:
     try:
         server = build_desktop_server()
     except ValueError as exc:
-        print(f"Radia Jama setup error: {exc}", file=sys.stderr)
+        print(f"Radia MCP setup error: {exc}", file=sys.stderr)
         return 1
     server.run("stdio")
     return 0

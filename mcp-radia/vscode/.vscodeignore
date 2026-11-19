@@ -1,0 +1,15 @@
+**
+!package.json
+!README.md
+!out/
+!out/*.js
+!server/
+!server/pyproject.toml
+!server/uv.lock
+!server/desktop/
+!server/desktop/server.py
+!server/mcp_radia/
+!server/mcp_radia/**
+server/**/__pycache__/**
+server/**/*.pyc
+server/**/.env*
