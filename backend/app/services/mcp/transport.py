@@ -45,6 +45,8 @@ _AUTH_SCHEME = "Bearer"
 #: description mcp-radia adds, and exceeding a result-sized limit here would
 #: silently disable every tool.
 _MAX_PROTOCOL_RESPONSE_BYTES = 1_000_000
+#: Violet guidance is returned as both text and structured content (~90 KB).
+_VIOLET_INSTRUCTIONS_RESPONSE_BYTES = 128_000
 
 
 @dataclass
@@ -182,6 +184,8 @@ class MCPTransport:
         size_limit = (
             self._max_response_bytes if method == "tools/call" else _MAX_PROTOCOL_RESPONSE_BYTES
         )
+        if method == "tools/call" and (params or {}).get("name") == "violet_get_instructions":
+            size_limit = max(size_limit, _VIOLET_INSTRUCTIONS_RESPONSE_BYTES)
         if len(response.content) > size_limit:
             logger.warning(
                 "mcp_response_too_large",

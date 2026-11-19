@@ -381,7 +381,8 @@ class MCPSettings(BaseSettings):
         gt=0,
         description=(
             "Tool-call responses larger than this are rejected. Tool discovery is not "
-            "subject to this limit."
+            "subject to this limit. Violet query instructions have a minimum response "
+            "budget of 128,000 bytes."
         ),
     )
     allowed_tools: Annotated[list[str], NoDecode] = Field(

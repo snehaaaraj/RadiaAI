@@ -74,3 +74,50 @@ async def test_an_oversized_tool_result_is_still_rejected() -> None:
     with pytest.raises(MCPProtocolError, match="size limit"):
         await transport.call_tool("jama_get_item", {"item_id": 1})
     await transport.aclose()
+
+
+@pytest.mark.parametrize("response_size", [90_000, 128_000, 128_001])
+async def test_violet_instructions_have_a_bounded_larger_response_budget(
+    response_size: int,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        payload = json.loads(request.content)
+        if "id" not in payload:
+            return httpx.Response(202)
+        if payload["method"] == "initialize":
+            return _respond(request, {"protocolVersion": "2025-06-18"})
+        response = _respond(request, {"content": [{"type": "text", "text": ""}]})
+        body = response.content.replace(
+            b'"text":""', b'"text":"' + b"x" * (response_size - len(response.content)) + b'"'
+        )
+        assert len(body) == response_size
+        return httpx.Response(200, content=body, headers={"content-type": "application/json"})
+
+    transport = _transport(handler)
+    try:
+        if response_size > 128_000:
+            with pytest.raises(MCPProtocolError, match="size limit"):
+                await transport.call_tool("violet_get_instructions", {})
+        else:
+            result = await transport.call_tool("violet_get_instructions", {})
+            assert result.text
+            assert not result.is_error
+    finally:
+        await transport.aclose()
+
+
+@pytest.mark.parametrize(
+    "tool_name", ["violet_explore_entities", "jira_get_issue", "confluence_get_page"]
+)
+async def test_other_tools_keep_the_configured_response_budget(tool_name: str) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if json.loads(request.content)["method"] == "initialize":
+            return _respond(request, {"protocolVersion": "2025-06-18"})
+        return _respond(request, {"content": [{"type": "text", "text": "x" * 40_000}]})
+
+    transport = _transport(handler)
+    try:
+        with pytest.raises(MCPProtocolError, match="size limit"):
+            await transport.call_tool(tool_name, {})
+    finally:
+        await transport.aclose()
