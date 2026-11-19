@@ -193,6 +193,13 @@ The MCP service acts as a client of Violet's remote MCP endpoint and exposes a c
 remain discoverable but return a configuration error when called. Violet connection failures do
 not prevent Jama, Jira, or Confluence calls from working.
 
+The backend allows at least 128,000 response bytes for `violet_get_instructions`
+and passes up to 48,000 characters to the model, since Violet's guidance exceeds
+the normal tool-result budget. Other tools retain their existing response limits
+and 6,000-character model-context cap. Deploy the updated backend as well as the
+MCP service; increasing `MCP_MAX_RESPONSE_BYTES` alone does not remove the normal
+model-context truncation.
+
 | Variable             | Default                              | Purpose |
 | -------------------- | ------------------------------------ | ------- |
 | `VIOLET_SERVER_URL`  | `https://mcp.violetgov.com/mcp`     | VioletGov MCP endpoint; use `https://mcp.violetlabs.com/mcp` for standard Violet |

@@ -45,6 +45,8 @@ logger = get_logger(__name__)
 #: independent of the transport-level response-size cap - keeps a single large
 #: result from dominating the context window of a multi-tool-call turn.
 _MAX_TOOL_RESULT_CHARS = 6000
+#: Preserve Violet's query guidance without expanding other tool results.
+_MAX_VIOLET_INSTRUCTIONS_CHARS = 48_000
 
 
 @dataclass
@@ -328,4 +330,9 @@ async def _execute_one_tool_call(
     text = result.text or (
         json.dumps(result.structured_content) if result.structured_content else ""
     )
-    return text[:_MAX_TOOL_RESULT_CHARS], source, True
+    max_chars = (
+        _MAX_VIOLET_INSTRUCTIONS_CHARS
+        if name == "violet_get_instructions"
+        else _MAX_TOOL_RESULT_CHARS
+    )
+    return text[:max_chars], source, True

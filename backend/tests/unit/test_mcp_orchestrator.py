@@ -12,7 +12,11 @@ import pytest
 from app.core.config import MCPSettings
 from app.services.mcp.client import MCPClientAdapter
 from app.services.mcp.errors import MCPUnavailableError
-from app.services.mcp.orchestrator import _sanitize_answer_links, run_chat_with_tools
+from app.services.mcp.orchestrator import (
+    _execute_one_tool_call,
+    _sanitize_answer_links,
+    run_chat_with_tools,
+)
 from app.services.mcp.transport import MCPToolCallResult, MCPToolDescriptor
 
 pytestmark = pytest.mark.unit
@@ -191,6 +195,48 @@ class FakeTransport:
 
     async def call_tool(self, name, arguments, *, extra_headers=None) -> MCPToolCallResult:  # type: ignore[no-untyped-def]
         return self.result
+
+
+@pytest.mark.parametrize(
+    ("tool_name", "input_chars", "expected_chars"),
+    [
+        ("violet_get_instructions", 44_079, 44_079),
+        ("violet_get_instructions", 48_000, 48_000),
+        ("violet_get_instructions", 48_001, 48_000),
+        ("violet_explore_entities", 44_079, 6000),
+        ("jama_get_item", 44_079, 6000),
+        ("jira_get_issue", 44_079, 6000),
+        ("confluence_get_page", 44_079, 6000),
+    ],
+)
+@pytest.mark.parametrize("structured_only", [False, True])
+async def test_tool_context_budget_is_expanded_only_for_violet_instructions(
+    tool_name: str, input_chars: int, expected_chars: int, structured_only: bool
+) -> None:
+    settings = _settings(allowed_tools=[tool_name])
+    data = {"guidance": "x" * (input_chars - len(json.dumps({"guidance": ""})))}
+    text = json.dumps(data)
+    assert len(text) == input_chars
+    transport = FakeTransport(
+        tools=[MCPToolDescriptor(name=tool_name, description="", input_schema={})],
+        result=MCPToolCallResult(
+            text="" if structured_only else text,
+            is_error=False,
+            structured_content=data,
+        ),
+    )
+    result, source, success = await _execute_one_tool_call(
+        _tool_call("guidance", tool_name, {}),  # type: ignore[arg-type]
+        mcp_client=_adapter_with_fake_transport(settings, transport),
+        trusted_source_hosts=frozenset(),
+        jama_client_id=None,
+        jama_client_secret=None,
+    )
+    budget = 48_000 if tool_name == "violet_get_instructions" else 6000
+    assert result == text[:budget]
+    assert len(result) == expected_chars
+    assert source is None
+    assert success
 
 
 async def test_falls_back_to_plain_completion_when_no_tools_are_available() -> None:
