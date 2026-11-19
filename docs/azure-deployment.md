@@ -216,7 +216,7 @@ az containerapp create -g $RG -n ca-mcp-radia --environment $ENVNAME `
              MCP_RADIA_HOST=0.0.0.0 MCP_RADIA_PORT=8081 MCP_RADIA_HTTP_PATH=/mcp `
              MCP_RADIA_SERVICE_TOKEN=secretref:mcp-token `
              JAMA_BASE_URL=https://<yourorg>.jamacloud.com `
-             VIOLET_SERVER_URL=https://mcp.violetlabs.com/mcp VIOLET_AUTH_MODE=apikey `
+             VIOLET_SERVER_URL=https://mcp.violetgov.com/mcp VIOLET_AUTH_MODE=apikey `
              VIOLET_API_KEY=secretref:violet-key
 
 $MCP_FQDN = az containerapp show -g $RG -n ca-mcp-radia --query properties.configuration.ingress.fqdn -o tsv

@@ -35,8 +35,8 @@ class VioletSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="VIOLET_", env_file=ENV_FILE, extra="ignore")
 
     server_url: str = Field(
-        default="https://mcp.violetlabs.com/mcp",
-        description="Remote MCP endpoint; use https://mcp.violetgov.com/mcp for VioletGov.",
+        default="https://mcp.violetgov.com/mcp",
+        description="VioletGov MCP endpoint; use https://mcp.violetlabs.com/mcp for standard Violet.",
     )
     auth_mode: Literal["apikey"] = Field(
         default="apikey",

@@ -18,6 +18,22 @@ from tests.conftest import connected_client
 pytestmark = pytest.mark.unit
 
 
+def test_violet_defaults_to_violetgov(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("VIOLET_SERVER_URL", raising=False)
+
+    settings = VioletSettings(_env_file=None)
+
+    assert settings.server_url == "https://mcp.violetgov.com/mcp"
+
+
+def test_violet_endpoint_can_be_overridden(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("VIOLET_SERVER_URL", "https://mcp.violetlabs.com/mcp")
+
+    settings = VioletSettings(_env_file=None)
+
+    assert settings.server_url == "https://mcp.violetlabs.com/mcp"
+
+
 class FakeVioletTransport:
     """Records the remote call and optionally returns or raises a test outcome."""
 

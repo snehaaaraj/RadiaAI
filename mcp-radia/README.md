@@ -195,12 +195,16 @@ not prevent Jama, Jira, or Confluence calls from working.
 
 | Variable             | Default                              | Purpose |
 | -------------------- | ------------------------------------ | ------- |
-| `VIOLET_SERVER_URL`  | `https://mcp.violetlabs.com/mcp`     | Violet MCP endpoint; use `https://mcp.violetgov.com/mcp` for VioletGov |
+| `VIOLET_SERVER_URL`  | `https://mcp.violetgov.com/mcp`     | VioletGov MCP endpoint; use `https://mcp.violetlabs.com/mcp` for standard Violet |
 | `VIOLET_AUTH_MODE`   | `apikey`                             | Pilot API-key mode; OAuth is not implemented |
 | `VIOLET_API_KEY`     | *empty*                              | API key created in Violet under **Settings > API Keys** |
 | `VIOLET_TIMEOUT_SECONDS` | `20`                             | MCP initialization/call timeout |
 
 For local use:
+
+Use the MCP endpoint above, not the workspace website (`https://radia.violetgov.com/`).
+An explicit `VIOLET_SERVER_URL` in an existing environment overrides the default; update it
+to `https://mcp.violetgov.com/mcp` when switching to VioletGov.
 
 1. In the intended Violet workspace, create a user API key at **Settings > API Keys**.
 2. Copy `.env.example` to `.env` and set `VIOLET_API_KEY` there. Keep `.env` untracked; never

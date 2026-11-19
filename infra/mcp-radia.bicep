@@ -17,8 +17,8 @@ param acrPullIdentityId string = ''
 @secure()
 param mcpServiceToken string
 
-@description('Violet MCP endpoint. Use the VioletGov endpoint for a VioletGov tenant.')
-param violetServerUrl string = 'https://mcp.violetlabs.com/mcp'
+@description('VioletGov MCP endpoint. Override for a standard Violet tenant.')
+param violetServerUrl string = 'https://mcp.violetgov.com/mcp'
 
 @description('Violet user API key for the read-only pilot. Leave empty to deploy Violet unconfigured.')
 @secure()
