@@ -109,6 +109,8 @@ Role assignments can take a couple of minutes to apply.
 ## 4. Store the secrets in Key Vault
 
 Prompting avoids leaving values in your shell history. Repeat for each secret in this table:
+The Violet key is optional; if you are not enabling the Violet pilot, omit its secret and the
+matching `violet-key` / `VIOLET_API_KEY` lines in section 8a.
 
 | Key Vault secret name | Backend / worker setting it feeds |
 |-----------------------|-----------------------------------|
@@ -120,6 +122,7 @@ Prompting avoids leaving values in your shell history. Repeat for each secret in
 | `jama-credential-encryption-key` | `JAMA_CREDENTIAL_ENCRYPTION_KEY` - **reuse the Vercel value**, otherwise users' linked Jama accounts stop decrypting |
 | `mcp-service-token` | backend `MCP_SERVICE_TOKEN` **and** mcp-radia `MCP_RADIA_SERVICE_TOKEN` (same value) |
 | `atlassian-api-token` | mcp-radia `ATLASSIAN_API_TOKEN` (only if used) |
+| `violet-api-key` | mcp-radia `VIOLET_API_KEY` (optional read-only pilot key) |
 
 ```powershell
 function Set-KvSecret($name) {
@@ -132,6 +135,7 @@ Set-KvSecret "azure-search-api-key"
 Set-KvSecret "azure-blob-connection-string"
 Set-KvSecret "sharepoint-client-secret"
 Set-KvSecret "jama-credential-encryption-key"
+Set-KvSecret "violet-api-key"  # optional; create in Violet Settings > API Keys
 
 # New MCP token (do not reuse the Vercel one)
 $tok = -join ((48..57 + 97..102) | Get-Random -Count 64 | ForEach-Object {[char]$_})
@@ -207,10 +211,13 @@ az containerapp create -g $RG -n ca-mcp-radia --environment $ENVNAME `
   --ingress internal --target-port 8081 --transport http `
   --min-replicas 1 --max-replicas 1 --cpu 0.5 --memory 1Gi `
   --secrets "mcp-token=keyvaultref:$KV_URI/mcp-service-token,identityref:$IDENT_ID" `
+             "violet-key=keyvaultref:$KV_URI/violet-api-key,identityref:$IDENT_ID" `
   --env-vars MCP_RADIA_ENVIRONMENT=production MCP_RADIA_LOG_LEVEL=INFO `
              MCP_RADIA_HOST=0.0.0.0 MCP_RADIA_PORT=8081 MCP_RADIA_HTTP_PATH=/mcp `
              MCP_RADIA_SERVICE_TOKEN=secretref:mcp-token `
-             JAMA_BASE_URL=https://<yourorg>.jamacloud.com
+             JAMA_BASE_URL=https://<yourorg>.jamacloud.com `
+             VIOLET_SERVER_URL=https://mcp.violetgov.com/mcp VIOLET_AUTH_MODE=apikey `
+             VIOLET_API_KEY=secretref:violet-key
 
 $MCP_FQDN = az containerapp show -g $RG -n ca-mcp-radia --query properties.configuration.ingress.fqdn -o tsv
 "MCP URL for the backend: https://$MCP_FQDN/mcp"
@@ -249,7 +256,7 @@ az containerapp create -g $RG -n ca-backend --environment $ENVNAME `
              SHAREPOINT_SITE_URL=<...> SHAREPOINT_WEBHOOK_ENABLED=false `
              JAMA_BASE_URL=https://<yourorg>.jamacloud.com JAMA_CREDENTIAL_ENCRYPTION_KEY=secretref:jama-key `
              MCP_ENABLED=true MCP_SERVER_URL=https://$MCP_FQDN/mcp MCP_SERVICE_TOKEN=secretref:mcp-token `
-             "MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_list_projects,list_related_items"
+             "MCP_ALLOWED_TOOLS=jama_get_item,jama_search,jama_get_children,jama_list_projects,list_related_items,violet_get_instructions,violet_explore_entities,violet_get_explore_column_values,violet_get_schema_model,violet_get_relationship_model,violet_get_entity_relationships,violet_get_entities_by_ids,violet_list_programs,violet_list_requirements,violet_get_requirement"
 ```
 
 Copy any other setting you use on Vercel (see `backend/.env.example` for every name). Notes:

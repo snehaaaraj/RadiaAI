@@ -104,6 +104,30 @@ async def test_discovers_tools_and_filters_to_allowlist() -> None:
     assert {t.name for t in tools} == {"jama_get_item", "jama_search"}
 
 
+async def test_violet_tools_are_offered_only_when_explicitly_allowlisted() -> None:
+    fake = FakeTransport(
+        tools=[
+            MCPToolDescriptor(name="violet_explore_entities", description="", input_schema={}),
+            MCPToolDescriptor(name="jama_get_item", description="", input_schema={}),
+        ]
+    )
+    adapter = _adapter_with_fake_transport(
+        _enabled_settings(allowed_tools=["violet_explore_entities"]), fake
+    )
+
+    tools = await adapter.available_tools()
+    result = await adapter.call_tool(
+        "violet_explore_entities",
+        {"keyword": "battery"},
+        jama_client_id="jama-user",
+        jama_client_secret="jama-secret",
+    )
+
+    assert {tool.name for tool in tools} == {"violet_explore_entities"}
+    assert result.text == "ok"
+    assert fake.calls == [("violet_explore_entities", {"keyword": "battery"}, {})]
+
+
 async def test_rejects_a_tool_not_on_the_allowlist_even_if_mcp_radia_advertises_it() -> None:
     fake = FakeTransport(
         tools=[MCPToolDescriptor(name="jira_get_issue", description="", input_schema={})]

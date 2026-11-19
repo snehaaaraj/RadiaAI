@@ -16,6 +16,7 @@ from mcp.shared.memory import create_client_server_memory_streams
 
 from mcp_radia.config import ServerSettings
 from mcp_radia.connectors.jama import JamaClient, JamaSettings
+from mcp_radia.connectors.violet import VioletMCPClient, VioletSettings
 from mcp_radia.server import build_server
 
 
@@ -35,7 +36,12 @@ def server(settings: ServerSettings) -> MCPServer:
     own server.
     """
     unconfigured_jama = JamaClient(JamaSettings(_env_file=None, base_url=""))
-    return build_server(settings, jama_client=unconfigured_jama)
+    unconfigured_violet = VioletMCPClient(VioletSettings(_env_file=None, api_key=""))
+    return build_server(
+        settings,
+        jama_client=unconfigured_jama,
+        violet_client=unconfigured_violet,
+    )
 
 
 @asynccontextmanager

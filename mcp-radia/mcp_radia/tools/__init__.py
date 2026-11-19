@@ -12,6 +12,7 @@ from mcp_radia.connectors.confluence import ConfluenceClient
 from mcp_radia.connectors.genesys import GenesysClient, GenesysSettings
 from mcp_radia.connectors.jama import JamaClient, JamaCredentials, JamaSettings
 from mcp_radia.connectors.jira import JiraClient
+from mcp_radia.connectors.violet import VioletMCPClient, VioletSettings
 from mcp_radia.linking.service import LinkingService
 from mcp_radia.logging import get_logger
 from mcp_radia.tools.confluence import register_confluence_tools
@@ -20,6 +21,7 @@ from mcp_radia.tools.jama import register_jama_tools
 from mcp_radia.tools.jama_write import register_jama_write_tools
 from mcp_radia.tools.jira import register_jira_tools
 from mcp_radia.tools.linking import register_linking_tools
+from mcp_radia.tools.violet import register_violet_tools
 
 logger = get_logger(__name__)
 
@@ -34,6 +36,7 @@ def register_tools(
     confluence_client: ConfluenceClient | None = None,
     genesys_client: GenesysClient | None = None,
     linking_service: LinkingService | None = None,
+    violet_client: VioletMCPClient | None = None,
 ) -> list[str]:
     """Register all MCP tools on ``server`` and return their names.
 
@@ -70,6 +73,7 @@ def register_tools(
     jira = jira_client or JiraClient(atlassian)
     confluence = confluence_client or ConfluenceClient(atlassian)
     genesys = genesys_client or GenesysClient(GenesysSettings())
+    violet = violet_client or VioletMCPClient(VioletSettings())
 
     registered: list[str] = []
     registered += register_jama_tools(server, jama)
@@ -85,5 +89,6 @@ def register_tools(
         linking_service
         or LinkingService(jama=jama, jira=jira, confluence=confluence, genesys=genesys),
     )
+    registered += register_violet_tools(server, violet)
     logger.debug("tools_registered", tools=registered, count=len(registered))
     return registered

@@ -49,6 +49,16 @@ async def test_mcp_client_completes_handshake_and_lists_tools(server: MCPServer)
         "confluence_get_page",
         "confluence_search",
         "list_related_items",
+        "violet_get_instructions",
+        "violet_explore_entities",
+        "violet_get_explore_column_values",
+        "violet_get_schema_model",
+        "violet_get_relationship_model",
+        "violet_get_entity_relationships",
+        "violet_get_entities_by_ids",
+        "violet_list_programs",
+        "violet_list_requirements",
+        "violet_get_requirement",
     }
 
 
